@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReMark — Mark it now. Find it later.</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-icon">⚡</span>
+        <span class="brand-title">ReMark</span>
+      </div>
+    </header>
+
+    <!-- Search Bar -->
+    <div class="controls-bar">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" placeholder="搜索划线内容或笔记...">
+        <button id="search-clear" class="clear-btn" style="display:none;">×</button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="content-area">
+      <section id="panel-clips" class="tab-panel active">
+        <div class="panel-toolbar">
+          <div id="batch-actions-bar" class="batch-actions-bar" style="display: none;">
+            <label class="batch-select-all" title="全选当前显示的页面">
+              <input type="checkbox" id="batch-select-all-page">
+              <span>全选页面</span>
+            </label>
+            <span id="batch-selected-count" class="batch-selected-count">0 个页面已选</span>
+            <div class="batch-action-group">
+              <button id="batch-export-markdown" class="btn btn-primary" style="font-size: 11px; padding: 4px 10px;">📄 导出 Markdown</button>
+              <button id="batch-clear-selection" class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;">清除</button>
+            </div>
+          </div>
+          <div style="font-size: 11.5px; color: var(--text-muted); padding: 2px 4px;">
+            📌 ⌘+划选高亮文字，⌘M 记录视频时间点，勾选后可导出 Markdown。
+          </div>
+        </div>
+
+        <div class="clips-list" id="clips-container">
+          <!-- Page cards rendered dynamically -->
+        </div>
+
+        <div class="empty-state" id="clips-empty-state" style="display: none;">
+          <div class="empty-icon">🌐</div>
+          <h3>暂无收纳内容</h3>
+          <p>在任意网页用 <strong>⌘+划选</strong> 高亮文字，或观看视频时用 <strong>⌘M</strong> 打点标记，内容将自动保存在这里。</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="../lib/storage.js"></script>
+  <script src="sidepanel.js"></script>
+</body>
+</html>

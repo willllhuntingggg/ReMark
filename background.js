@@ -37,7 +37,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "OPEN_SIDE_PANEL") {
     if (sender.tab?.windowId) {
-      chrome.sidePanel.open({ windowId: sender.tab.windowId });
+      chrome.sidePanel.open({ windowId: sender.tab.windowId }).then(() => {
+        setTimeout(() => chrome.runtime.sendMessage({ action: 'FOCUS_CLIP', clipId: message.clipId, markId: message.markId }), 180);
+      });
       sendResponse({ success: true });
     }
   }

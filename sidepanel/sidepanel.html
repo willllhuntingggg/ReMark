@@ -5,59 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ReMark — Mark it now. Find it later.</title>
   <link rel="stylesheet" href="sidepanel.css">
+  <link rel="stylesheet" href="tailwind.css">
 </head>
 <body>
   <div class="app-container">
-    <!-- Header -->
     <header class="app-header">
-      <div class="brand">
-        <span class="brand-icon">⚡</span>
-        <span class="brand-title">ReMark</span>
+      <div class="brand"><span class="brand-title">ReMark</span></div>
+      <div class="view-identity">
+        <button id="source-back" class="source-back" type="button" style="display: none;" aria-label="返回 Mark 时间流">← 时间流</button>
+        <span id="view-subtitle" class="view-subtitle">你的 Mark 时间流</span>
       </div>
     </header>
-
-    <!-- Search Bar -->
     <div class="controls-bar">
       <div class="search-box">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="search-input" placeholder="搜索划线内容或笔记...">
-        <button id="search-clear" class="clear-btn" style="display:none;">×</button>
+        <span class="search-icon" aria-hidden="true">/</span>
+        <input type="text" id="search-input" placeholder="搜索 Mark、笔记、来源或时间点" aria-label="搜索 Mark">
+        <button id="search-clear" class="clear-btn" type="button" aria-label="清除搜索" style="display: none;">×</button>
       </div>
     </div>
-
-    <!-- Main Content -->
     <main class="content-area">
       <section id="panel-clips" class="tab-panel active">
-        <div class="panel-toolbar">
-          <div id="batch-actions-bar" class="batch-actions-bar" style="display: none;">
-            <label class="batch-select-all" title="全选当前显示的页面">
-              <input type="checkbox" id="batch-select-all-page">
-              <span>全选页面</span>
-            </label>
-            <span id="batch-selected-count" class="batch-selected-count">0 个页面已选</span>
-            <div class="batch-action-group">
-              <button id="batch-export-markdown" class="btn btn-primary" style="font-size: 11px; padding: 4px 10px;">📄 导出 Markdown</button>
-              <button id="batch-clear-selection" class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;">清除</button>
-            </div>
-          </div>
-          <div style="font-size: 11.5px; color: var(--text-muted); padding: 2px 4px;">
-            📌 ⌘+划选高亮文字，⌘M 记录视频时间点，勾选后可导出 Markdown。
-          </div>
-        </div>
-
-        <div class="clips-list" id="clips-container">
-          <!-- Page cards rendered dynamically -->
-        </div>
-
-        <div class="empty-state" id="clips-empty-state" style="display: none;">
-          <div class="empty-icon">🌐</div>
-          <h3>暂无收纳内容</h3>
-          <p>在任意网页用 <strong>⌘+划选</strong> 高亮文字，或观看视频时用 <strong>⌘M</strong> 打点标记，内容将自动保存在这里。</p>
+        <div id="collection-context" class="collection-context" hidden></div>
+        <div id="clips-container" class="clips-list" aria-live="polite"></div>
+        <div id="clips-empty-state" class="empty-state" style="display: none;">
+          <div class="empty-icon" aria-hidden="true">—</div>
+          <h3>还没有留下 Mark</h3>
+          <p>在网页中先按住 <strong>Command/Ctrl</strong>，再划选文字；在视频中按 <strong>Command/Ctrl+M</strong>。Mark 会自动出现在这里。</p>
         </div>
       </section>
     </main>
   </div>
-
   <script src="../lib/storage.js"></script>
   <script src="sidepanel.js"></script>
 </body>

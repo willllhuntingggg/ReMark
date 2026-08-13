@@ -9,6 +9,7 @@
   window.__remark_loaded__ = true;
 
   let currentSelection = null;
+  showFirstUseGuide();
   let loadedClipsForPage = [];
 
   const DEFAULT_HIGHLIGHT_COLOR = '#FFE066';
@@ -25,6 +26,54 @@
     chrome.storage.onChanged.addListener(() => {
       renderVideoMarkers();
     });
+  }
+
+  async function showFirstUseGuide() {
+    if (document.getElementById('remark-first-use-guide')) return;
+    try {
+      const settings = await ReMarkStorage.getSettings();
+      if (settings.onboardingSeen) return;
+      const guide = document.createElement('div');
+      guide.id = 'remark-first-use-guide';
+      guide.setAttribute('role', 'dialog');
+      guide.setAttribute('aria-live', 'polite');
+      guide.innerHTML = '<div class="remark-guide-card">' +
+        '<button class="remark-guide-close" type="button" aria-label="关闭首次使用教学">×</button>' +
+        '<div class="remark-guide-eyebrow">ReMark 首次使用指南</div>' +
+        '<h2>先按住快捷键，再划选文字</h2>' +
+        '<p>先按住 <strong>Command ⌘</strong> 或 <strong>Ctrl</strong>，再用鼠标划选至少 2 个字符；鼠标停下后，内容就会自动保存并高亮。</p>' +
+        '<div class="remark-guide-demo" aria-label="快捷键划选动画演示">' +
+        '<div class="remark-guide-line remark-guide-line-top"></div>' +
+        '<div class="remark-guide-line remark-guide-line-main"></div>' +
+        '<div class="remark-guide-line remark-guide-line-bottom"></div>' +
+        '<div class="remark-guide-selection" aria-hidden="true"></div>' +
+        '<div class="remark-guide-cursor" aria-hidden="true"></div>' +
+        '<div class="remark-guide-key">⌘ / Ctrl</div>' +
+        '<div class="remark-guide-result">已高亮</div></div>' +
+        '<div class="remark-guide-fallback">动画未播放时，请记住：<strong>先按住 Command/Ctrl，再用鼠标划选文字</strong>。</div>' +
+        '<div class="remark-guide-actions"><button class="remark-guide-start" type="button">我知道了</button>' +
+        '<button class="remark-guide-dismiss" type="button">不再提示</button></div></div>';
+      document.documentElement.appendChild(guide);
+      const complete = async () => {
+        await ReMarkStorage.updateSettings({ onboardingSeen: true });
+        guide.remove();
+      };
+      guide.querySelector('.remark-guide-close')?.addEventListener('click', complete);
+      guide.querySelector('.remark-guide-start')?.addEventListener('click', complete);
+      guide.querySelector('.remark-guide-dismiss')?.addEventListener('click', complete);
+      guide.addEventListener('click', (event) => {
+        if (event.target === guide) complete();
+      });
+      const onEscape = (event) => {
+        if (event.key === 'Escape' && document.documentElement.contains(guide)) {
+          document.removeEventListener('keydown', onEscape);
+          complete();
+        }
+      };
+      document.addEventListener('keydown', onEscape);
+    } catch (error) {
+      console.warn('[ReMark] First-use guide unavailable:', error);
+    }
   }
 
   // ⌘/Ctrl + mouseup → silent highlight
@@ -64,6 +113,31 @@
     }
   });
 
+  let selectedHighlight = null;
+  document.addEventListener('keydown', async (event) => {
+    if ((event.key === 'Delete' || event.key === 'Backspace') && selectedHighlight && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+      event.preventDefault();
+      const clipId = selectedHighlight.getAttribute('data-clip-id');
+      const clips = await ReMarkStorage.getClips();
+      const item = clips.find(c => c.id === clipId);
+      if (item) {
+        await ReMarkStorage.deleteClip(clipId);
+        await ReMarkStorage.pushUndo({ type: 'delete_clip', item });
+        selectedHighlight.remove();
+        selectedHighlight = null;
+        notifyStorageUpdated();
+      }
+      return;
+    }
+    if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return;
+    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+    event.preventDefault();
+    if (await ReMarkStorage.undoLast()) {
+      restorePageHighlights();
+      renderVideoMarkers();
+      notifyStorageUpdated();
+    }
+  });
   // Re-run per-page restore when the URL changes without a full reload (SPA)
   function watchForUrlChanges() {
     const dispatchUrlChange = () => window.dispatchEvent(new Event('remark:urlchange'));
@@ -146,11 +220,13 @@
       url: window.location.href,
       pageTitle: document.title,
       text,
+      sourcePosition: range ? Math.round(range.getBoundingClientRect().top + window.scrollY) : null,
       color: colorCode,
       note: ''
     };
 
     const savedClip = await ReMarkStorage.addClip(clipData);
+    await ReMarkStorage.pushUndo({ type: 'restore_clip', id: savedClip.id });
     if (range) {
       highlightDOMRange(range, savedClip);
       window.getSelection()?.removeAllRanges();
@@ -193,6 +269,7 @@
   function bindHighlightClick(element, clip) {
     element.addEventListener('click', (e) => {
       e.stopPropagation();
+      try { chrome.runtime.sendMessage({ action: 'OPEN_SIDE_PANEL', clipId: clip.id }); } catch (_) {}
       // Pulse the element to acknowledge the click
       element.classList.add('remark-locate-pulse');
       setTimeout(() => element.classList.remove('remark-locate-pulse'), 2200);
@@ -233,6 +310,9 @@
         const range = document.createRange();
         range.setStart(node, index);
         range.setEnd(node, index + clip.text.length);
+        if (!Number.isFinite(Number(clip.sourcePosition))) {
+          void ReMarkStorage.updateClip(clip.id, { sourcePosition: Math.round(range.getBoundingClientRect().top + window.scrollY) });
+        }
         highlightDOMRange(range, clip);
         break;
       }
@@ -432,7 +512,7 @@
       return;
     }
 
-    await ReMarkStorage.addVideoMark({
+    const savedMark = await ReMarkStorage.addVideoMark({
       url: window.location.href.split('#')[0],
       videoKey: vkey,
       time: Math.round(t * 10) / 10,
@@ -526,7 +606,7 @@
     hideMarkTooltip();
     const tip = document.createElement('div');
     tip.className = 'remark-video-mark-tip';
-    tip.innerHTML = `<span class="remark-video-mark-tip-time">⏱️ ${formatVideoTime(mark.time)}</span><span class="remark-video-mark-tip-del" title="删除此标记">🗑️</span>`;
+    tip.innerHTML = `<span class="remark-video-mark-tip-time">${formatVideoTime(mark.time)}</span><button class="remark-video-mark-tip-del" type="button" title="删除此标记" aria-label="删除此标记">×</button>`;
     document.body.appendChild(tip);
     markTooltipEl = tip;
 
@@ -567,7 +647,7 @@
     if (existing) existing.remove();
     const toast = document.createElement('div');
     toast.id = 'remark-toast';
-    toast.innerHTML = `<span>ReMark</span> <span>${msg}</span>`;
+    toast.textContent = msg;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 2800);
   }

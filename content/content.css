@@ -2,41 +2,41 @@
 
 /* Handwritten / Informal Marker Highlighted Text on Webpage */
 mark.remark-highlight-mark {
-  background: linear-gradient(180deg, transparent 52%, rgba(255, 224, 102, 0.75) 52%);
-  border-bottom: 2.5px solid rgba(255, 45, 85, 0.75);
-  border-radius: 4px 10px 2px 8px;
+  background: linear-gradient(180deg, transparent 34%, rgba(255, 235, 74, 0.78) 34%);
+  border-bottom: 2px solid rgba(208, 174, 28, 0.72);
+  border-radius: 2px;
   color: inherit;
-  padding: 1px 4px;
+  padding: 0 1px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
   position: relative;
   font-weight: inherit;
 }
-
 mark.remark-highlight-mark:hover {
-  background: linear-gradient(180deg, transparent 40%, rgba(255, 224, 102, 0.9) 40%);
-  border-bottom-color: rgba(255, 45, 85, 0.95);
+  background: linear-gradient(180deg, transparent 26%, rgba(255, 232, 54, 0.92) 26%);
+  border-bottom-color: rgba(120, 100, 25, 0.65);
 }
-
 mark.remark-highlight-mark.has-note::after {
-  content: '💡';
-  font-size: 11px;
+  content: '•';
+  display: inline-block;
   margin-left: 3px;
+  color: #9a842b;
+  font-size: 12px;
+  line-height: 1;
   vertical-align: super;
 }
-
 /* Locate & Focus Pulse Animation */
 mark.remark-highlight-mark.remark-locate-pulse {
-  animation: remark-locate-glow 2.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  animation: remark-locate-glow 1.2s cubic-bezier(0.25, 0.8, 0.25, 1);
   z-index: 2147483646;
 }
 
 @keyframes remark-locate-glow {
   0% {
-    box-shadow: 0 0 0 0 rgba(255, 45, 85, 0.8);
+    box-shadow: 0 0 0 0 rgba(154, 132, 43, 0.22);
     transform: scale(1);
     background: linear-gradient(180deg, transparent 40%, rgba(255, 45, 85, 0.45) 40%);
-    border-bottom-color: rgba(255, 45, 85, 1);
+    border-bottom-color: rgba(154, 132, 43, 0.55);
   }
   20% {
     box-shadow: 0 0 0 12px rgba(255, 45, 85, 0);
@@ -178,18 +178,18 @@ mark.remark-highlight-mark.remark-remove-fade {
   align-items: center;
   gap: 8px;
   padding: 5px 9px;
-  background: rgba(28, 28, 30, 0.95);
+  background: rgba(38, 42, 48, 0.92);
   color: #fff;
   font-size: 11.5px;
-  font-weight: 600;
-  border-radius: 9px;
+  font-weight: 500;
+  border-radius: 8px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.32);
   white-space: nowrap;
   pointer-events: auto;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, sans-serif;
 }
 
-.remark-video-mark-tip-time { color: #ff8f61; }
+.remark-video-mark-tip-time { color: #b8d8e8; }
 
 .remark-video-mark-tip-del {
   cursor: pointer;
@@ -203,3 +203,81 @@ mark.remark-highlight-mark.remark-remove-fade {
   transform: scale(1.2);
   color: #fff;
 }
+
+/* First-load page guide */
+#remark-first-use-guide {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  background: rgba(20, 20, 24, 0.36);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
+}
+.remark-guide-card {
+  position: relative;
+  width: min(430px, 100%);
+  box-sizing: border-box;
+  padding: 26px 24px 20px;
+  border-radius: 20px;
+  background: #fff;
+  color: #1c1c1e;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .24);
+  text-align: center;
+}
+.remark-guide-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: #f2f2f7;
+  color: #8e8e93;
+  font-size: 20px;
+  cursor: pointer;
+}
+.remark-guide-eyebrow {
+  color: #ff2d55;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+.remark-guide-card h2 {
+  margin: 7px 22px 8px;
+  font-size: 23px;
+  line-height: 1.25;
+}
+.remark-guide-card p {
+  margin: 0 auto 16px;
+  color: #6e6e78;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.remark-guide-demo { position: relative; height: 170px; overflow: hidden; border: 1px solid #e8e8ee; border-radius: 14px; background: linear-gradient(135deg, #fbfbfd, #f1f2f7); text-align: left; }
+.remark-guide-line { position: absolute; left: 28px; height: 10px; border-radius: 4px; background: #d9d9e2; }
+.remark-guide-line-top { top: 28px; width: 48%; height: 5px; }
+.remark-guide-line-main { top: 68px; width: 76%; }
+.remark-guide-line-bottom { top: 94px; width: 62%; }
+.remark-guide-selection { position: absolute; top: 64px; left: 28px; width: 0; height: 18px; border-radius: 3px; background: #9ed7ff; animation: remark-guide-select 5s linear infinite; }
+.remark-guide-cursor { position: absolute; top: 62px; left: 35px; width: 2px; height: 23px; border-radius: 2px; background: #1c1c1e; box-shadow: 0 0 0 1px rgba(255,255,255,.85); animation: remark-guide-cursor 5s linear infinite; }
+.remark-guide-cursor::before, .remark-guide-cursor::after { content: ''; position: absolute; left: -3px; width: 8px; height: 2px; border-radius: 2px; background: #1c1c1e; }
+.remark-guide-cursor::before { top: 0; }
+.remark-guide-cursor::after { bottom: 0; }
+.remark-guide-key { position: absolute; bottom: 22px; left: 28px; padding: 6px 10px; border: 1px solid #d2d2dc; border-bottom-width: 3px; border-radius: 7px; background: #fff; color: #555563; font-size: 11px; font-weight: 700; animation: remark-guide-key 5s linear infinite; }
+.remark-guide-result { position: absolute; right: 24px; bottom: 29px; color: #ff2d55; font-size: 11px; font-weight: 700; opacity: 0; animation: remark-guide-result 5s linear infinite; }
+.remark-guide-fallback { margin: 12px 0 0 !important; color: #8e8e93 !important; font-size: 11px !important; }
+.remark-guide-actions { display: flex; justify-content: center; align-items: center; gap: 14px; margin-top: 16px; }
+.remark-guide-start { min-width: 110px; padding: 8px 16px; border: 0; border-radius: 9px; background: #ff2d55; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; }
+.remark-guide-dismiss { border: 0; background: transparent; color: #8e8e93; font-size: 11px; cursor: pointer; }
+@keyframes remark-guide-select { 0%,18% { left:28px; width:0; opacity:0; background:#9ed7ff; } 22%,58% { left:52px; width:190px; opacity:1; background:#9ed7ff; } 62%,100% { left:52px; width:190px; opacity:1; background:#ffe066; } }
+@keyframes remark-guide-cursor { 0%,18% { left:35px; top:62px; } 22%,92% { left:242px; top:62px; } 100% { left:35px; top:62px; } }
+@keyframes remark-guide-key { 0%,10% { transform:translateY(0); box-shadow:0 2px 0 #d2d2dc; } 14%,58% { transform:translateY(2px); box-shadow:none; background:#fff7c7; } 70%,100% { transform:translateY(0); box-shadow:0 2px 0 #d2d2dc; } }
+@keyframes remark-guide-result { 0%,60% { opacity:0; transform:translateY(3px); } 64%,100% { opacity:1; transform:translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .remark-guide-selection, .remark-guide-cursor, .remark-guide-key, .remark-guide-result { animation:none; } .remark-guide-selection { left:52px; width:190px; opacity:1; background:#ffe066; } .remark-guide-cursor { left:242px; top:62px; } .remark-guide-key { background:#fff7c7; } .remark-guide-result { opacity:1; } }
+
+mark.remark-highlight-mark.remark-selected{outline:2px solid rgba(80,80,64,.28);outline-offset:3px;border-radius:2px}

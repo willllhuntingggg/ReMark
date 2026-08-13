@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { color-scheme: light; }
+  *, ::before, ::after { box-sizing: border-box; }
+  body { background: #fbfbfa; color: #292b2f; }
+}
+
+@layer components {
+  .app-header { @apply border-0 bg-transparent px-[18px] pb-3 pt-[18px]; }
+  .brand { @apply text-[15px] font-semibold tracking-[-0.02em]; }
+  .controls-bar { @apply border-b border-border bg-transparent px-4 pb-3 pt-1; }
+  .search-box input { @apply h-8 rounded-md border border-transparent bg-muted px-7 text-[12px] text-foreground outline-none transition focus:border-ring focus:bg-white focus:ring-4 focus:ring-slate-200/50; }
+  .content-area { @apply px-[18px] pb-8 pt-2; }
+  .url-group-card { @apply mb-0 overflow-visible rounded-none border-0 bg-transparent shadow-none; }
+  .url-group-header { @apply cursor-default border-0 bg-transparent px-0 pb-2 pt-[18px]; }
+  .url-group-header:hover { @apply bg-transparent; }
+  .url-icon { @apply hidden; }
+  .url-title { @apply text-[11px] font-semibold tracking-[0.01em] text-muted-foreground; }
+  .url-badge { @apply ml-2 rounded-none bg-transparent p-0 text-[10px] font-normal text-slate-400; }
+  .url-group-header > span:last-child { @apply hidden; }
+  .url-clips-body { @apply gap-0 bg-transparent p-0; }
+  .clip-card { @apply rounded-none border-0 border-b border-border bg-transparent px-0 pb-4 pl-3 pt-[13px] shadow-none; }
+  .clip-card:hover, .clip-card.selected { @apply bg-transparent shadow-none; }
+  .clip-highlight-box { @apply mb-2 rounded-none border-0 bg-transparent p-0 text-[13px] leading-[1.62] text-foreground; }
+  .clip-highlight-box::before { content: ''; @apply mr-2 inline-block h-[3px] w-[3px] rounded-full bg-amber-300 align-middle; }
+  .clip-highlight-box:hover { @apply translate-x-0 border-0 bg-transparent text-slate-950; }
+  .remark-video-mark-card .clip-highlight-box::before { @apply bg-sky-300; }
+  .clip-video-title { @apply mb-1 text-[10.5px] text-muted-foreground; }
+  .clip-note-display { @apply bg-transparent p-0 text-[11.5px] leading-[1.55] text-slate-500; }
+  .clip-note-display:hover { @apply bg-transparent text-slate-700; }
+  .clip-note-placeholder { @apply p-0 text-[11px] text-transparent; }
+  .clip-card:hover .clip-note-placeholder, .clip-note-placeholder:focus { @apply text-slate-400; }
+  .clip-footer { @apply mt-1 min-h-0; }
+  .clip-actions { @apply gap-2 opacity-0 transition-opacity; }
+  .clip-card:hover .clip-actions, .clip-card:focus-within .clip-actions { @apply opacity-100; }
+  .clip-action-icon { @apply text-[11px] text-slate-400 opacity-100; }
+  .clip-action-icon:hover { @apply text-slate-700; }
+  .empty-state { @apply border-0 bg-transparent px-5 py-[78px]; }
+  .empty-state h3 { @apply mb-2 text-[13px] font-semibold; }
+  .empty-state p { @apply mx-auto max-w-[245px] leading-[1.7] text-muted-foreground; }
+  .empty-icon { @apply mb-2 text-lg text-slate-300; }
+  .toggle-btn, .view-mode-bar { @apply hidden; }
+  .batch-actions-bar { @apply my-2 rounded-md border border-border bg-white p-2 text-slate-600; }
+  .batch-select-all, .batch-selected-count { @apply text-slate-600; }
+  .batch-action-group .btn { @apply border border-border bg-transparent px-2 py-1 text-slate-600; }
+  .clip-note-editor { @apply mt-1 overflow-hidden rounded-md border border-border bg-white shadow-soft; }
+  .clip-note-editor-actions { @apply bg-background; }
+  .note-save-btn { @apply bg-slate-600; }
+}

@@ -62,6 +62,17 @@ mark.remark-highlight-mark.remark-locate-pulse {
   100% { background: rgb(250, 222, 74); }
 }
 
+/* A just-saved highlight lands with a soft ink sweep. */
+mark.remark-highlight-mark.remark-fresh {
+  animation: remark-ink-in .5s ease;
+}
+
+@keyframes remark-ink-in {
+  0% { background: rgba(250, 222, 74, .35); }
+  55% { background: rgb(255, 241, 166); }
+  100% { background: rgb(250, 222, 74); }
+}
+
 /* Removal fade. */
 mark.remark-highlight-mark.remark-remove-fade {
   animation: remark-remove-collapse .28s ease forwards;
@@ -160,9 +171,27 @@ html.remark-page-light mark.remark-highlight-mark {
     Roboto, sans-serif;
 }
 
+.remark-video-mark-tip {
+  animation: remark-tip-in .13s ease;
+}
+
+@keyframes remark-tip-in {
+  from { opacity: 0; transform: translate(-50%, -100%) scale(.96); }
+  to { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+}
+
 .remark-video-mark-tip-time {
   color: #ffe9a8;
   font-variant-numeric: tabular-nums;
+}
+
+.remark-video-mark-tip-note {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, .82);
+  font-weight: 400;
 }
 
 .remark-video-mark-tip-del {
@@ -241,10 +270,93 @@ html.remark-page-light mark.remark-highlight-mark {
   .remark-video-mark.pop,
   .remark-video-marker-feedback.land,
   .remark-video-timeline-feedback,
-  .remark-video-timeline-feedback i {
+  .remark-video-timeline-feedback i,
+  mark.remark-highlight-mark.remark-fresh,
+  .remark-note-saved-chip,
+  .remark-toast,
+  .remark-quick-note,
+  .remark-video-mark-tip {
     animation: none;
     transition: none;
   }
+}
+
+/* ---------- Page feedback: saved chip & toast ---------- */
+
+/* Tiny confirmation chip after a note is saved near the mark. */
+.remark-note-saved-chip {
+  position: fixed;
+  z-index: 2147483647;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(26, 29, 34, .92);
+  color: #ffe9a8;
+  font-size: 11.5px;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .24);
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI",
+    Roboto, sans-serif;
+  animation: remark-chip-in .22s cubic-bezier(.2, .8, .28, 1) both;
+}
+
+@keyframes remark-chip-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Lightweight undo toast: quiet, reversible, auto-dismisses. */
+.remark-toast-root {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  z-index: 2147483647;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  padding: 0 16px;
+}
+
+.remark-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: rgba(26, 29, 34, .94);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
+  pointer-events: auto;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI",
+    Roboto, sans-serif;
+  animation: remark-toast-in .2s ease;
+}
+
+.remark-toast-action {
+  padding: 3px 5px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #ffe9a8;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color .12s ease, color .12s ease;
+}
+
+.remark-toast-action:hover,
+.remark-toast-action:focus-visible {
+  background: rgba(255, 255, 255, .12);
+  color: #fff;
+  outline: none;
+}
+
+@keyframes remark-toast-in {
+  from { opacity: 0; transform: translateY(10px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* ---------- Onboarding ---------- */
@@ -454,6 +566,16 @@ html.remark-page-light mark.remark-highlight-mark {
   color: #26282d;
   font: 13px/1.5 inherit;
   outline: 0;
+}
+
+.remark-quick-note {
+  transform-origin: top center;
+  animation: remark-quick-note-in .18s cubic-bezier(.2, .8, .28, 1);
+}
+
+@keyframes remark-quick-note-in {
+  from { opacity: 0; transform: translateY(-4px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .remark-quick-note textarea::placeholder {

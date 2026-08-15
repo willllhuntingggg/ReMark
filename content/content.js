@@ -11,6 +11,7 @@
 
   let currentSelection = null;
   let loadedClipsForPage = [];
+  const escHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   const DEFAULT_HIGHLIGHT_COLOR = '#FFE066';
   function applyMarkContrastTheme() {
@@ -226,7 +227,29 @@
         selectedHighlight.remove();
         selectedHighlight = null;
         notifyStorageUpdated();
+        showPageToast(t('mark_deleted'), {
+          label: t('undo'),
+          onAction: async () => {
+            if (await ReMarkStorage.undoLast()) { restorePageHighlights(); notifyStorageUpdated(); }
+          }
+        });
       }
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && selectedHighlight && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+      // ⌘/Ctrl + Enter on a selected highlight: attach a thought right there.
+      event.preventDefault();
+      const clipId = selectedHighlight.getAttribute('data-clip-id');
+      const rect = selectedHighlight.getBoundingClientRect();
+      openQuickNoteInput({
+        rect,
+        onSave: async (note) => {
+          if (!note) return;
+          await ReMarkStorage.updateClip(clipId, { note });
+          document.querySelector(`mark[data-clip-id="${clipId}"]`)?.classList.add('has-note');
+          notifyStorageUpdated();
+        }
+      });
       return;
     }
     if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return;
@@ -347,7 +370,7 @@
     const savedClip = await ReMarkStorage.addClip(clipData);
     await ReMarkStorage.pushUndo({ type: 'restore_clip', id: savedClip.id });
     if (range) {
-      highlightDOMRange(range, savedClip);
+      highlightDOMRange(range, savedClip, true);
       window.getSelection()?.removeAllRanges();
     }
     notifyStorageUpdated();
@@ -374,18 +397,80 @@
     document.documentElement.appendChild(shell);
     const input = shell.querySelector('textarea');
     let done = false;
-    const finish = async () => { if (done) return; done = true; try { await onSave(input.value.trim()); } finally { shell.remove(); } };
+    const finish = async () => {
+      if (done) return;
+      done = true;
+      const value = input.value.trim();
+      try {
+        await onSave(value);
+        if (value) showNoteSavedChip(rect);
+      } finally { shell.remove(); }
+    };
     input.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void finish(); } if (event.key === 'Escape') { event.preventDefault(); void finish(); } });
     input.addEventListener('blur', () => setTimeout(() => { if (!shell.contains(document.activeElement)) void finish(); }, 0));
     input.focus();
   }
 
+  function showNoteSavedChip(rect) {
+    document.querySelector('.remark-note-saved-chip')?.remove();
+    const chip = document.createElement('div');
+    chip.className = 'remark-note-saved-chip';
+    chip.textContent = '✓ ' + t('note_saved');
+    document.body.appendChild(chip);
+    const left = Math.max(12, Math.min((rect?.left ?? window.innerWidth / 2) + 10, window.innerWidth - 150));
+    const top = Math.max(12, (rect?.bottom ?? 48) + 10);
+    chip.style.left = left + 'px';
+    chip.style.top = top + 'px';
+    window.setTimeout(() => chip.remove(), 1500);
+  }
+
+  // Lightweight, auto-dismissing toast with an optional undo action.
+  function showPageToast(message, options = {}) {
+    let root = document.getElementById('remark-page-toast-root');
+    if (!root) {
+      root = document.createElement('div');
+      root.id = 'remark-page-toast-root';
+      root.className = 'remark-toast-root';
+      document.body.appendChild(root);
+    }
+    root.textContent = '';
+    const toast = document.createElement('div');
+    toast.className = 'remark-toast';
+    const textNode = document.createElement('span');
+    textNode.textContent = message;
+    toast.appendChild(textNode);
+    if (options.label && options.onAction) {
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.className = 'remark-toast-action';
+      action.textContent = options.label;
+      action.addEventListener('click', () => { hidePageToast(); void options.onAction(); });
+      toast.appendChild(action);
+    }
+    root.appendChild(toast);
+    clearTimeout(showPageToast.timer);
+    showPageToast.timer = window.setTimeout(hidePageToast, options.duration ?? 4200);
+  }
+  function hidePageToast() {
+    clearTimeout(showPageToast.timer);
+    document.getElementById('remark-page-toast-root')?.remove();
+  }
+
   // DOM Highlighting Engine
-  function highlightDOMRange(range, clip) {
+  // fresh = true when the mark was just created by the user; it then lands
+  // with a short ink sweep so the capture moment feels immediate.
+  function highlightDOMRange(range, clip, fresh = false) {
+    const markWithFresh = (mark) => {
+      if (fresh) {
+        mark.classList.add('remark-fresh');
+        mark.addEventListener('animationend', () => mark.classList.remove('remark-fresh'), { once: true });
+      }
+    };
     try {
       const mark = document.createElement('mark');
       mark.className = `remark-highlight-mark ${clip.note ? 'has-note' : ''}`;
       mark.setAttribute('data-clip-id', clip.id);
+      markWithFresh(mark);
 
       if (range.startContainer === range.endContainer && range.startContainer.nodeType === Node.TEXT_NODE) {
         range.surroundContents(mark);
@@ -404,6 +489,7 @@
         mark.textContent = range.toString();
         range.deleteContents();
         range.insertNode(mark);
+        markWithFresh(mark);
         bindHighlightClick(mark, clip);
       } catch (err) {
         console.error('[ReMark] Fallback highlight failed:', err);
@@ -831,6 +917,8 @@
         video.currentTime = m.time;
         if (video.paused) video.play().catch(() => {});
       });
+      dot.addEventListener('mouseenter', () => { showMarkTooltip(dot, m); });
+      dot.addEventListener('mouseleave', () => scheduleHideMarkTooltip());
       host.appendChild(dot);
       positionMarkerInHost(dot, host, bar, pct);
       newIds.add(m.id);
@@ -849,7 +937,8 @@
     hideMarkTooltip();
     const tip = document.createElement('div');
     tip.className = 'remark-video-mark-tip';
-    tip.innerHTML = `<span class="remark-video-mark-tip-time">${formatVideoTime(mark.time)}</span><button class="remark-video-mark-tip-del" type="button" title="${t('delete_video_marker')}" aria-label="${t('delete_video_marker')}">×</button>`;
+    const notePreview = mark.note ? `<span class="remark-video-mark-tip-note">${escHtml(mark.note)}</span>` : '';
+    tip.innerHTML = `<span class="remark-video-mark-tip-time">${formatVideoTime(mark.time)}</span>${notePreview}<button class="remark-video-mark-tip-del" type="button" title="${t('delete_video_marker')}" aria-label="${t('delete_video_marker')}">×</button>`;
     document.body.appendChild(tip);
     markTooltipEl = tip;
 
@@ -863,9 +952,16 @@
     tip.querySelector('.remark-video-mark-tip-del').addEventListener('click', async (e) => {
       e.stopPropagation();
       await ReMarkStorage.deleteVideoMark(mark.id);
+      await ReMarkStorage.pushUndo({ type: 'delete_video_mark', item: mark });
       hideMarkTooltip();
       renderVideoMarkers();
       notifyStorageUpdated();
+      showPageToast(t('video_mark_deleted'), {
+        label: t('undo'),
+        onAction: async () => {
+          if (await ReMarkStorage.undoLast()) { renderVideoMarkers(); notifyStorageUpdated(); }
+        }
+      });
     });
   }
 

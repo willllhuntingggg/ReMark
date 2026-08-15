@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     settingsOpenButton.hidden = false;
     appContainer.classList.remove('is-more-open');
     viewIdentity.hidden = false;
-    render();
+    render(true);
   }
 
   async function applyLanguagePreference(preference) {
@@ -193,7 +193,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const locale = ReMarkI18n.locale === 'zh' ? 'zh-CN' : 'en-US';
     return new Intl.DateTimeFormat(locale, { month: 'numeric', day: 'numeric' }).format(new Date(value));
   }
-  function markHtml(item) {
+  function markHtml(item, index = 0) {
+    const jumpTitle = item.type === 'video'
+      ? t('jump_to_time', { time: clock(item.time) })
+      : item.text;
     const content = item.type === 'video'
       ? `<span class="video-timestamp"><span aria-hidden="true">▶</span>${clock(item.time)}</span>`
         + (item.duration ? `<span class="video-duration"> / ${clock(item.duration)}</span>` : '')
@@ -211,7 +214,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ].join('');
     const source = `${item.title}${host(item.url) ? ` · ${host(item.url)}` : ''}`;
     const sourceControl = sourceUrl === null
-      ? `<button class="mark-source" data-action="source" data-url="${esc(item.url)}" type="button">${esc(source)}</button>`
+      ? `<button class="mark-source" data-action="source" data-url="${esc(item.url)}" type="button" title="${esc(item.url)}">${esc(source)}</button>`
       : '';
     const menu = [
       `<button data-action="note" data-key="${esc(item.key)}" type="button">${esc(t(item.note ? 'edit_note' : 'add_note'))}</button>`,
@@ -219,8 +222,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       `<button data-action="delete" data-key="${esc(item.key)}" type="button">${esc(t('delete_mark'))}</button>`
     ].join('');
     return [
-      `<article class="mark-card mark-card--${item.type}" data-key="${esc(item.key)}" data-id="${esc(item.id)}" tabindex="0">`,
-      `<div class="mark-content"><button class="mark-content-text" data-action="jump" data-key="${esc(item.key)}" type="button">${content}</button></div>`,
+      `<article class="mark-card mark-card--${item.type}" data-key="${esc(item.key)}" data-id="${esc(item.id)}" tabindex="0" style="--i:${index}">`,
+      `<div class="mark-content"><button class="mark-content-text" data-action="jump" data-key="${esc(item.key)}" type="button" title="${esc(jumpTitle)}">${content}</button></div>`,
       `<div class="mark-note-area">${note}${editor}</div>`,
       `<footer class="mark-footer">${sourceControl}`,
       `<span class="mark-created">${ago(item.createdAt)}</span><div class="mark-actions">`,
@@ -228,7 +231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       `<div class="mark-menu" hidden>${menu}</div></div></footer></article>`
     ].join('');
   }
-  function render() {
+  function render(animated = false) {
     if (showingSettings) return;
     const rows = visible();
     const inSource = sourceUrl !== null;
@@ -239,24 +242,36 @@ document.addEventListener('DOMContentLoaded', async () => {
       subtitle.hidden = false;
       subtitle.textContent = title;
       context.hidden = false;
+      const count = sourceRows.length;
       context.innerHTML = [
         '<div class="source-collection-summary">',
         `<span>${esc(t('marks_in_source'))}</span>`,
+        `<strong>${esc(count === 1 ? t('one_mark') : t('marks_count', { count }))}</strong>`,
         '</div>'
       ].join('');
+    } else if (query) {
+      subtitle.hidden = false;
+      subtitle.textContent = t('timeline');
+      context.hidden = false;
+      context.innerHTML = `<div class="search-summary">${esc(rows.length === 1 ? t('one_mark_found') : t('marks_found', { count: rows.length }))}</div>`;
     } else {
       subtitle.hidden = false;
       subtitle.textContent = t('timeline');
       context.hidden = true;
       context.innerHTML = '';
     }
+    list.classList.toggle('is-entering', Boolean(animated));
     let previous = '';
-    list.innerHTML = rows.map((item) => {
+    const html = [];
+    rows.forEach((item, index) => {
       const label = day(item.createdAt);
-      const divider = inSource || label === previous ? '' : `<div class="feed-day-heading">${label}</div>`;
-      previous = label;
-      return divider + markHtml(item);
-    }).join('');
+      if (!inSource && label !== previous) {
+        html.push(`<div class="feed-day-heading" style="--i:${html.length}">${label}</div>`);
+        previous = label;
+      }
+      html.push(markHtml(item, html.length));
+    });
+    list.innerHTML = html.join('');
     empty.hidden = rows.length > 0;
     if (selected) cardFor(selected)?.classList.add('mark-active');
     const heading = $('h3', empty);
@@ -274,10 +289,69 @@ document.addEventListener('DOMContentLoaded', async () => {
       description.textContent = t('no_marks_description');
     }
   }
-  async function load() { [clips, videos] = await Promise.all([ReMarkStorage.getClips(), ReMarkStorage.getVideoMarks()]); render(); }
-  async function saveNote(key, value) { const item = itemFor(key); if (!item) return; const note = String(value ?? '').trim(); await (item.type === 'video' ? ReMarkStorage.updateVideoMark(item.id, { note }) : ReMarkStorage.updateClip(item.id, { note })); await load(); }
+  async function load(animated) { [clips, videos] = await Promise.all([ReMarkStorage.getClips(), ReMarkStorage.getVideoMarks()]); render(animated); }
+  async function saveNote(key, value) {
+    const item = itemFor(key);
+    if (!item) return;
+    const note = String(value ?? '').trim();
+    await (item.type === 'video' ? ReMarkStorage.updateVideoMark(item.id, { note }) : ReMarkStorage.updateClip(item.id, { note }));
+    await load();
+    const noteNode = cardFor(key)?.querySelector('.mark-note-text');
+    if (noteNode) {
+      noteNode.classList.remove('note-just-saved');
+      void noteNode.offsetWidth;
+      noteNode.classList.add('note-just-saved');
+      setTimeout(() => noteNode.classList.remove('note-just-saved'), 1100);
+    }
+  }
   function openNote(key) { const card = cardFor(key), editor = $('.mark-note-editor', card); if (!editor) return; editor.hidden = false; $('.mark-note', card)?.setAttribute('hidden', ''); $('.note-add', card)?.setAttribute('hidden', ''); const input = $('textarea', editor); input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
-  async function deleteMark(key) { const item = itemFor(key); if (!item) return; if (item.type === 'video') { await ReMarkStorage.deleteVideoMark(item.id); await ReMarkStorage.pushUndo({ type:'delete_video_mark', item:item.raw }); } else { await ReMarkStorage.deleteClip(item.id); await ReMarkStorage.pushUndo({ type:'delete_clip', item:item.raw }); } selected = null; await load(); }
+  async function deleteMark(key) {
+    const item = itemFor(key);
+    if (!item) return;
+    let messageKey = 'mark_deleted';
+    if (item.type === 'video') {
+      await ReMarkStorage.deleteVideoMark(item.id);
+      await ReMarkStorage.pushUndo({ type: 'delete_video_mark', item: item.raw });
+      messageKey = 'video_mark_deleted';
+    } else {
+      await ReMarkStorage.deleteClip(item.id);
+      await ReMarkStorage.pushUndo({ type: 'delete_clip', item: item.raw });
+    }
+    selected = null;
+    await load();
+    showToast(t(messageKey), {
+      label: t('undo'),
+      onAction: async () => { if (await ReMarkStorage.undoLast()) await load(); }
+    });
+  }
+
+  // Lightweight toast: reversible actions stay quiet and auto-dismiss.
+  let toastTimer = null;
+  function showToast(message, options = {}) {
+    const root = document.getElementById('remark-toast-root');
+    if (!root) return;
+    root.textContent = '';
+    const toast = document.createElement('div');
+    toast.className = 'remark-toast';
+    const textNode = document.createElement('span');
+    textNode.textContent = message;
+    toast.appendChild(textNode);
+    if (options.label && options.onAction) {
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.className = 'remark-toast-action';
+      action.textContent = options.label;
+      action.addEventListener('click', () => {
+        clearTimeout(toastTimer);
+        root.textContent = '';
+        void options.onAction();
+      });
+      toast.appendChild(action);
+    }
+    root.appendChild(toast);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { root.textContent = ''; }, options.duration ?? 4200);
+  }
   function safeSendMessage(tabId, message) { const tabs = globalThis.chrome?.tabs; if (!tabs?.sendMessage || !Number.isInteger(tabId)) return Promise.resolve(); return tabs.sendMessage(tabId, message).catch((error) => { if (!/Receiving end does not exist/i.test(error?.message || "")) console.debug("[ReMark] Message delivery skipped:", error); }); }
   function syncSourceActive(item, active) { if (item?.type !== 'highlight') return; globalThis.chrome?.tabs?.query({}).then((tabs) => { const tab = tabs.find((row) => sameUrl(row.url, item.url)); if (tab?.id) safeSendMessage(tab.id, { action: active ? 'SET_ACTIVE_CLIP' : 'CLEAR_ACTIVE_CLIP', clipId: item.id }); }).catch(() => {}); }
   function setActive(key) { selected = key; list.querySelectorAll('.mark-active').forEach((node) => node.classList.remove('mark-active')); const item = itemFor(key); cardFor(key)?.classList.add('mark-active'); syncSourceActive(item, true); }
@@ -295,17 +369,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   list.addEventListener('focusout', (event) => { const card = event.target.closest('.mark-card'); if (!card) return; setTimeout(() => { if (!card.contains(document.activeElement)) clearActive(card.dataset.key); }, 0); });
   document.addEventListener('pointerdown', () => { keyboardFocus = false; if (selected) clearActive(selected); });
   document.addEventListener('click', (event) => { if (!event.target.closest('.mark-actions')) document.querySelectorAll('.mark-menu:not([hidden])').forEach((node) => { node.hidden = true; }); });
-  back.addEventListener('click', () => { sourceUrl = null; selected = null; render(); });
+  back.addEventListener('click', () => { sourceUrl = null; selected = null; render(true); });
+  function clearSearch() { search.value = ''; query = ''; clear.hidden = true; render(); }
   search.addEventListener('input', () => { query = search.value; clear.hidden = !query; render(); });
-  clear.addEventListener('click', () => { search.value = ''; query = ''; clear.hidden = true; render(); search.focus(); });
-  document.addEventListener('keydown', async (event) => { if (event.key === 'Tab' || event.key.startsWith('Arrow')) keyboardFocus = true; const editing = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName); if (!editing && event.key === 'ArrowDown') { event.preventDefault(); moveActive(1); return; } if (!editing && event.key === 'ArrowUp') { event.preventDefault(); moveActive(-1); return; } if (!editing && (event.metaKey || event.ctrlKey) && event.key === 'Enter' && selected) { event.preventDefault(); openNote(selected); } else if (!editing && ['Delete','Backspace'].includes(event.key) && selected) { event.preventDefault(); await deleteMark(selected); } else if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (await ReMarkStorage.undoLast()) await load(); } else if (!editing && event.key === '/') { event.preventDefault(); search.focus(); } else if (!editing && event.key === 'Escape' && showingSettings) { showTimeline(); } else if (!editing && event.key === 'Escape' && sourceUrl !== null) { sourceUrl = null; selected = null; render(); } });
+  search.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.stopPropagation(); clearSearch(); } });
+  clear.addEventListener('click', () => { clearSearch(); search.focus(); });
+  document.addEventListener('keydown', async (event) => { if (event.key === 'Tab' || event.key.startsWith('Arrow')) keyboardFocus = true; const editing = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName); if (!editing && event.key === 'ArrowDown') { event.preventDefault(); moveActive(1); return; } if (!editing && event.key === 'ArrowUp') { event.preventDefault(); moveActive(-1); return; } if (!editing && event.key === 'Enter' && event.shiftKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); openNote(selected); return; } if (!editing && (event.metaKey || event.ctrlKey) && event.key === 'Enter' && selected) { event.preventDefault(); openNote(selected); } else if (!editing && ['Delete','Backspace'].includes(event.key) && selected) { event.preventDefault(); await deleteMark(selected); } else if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (await ReMarkStorage.undoLast()) await load(); } else if (!editing && event.key === '/') { event.preventDefault(); search.focus(); } else if (!editing && event.key === 'Escape' && showingSettings) { showTimeline(); } else if (!editing && event.key === 'Escape' && sourceUrl !== null) { sourceUrl = null; selected = null; render(true); } });
   globalThis.chrome?.runtime?.onMessage?.addListener((message) => { if (message?.action === 'REMARK_STORAGE_UPDATED') void load(); if (message?.action === 'FOCUS_CLIP') focusFromSource(message.clipId || message.markId); });
   async function consumePendingFocus() { try { const session = globalThis.chrome?.storage?.local; if (!session) return; const data = await session.get('remark_pending_focus'); const id = data?.remark_pending_focus?.clipId || data?.remark_pending_focus?.markId; if (id) { await session.remove('remark_pending_focus'); focusFromSource(id); } } catch (_) {} }
   globalThis.chrome?.storage?.onChanged?.addListener((changes) => { const pending = changes?.remark_pending_focus?.newValue; if (pending) focusFromSource(pending.clipId || pending.markId); void load(); });
   try {
     await ReMarkStorage.init();
     await initializeLanguagePreference();
-    await load();
+    await load(true);
     await consumePendingFocus();
   } catch (error) {
     console.error('[ReMark] Sidepanel initialization failed:', error);

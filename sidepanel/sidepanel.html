@@ -9,18 +9,11 @@
 <body>
   <div class="app-container">
     <header class="app-header">
-      <div class="brand">
-        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M7 4.5h10a.75.75 0 0 1 .75.75V19.5l-5.75-3.9L6.25 19.5V5.25A.75.75 0 0 1 7 4.5z"
-            fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
-        </svg>
-        <span class="brand-title">ReMark</span>
-      </div>
+      <button id="source-back" class="source-back" type="button" hidden>
+        <span aria-hidden="true">←</span>
+        <span data-i18n="back_to_timeline">Back to Mark timeline</span>
+      </button>
       <div class="view-identity">
-        <button id="source-back" class="source-back" type="button" hidden>
-          <span aria-hidden="true">←</span>
-          <span data-i18n="back_to_timeline">Back to Mark timeline</span>
-        </button>
         <span id="view-subtitle" class="view-subtitle" data-i18n="timeline">
           Your Mark timeline
         </span>
@@ -122,6 +115,7 @@
       </section>
     </main>
   </div>
+  <div id="remark-toast-root" class="remark-toast-root" role="status" aria-live="polite"></div>
   <script src="../lib/i18n.js"></script>
   <script src="../lib/storage.js"></script>
   <script src="sidepanel.js"></script>

@@ -1,0 +1,5 @@
+{
+  "extension_name": { "message": "ReMark — Mark it now. Find it later." },
+  "extension_description": { "message": "Save web highlights, notes, and video timestamps locally." },
+  "open_sidepanel": { "message": "Open ReMark side panel" }
+}

@@ -1,0 +1,5 @@
+{
+  "extension_name": { "message": "ReMark — 即刻标记，随时回顾" },
+  "extension_description": { "message": "在本地保存网页划线、笔记与视频时间点。" },
+  "open_sidepanel": { "message": "打开 ReMark 侧边栏" }
+}

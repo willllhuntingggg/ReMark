@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "ReMark — Mark it now. Find it later.",
+  "default_locale": "en",
+  "name": "__MSG_extension_name__",
   "version": "1.0.0",
-  "description": "高效网页划线高亮、写想法笔记、按标签整理归档，支持视频时间打点标记，一键导出 Markdown 文档。Mark it now. Find it later.",
+  "description": "__MSG_extension_description__",
   "permissions": [
     "storage",
     "activeTab",
@@ -18,7 +19,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "打开划词灵感侧边栏",
+    "default_title": "__MSG_open_sidepanel__",
     "default_icon": {
       "16": "assets/icons/icon16.png",
       "48": "assets/icons/icon48.png",
@@ -32,7 +33,7 @@
     {
       "matches": ["<all_urls>"],
       "css": ["content/content.css"],
-      "js": ["lib/storage.js", "content/content.js"]
+      "js": ["lib/i18n.js", "lib/storage.js", "content/content.js"]
     }
   ],
   "icons": {

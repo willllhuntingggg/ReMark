@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,29 +12,96 @@
     <header class="app-header">
       <div class="brand"><span class="brand-title">ReMark</span></div>
       <div class="view-identity">
-        <button id="source-back" class="source-back" type="button" style="display: none;" aria-label="返回 Mark 时间流">← 时间流</button>
-        <span id="view-subtitle" class="view-subtitle">你的 Mark 时间流</span>
+        <button id="source-back" class="source-back" type="button" hidden>
+          <span aria-hidden="true">←</span>
+          <span data-i18n="back_to_timeline">Back to Mark timeline</span>
+        </button>
+        <span id="view-subtitle" class="view-subtitle" data-i18n="timeline">
+          Your Mark timeline
+        </span>
       </div>
+      <button id="settings-open" class="settings-trigger" type="button"
+        data-i18n-aria-label="open_more" aria-label="Open more menu">
+        <span aria-hidden="true">•••</span>
+      </button>
     </header>
-    <div class="controls-bar">
+    <div id="timeline-controls" class="controls-bar">
       <div class="search-box">
         <span class="search-icon" aria-hidden="true">/</span>
-        <input type="text" id="search-input" placeholder="搜索 Mark、笔记、来源或时间点" aria-label="搜索 Mark">
-        <button id="search-clear" class="clear-btn" type="button" aria-label="清除搜索" style="display: none;">×</button>
+        <input type="text" id="search-input"
+          data-i18n-placeholder="search_placeholder"
+          data-i18n-aria-label="search_marks"
+          placeholder="Search Marks, notes, sources, or timestamps"
+          aria-label="Search Marks">
+        <button id="search-clear" class="clear-btn" type="button"
+          data-i18n-aria-label="clear_search" aria-label="Clear search" hidden>×</button>
       </div>
     </div>
     <main class="content-area">
       <section id="panel-clips" class="tab-panel active">
         <div id="collection-context" class="collection-context" hidden></div>
         <div id="clips-container" class="clips-list" aria-live="polite"></div>
-        <div id="clips-empty-state" class="empty-state" style="display: none;">
+        <div id="clips-empty-state" class="empty-state" hidden>
           <div class="empty-icon" aria-hidden="true">—</div>
-          <h3>还没有留下 Mark</h3>
-          <p>在网页中先按住 <strong>Command/Ctrl</strong>，再划选文字；在视频中按 <strong>Command/Ctrl+M</strong>。Mark 会自动出现在这里。</p>
+          <h3 data-i18n="no_marks_title">No Marks yet</h3>
+          <p data-i18n="no_marks_description">
+            Select text while holding Command/Ctrl, or press Command/Ctrl+M in a video.
+          </p>
         </div>
+      </section>
+      <section id="panel-settings" class="settings-panel" hidden>
+        <div class="settings-heading">
+          <button id="settings-back" class="settings-back" type="button">
+            <span aria-hidden="true">←</span>
+            <span data-i18n="close_more">Back to timeline</span>
+          </button>
+        </div>
+        <section class="language-section" aria-labelledby="language-heading">
+          <div class="language-copy">
+            <h2 id="language-heading" data-i18n="language">Language</h2>
+            <p data-i18n="language_description">Choose the display language for ReMark.</p>
+          </div>
+          <select id="language-setting" class="language-select" aria-labelledby="language-heading">
+            <option value="system" data-i18n="language_system">System default</option>
+            <option value="en" data-i18n="language_english">English</option>
+            <option value="zh" data-i18n="language_chinese">Chinese</option>
+          </select>
+        </section>
+        <section class="backup-section" aria-labelledby="backup-heading">
+          <div class="backup-copy">
+            <h2 id="backup-heading" data-i18n="data">Data</h2>
+            <p data-i18n="data_description">Your ReMarks are stored locally on this device.</p>
+          </div>
+          <div class="backup-actions">
+            <div class="backup-action-group">
+              <button id="export-backup" class="backup-action" type="button"
+                data-i18n="export_backup">Export Backup</button>
+              <p data-i18n="export_backup_description">
+                Save a backup of your ReMarks as a JSON file.
+              </p>
+            </div>
+            <div class="backup-action-group">
+              <button id="import-backup" class="backup-action backup-action-secondary"
+                type="button" data-i18n="import_backup">Import Backup</button>
+              <p data-i18n="import_backup_description">
+                Restore a backup. Your existing ReMarks will not be deleted.
+              </p>
+            </div>
+          </div>
+          <input id="import-backup-file" type="file" accept="application/json,.json" hidden>
+          <p id="backup-status" class="backup-status" role="status" aria-live="polite" hidden></p>
+        </section>
+        <section class="help-section" aria-labelledby="help-heading">
+          <h2 id="help-heading" data-i18n="help">Help</h2>
+          <button id="replay-tutorial" class="help-action" type="button">
+            <span data-i18n="help_how_remark_works">How ReMark works</span>
+            <small data-i18n="help_replay_tutorial">Replay the tutorial</small>
+          </button>
+        </section>
       </section>
     </main>
   </div>
+  <script src="../lib/i18n.js"></script>
   <script src="../lib/storage.js"></script>
   <script src="sidepanel.js"></script>
 </body>

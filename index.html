@@ -6,93 +6,164 @@
   <title>ReMark — Mark it now. Find it later.</title>
   <style>
     :root {
-      --primary: #FF2D55;
-      --bg: #F8F9FA;
-      --card-bg: #FFFFFF;
-      --text: #1C1C1E;
-      --muted: #8E8E93;
+      color-scheme: light;
+      --bg: #faf9f6;
+      --surface: #ffffff;
+      --surface-2: #f1f0eb;
+      --ink: #26282d;
+      --ink-2: #565b64;
+      --ink-3: #8b909a;
+      --line: #e8e6df;
+      --line-strong: #d9d6cd;
+      --gold: #c8a02e;
+      --gold-deep: #a67f1e;
+      --gold-soft: rgba(250, 222, 74, .35);
+      --radius-lg: 16px;
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+        Roboto, "Helvetica Neue", "PingFang SC", "Hiragino Sans GB",
+        "Microsoft YaHei", sans-serif;
     }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, sans-serif;
       background: var(--bg);
-      color: var(--text);
+      color: var(--ink);
+      font-family: var(--font);
       line-height: 1.8;
+      -webkit-font-smoothing: antialiased;
     }
-    .hero {
-      background: linear-gradient(135deg, #1C1C1E, #2C2C2E);
-      color: #FFFFFF;
-      padding: 60px 20px;
+    ::selection { background: rgba(200, 160, 46, .3); }
+
+    .page-header {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 64px 24px 20px;
       text-align: center;
     }
-    .hero h1 {
-      font-size: 32px;
-      margin: 0 0 12px 0;
-      display: flex;
+    .brand {
+      display: inline-flex;
       align-items: center;
-      justify-content: center;
-      gap: 10px;
+      gap: 8px;
+      font-size: 26px;
+      font-weight: 750;
+      letter-spacing: -.02em;
     }
-    .hero p {
-      font-size: 16px;
-      color: #AEAEB2;
-      max-width: 600px;
-      margin: 0 auto 24px auto;
+    .brand svg { width: 20px; height: 20px; color: var(--gold-deep); }
+    .tagline {
+      margin: 10px auto 0;
+      color: var(--ink-3);
+      font-size: 15px;
     }
-    .hero-badge {
+    .badge {
       display: inline-block;
-      background: var(--primary);
-      color: #ffffff;
-      font-size: 12px;
-      font-weight: bold;
-      padding: 6px 16px;
-      border-radius: 20px;
+      margin-top: 18px;
+      padding: 5px 14px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--ink-2);
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: .02em;
     }
+
     .main-wrapper {
-      max-width: 800px;
-      margin: -40px auto 60px auto;
-      background: var(--card-bg);
-      border-radius: 20px;
-      padding: 40px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-      position: relative;
+      max-width: 720px;
+      margin: 28px auto 80px;
+      padding: 0 24px;
     }
-    .guide-step {
-      background: #F2F2F7;
-      border-radius: 14px;
-      padding: 20px;
-      margin-bottom: 30px;
-      border-left: 4px solid var(--primary);
+
+    .guide {
+      margin-bottom: 44px;
+      padding: 22px 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface);
     }
-    .guide-step h3 {
-      margin: 0 0 8px 0;
-      color: var(--text);
+    .guide h3 {
+      margin: 0 0 14px;
+      font-size: 14px;
+      font-weight: 700;
     }
-    .article-section {
-      margin-top: 40px;
+    .guide ol {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--ink-2);
+      font-size: 13.5px;
     }
+    .guide li { margin: 6px 0; }
+    .guide kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border: 1px solid var(--line-strong);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      background: var(--surface-2);
+      color: var(--ink-2);
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .article-section { margin-top: 40px; }
     .article-section h2 {
-      font-size: 22px;
-      border-bottom: 2px solid #E5E5EA;
-      padding-bottom: 8px;
+      margin: 0 0 18px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+      font-size: 20px;
+      letter-spacing: -.01em;
     }
+    .article-section p {
+      margin: 14px 0;
+      color: #3c3f45;
+      font-size: 15px;
+    }
+
+    /* Static sample of the ReMark mark on the page. */
+    .sample-mark {
+      background: #fade4a;
+      color: #24220f;
+      border-radius: 5px;
+      padding: 0 1px;
+      -webkit-box-decoration-break: slice;
+      box-decoration-break: slice;
+    }
+    .sample-mark.note::after {
+      content: '•';
+      display: inline-block;
+      margin-left: 3px;
+      color: #7a6416;
+      font-size: 12px;
+      vertical-align: super;
+    }
+
     blockquote {
-      background: #FFF9E6;
-      border-left: 4px solid #FFE066;
-      margin: 20px 0;
-      padding: 16px 20px;
-      border-radius: 0 12px 12px 0;
-      font-style: italic;
+      margin: 24px 0;
+      padding: 18px 22px;
+      border: 1px solid rgba(200, 160, 46, .35);
+      border-radius: 12px;
+      background: var(--gold-soft);
+      color: #3a3626;
+      font-size: 15px;
     }
+    blockquote::before {
+      content: '“';
+      display: block;
+      margin-bottom: 4px;
+      color: var(--gold-deep);
+      font-size: 26px;
+      line-height: 1;
+    }
+    blockquote p { margin: 0; }
+
     .tag-demo {
       display: inline-block;
-      background: rgba(255,45,85,0.1);
-      color: var(--primary);
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--ink-2);
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
       font-size: 12px;
-      padding: 2px 8px;
-      border-radius: 10px;
-      margin-right: 6px;
     }
   </style>
 
@@ -104,42 +175,57 @@
 </head>
 <body>
 
-  <div class="hero">
-    <h1>⚡ ReMark</h1>
-    <p>Mark it now. Find it later. — 高效网页划线高亮、写想法笔记，自动整理归档你的知识碎片，支持视频时间打点与一键导出。</p>
-    <div class="hero-badge">Chrome Extension (Manifest V3) 已就绪</div>
-  </div>
+  <header class="page-header">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 4.5h10a.75.75 0 0 1 .75.75V19.5l-5.75-3.9L6.25 19.5V5.25A.75.75 0 0 1 7 4.5z"
+          fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+      </svg>
+      ReMark
+    </div>
+    <p class="tagline">Mark it now. Find it later. — 本地优先的划线、笔记与视频打点收集工具。</p>
+    <span class="badge">Chrome Extension · Manifest V3 · 数据仅保存在本地</span>
+  </header>
 
   <div class="main-wrapper">
-    <div class="guide-step">
-      <h3>🚀 快速测试引导：</h3>
-      <ol style="margin: 0; padding-left: 20px;">
-        <li>用鼠标选中本页面下方的任意一段文字，体验<b>浮动工具栏</b>弹出。</li>
-        <li>点击颜色按钮进行高亮，或点击 <b>📝 写想法</b> 按钮写入思考与 #标签。</li>
-        <li>点击右侧或者插件图标打开 <b>ReMark 侧边栏 (Sidepanel)</b>，查看剪藏库中的划线、想法与视频打点，并可多选页面导出 Markdown 文档。</li>
+    <section class="guide">
+      <h3>快速测试引导</h3>
+      <ol>
+        <li>用鼠标选中下方任意一段文字，体验 <b>按住 <kbd>⌘</kbd>/<kbd>Ctrl</kbd> 后划选并高亮</b> 的保存方式。</li>
+        <li>点击页面中的高亮文字，在侧边栏中定位对应的 Mark，并为其添加笔记。</li>
+        <li>在 YouTube 或 Bilibili 视频播放到关键位置时，按 <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>M</kbd> 记录视频打点。</li>
+        <li>打开 <b>ReMark 侧边栏</b>：查看 Mark 时间流、搜索、按来源浏览，并多选页面导出 Markdown。</li>
       </ol>
-    </div>
+    </section>
 
-    <div class="article-section">
+    <section class="article-section">
       <h2>深度测试段落 1：为什么信息整理需要“卡片化”与“评语”？</h2>
       <p>
-        在进行行业调研或深度学习时，简单的“收藏夹”往往会沦为知识的坟场。真正的认知提升发生于<b>划线提炼</b>与<b>撰写评语思考</b>的瞬间。通过在看到有启发的内容时快速高亮，并用一两句话记录下自己的见解，能够将外部信息转化为个人知识库。
+        在进行行业调研或深度学习时，简单的“收藏夹”往往会沦为知识的坟场。真正的认知提升发生于
+        <mark class="sample-mark note">划线提炼</mark> 与
+        <mark class="sample-mark">撰写评语思考</mark> 的瞬间。通过在看到有启发的内容时快速高亮，
+        并用一两句话记录下自己的见解，能够将外部信息转化为个人知识库。
       </p>
-      
+
       <blockquote>
-        "Mark it now. Find it later." —— ReMark 设计理念
+        <p>Mark it now. Find it later. —— ReMark 设计理念</p>
       </blockquote>
 
       <h2>深度测试段落 2：让收集的知识能被二次唤醒</h2>
       <p>
-        收集本身不是目的，<b>二次唤醒</b>才是。当你为一段划线补上自己的想法与标签，它就从一个孤立的片段变成了可检索、可复用的知识节点。配合视频打点（⌘M 记录视频关键时间点）与批量导出 Markdown，你可以在任意工具中继续沉淀与使用这些内容。
+        收集本身不是目的，<mark class="sample-mark">二次唤醒</mark> 才是。当你为一段划线补上自己的想法，
+        它就从一个孤立的片段变成了可检索、可复用的知识节点。配合视频打点（
+        <kbd>⌘</kbd>/<kbd>Ctrl</kbd>+<kbd>M</kbd> 记录关键时间点）与批量导出 Markdown，
+        你可以在任意工具中继续沉淀与使用这些内容。
       </p>
 
       <h2>深度测试段落 3：全本地数据存储与统一归档</h2>
       <p>
-        ReMark 基于 Chrome 扩展程序原生的 <span class="tag-demo">#chrome.storage.local</span> 运行，所有划线快照、评语笔记与视频打点均保存在你的本地浏览器中，<b>不需要任何后台服务器</b>，隐私安全且毫秒级快速响应。
+        ReMark 基于 Chrome 扩展程序原生的 <span class="tag-demo">#chrome.storage.local</span> 运行，
+        所有划线快照、评语笔记与视频打点均保存在你的本地浏览器中，
+        <b>不需要任何后台服务器</b>，隐私安全且毫秒级快速响应。
       </p>
-    </div>
+    </section>
   </div>
 
 </body>

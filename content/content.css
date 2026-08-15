@@ -1,427 +1,96 @@
-/* ReMark Content Script Styles */
+/* ============================================================
+   ReMark — Content Script Styles
+   The same ink & paper identity extends onto the page:
+   - Saved text is a solid, rounded mark in highlight gold —
+     always readable because the ink inside is fixed dark.
+   - Video moments are compact flags on the progress bar.
+   - Onboarding and quick notes are quiet, tool-like surfaces.
+   ============================================================ */
 
-/* Handwritten / Informal Marker Highlighted Text on Webpage */
+/* ---------- Text highlights ---------- */
+
 mark.remark-highlight-mark {
-  background: linear-gradient(180deg, transparent 34%, rgba(255, 235, 74, 0.78) 34%);
-  border-bottom: 2px solid rgba(208, 174, 28, 0.72);
-  border-radius: 2px;
-  color: inherit;
-  padding: 0 1px;
-  cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
   position: relative;
+  background: rgb(250, 222, 74);
+  color: #24220f;
+  border: 0;
+  border-radius: 5px;
+  box-shadow: none;
+  padding: 0 1px;
+  line-height: inherit;
+  vertical-align: baseline;
   font-weight: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-box-decoration-break: slice;
+  box-decoration-break: slice;
+  background-clip: border-box;
+  transition: background-color .16s ease;
 }
+
 mark.remark-highlight-mark:hover {
-  background: linear-gradient(180deg, transparent 26%, rgba(255, 232, 54, 0.92) 26%);
-  border-bottom-color: rgba(120, 100, 25, 0.65);
+  background: rgb(255, 233, 106);
+  text-decoration: none;
 }
+
+/* A saved note is signalled by a quiet dot after the mark. */
 mark.remark-highlight-mark.has-note::after {
   content: '•';
   display: inline-block;
   margin-left: 3px;
-  color: #9a842b;
+  color: #7a6416;
   font-size: 12px;
   line-height: 1;
   vertical-align: super;
 }
-/* Locate & Focus Pulse Animation */
+
+/* Clicking a mark focuses it in the side panel. */
+mark.remark-highlight-mark.remark-selected {
+  outline: 1.5px solid rgba(110, 98, 30, .35);
+  outline-offset: 2px;
+  border-radius: 5px;
+}
+
+/* Locate pulse when jumping to a mark from the panel. */
 mark.remark-highlight-mark.remark-locate-pulse {
-  animation: remark-locate-glow 1.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-  z-index: 2147483646;
+  animation: remark-gentle-focus 1.15s ease-in-out;
 }
 
-@keyframes remark-locate-glow {
-  0% {
-    box-shadow: 0 0 0 0 rgba(154, 132, 43, 0.22);
-    transform: scale(1);
-    background: linear-gradient(180deg, transparent 40%, rgba(255, 45, 85, 0.45) 40%);
-    border-bottom-color: rgba(154, 132, 43, 0.55);
-  }
-  20% {
-    box-shadow: 0 0 0 12px rgba(255, 45, 85, 0);
-    transform: scale(1.08);
-  }
-  40% {
-    box-shadow: 0 0 0 0 rgba(255, 45, 85, 0.6);
-    transform: scale(1.02);
-  }
-  60% {
-    box-shadow: 0 0 0 10px rgba(255, 45, 85, 0);
-  }
-  80% {
-    transform: scale(1);
-    background: linear-gradient(180deg, transparent 52%, rgba(255, 224, 102, 0.85) 52%);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(255, 45, 85, 0);
-    background: linear-gradient(180deg, transparent 52%, rgba(255, 224, 102, 0.75) 52%);
-  }
-}
-
-/* Remove Highlight Fade-out Animation */
-mark.remark-highlight-mark.remark-remove-fade {
-  animation: remark-remove-collapse 0.28s ease forwards;
-}
-
-@keyframes remark-remove-collapse {
-  0%   { opacity: 1; transform: scale(1);    filter: brightness(1); }
-  50%  { opacity: 0.6; transform: scale(0.96); filter: brightness(1.5); }
-  100% { opacity: 0; transform: scale(0.85); filter: brightness(2); }
-}
-
-/* Toast Notifications (video mark duplicate only) */
-#remark-toast {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 2147483647;
-  background: rgba(28, 28, 30, 0.94);
-  color: #ffffff;
-  padding: 10px 16px;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 500;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  animation: remark-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-@keyframes remark-pop {
-  0%   { opacity: 0; transform: scale(0.88) translateY(6px); }
-  100% { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-/* ======== Video Timestamp Marks (YouTube & Bilibili) ======== */
-
-#remark-video-mark-btn {
-  position: fixed;
-  right: 18px;
-  bottom: 24px;
-  z-index: 2147483000;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 8px 13px;
-  border: none;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #FB7299, #ff8f61);
-  color: #fff;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 6px 18px rgba(251, 114, 153, 0.45);
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, sans-serif;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  animation: remark-pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-#remark-video-mark-btn:hover {
-  transform: translateY(-1px) scale(1.04);
-  box-shadow: 0 8px 22px rgba(251, 114, 153, 0.55);
-}
-
-#remark-video-mark-btn:active {
-  transform: scale(0.95);
-}
-
-#remark-video-mark-btn .remark-video-mark-btn-icon {
-  font-size: 14px;
-  line-height: 1;
-}
-
-/* Markers pinned to the video progress bar */
-.remark-video-mark {
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 9px;
-  height: 9px;
-  box-sizing: border-box;
-  border-radius: 50%;
-  background: #FF2D55;
-  border: 2px solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-  pointer-events: auto;
-  z-index: 90;
-}
-
-.remark-video-mark::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 100%;
-  width: 2px;
-  height: 7px;
-  transform: translateX(-50%);
-  background: #FF2D55;
-  border-radius: 1px;
-}
-
-.remark-video-mark.pop {
-  animation: remark-mark-pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes remark-mark-pop {
-  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
-  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-}
-
-/* Tooltip on hover (time + delete) */
-.remark-video-mark-tip {
-  position: fixed;
-  z-index: 2147483647;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 9px;
-  background: rgba(38, 42, 48, 0.92);
-  color: #fff;
-  font-size: 11.5px;
-  font-weight: 500;
-  border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.32);
-  white-space: nowrap;
-  pointer-events: auto;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, sans-serif;
-}
-
-.remark-video-mark-tip-time { color: #b8d8e8; }
-
-.remark-video-mark-tip-del {
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.75);
-  transition: transform 0.12s ease;
-}
-
-.remark-video-mark-tip-del:hover {
-  transform: scale(1.2);
-  color: #fff;
-}
-
-/* First-load page guide */
-#remark-first-use-guide {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483646;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  box-sizing: border-box;
-  background: rgba(20, 20, 24, 0.36);
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
-}
-.remark-guide-card {
-  position: relative;
-  width: min(430px, 100%);
-  box-sizing: border-box;
-  padding: 26px 24px 20px;
-  border-radius: 20px;
-  background: #fff;
-  color: #1c1c1e;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .24);
-  text-align: center;
-}
-.remark-guide-close {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  width: 28px;
-  height: 28px;
-  border: 0;
-  border-radius: 50%;
-  background: #f2f2f7;
-  color: #8e8e93;
-  font-size: 20px;
-  cursor: pointer;
-}
-.remark-guide-eyebrow {
-  color: #ff2d55;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .08em;
-}
-.remark-guide-card h2 {
-  margin: 7px 22px 8px;
-  font-size: 23px;
-  line-height: 1.25;
-}
-.remark-guide-card p {
-  margin: 0 auto 16px;
-  color: #6e6e78;
-  font-size: 13px;
-  line-height: 1.65;
-}
-.remark-guide-demo { position: relative; height: 170px; overflow: hidden; border: 1px solid #e8e8ee; border-radius: 14px; background: linear-gradient(135deg, #fbfbfd, #f1f2f7); text-align: left; }
-.remark-guide-line { position: absolute; left: 28px; height: 10px; border-radius: 4px; background: #d9d9e2; }
-.remark-guide-line-top { top: 28px; width: 48%; height: 5px; }
-.remark-guide-line-main { top: 68px; width: 76%; }
-.remark-guide-line-bottom { top: 94px; width: 62%; }
-.remark-guide-selection { position: absolute; top: 64px; left: 28px; width: 0; height: 18px; border-radius: 3px; background: #9ed7ff; animation: remark-guide-select 5s linear infinite; }
-.remark-guide-cursor { position: absolute; top: 62px; left: 35px; width: 2px; height: 23px; border-radius: 2px; background: #1c1c1e; box-shadow: 0 0 0 1px rgba(255,255,255,.85); animation: remark-guide-cursor 5s linear infinite; }
-.remark-guide-cursor::before, .remark-guide-cursor::after { content: ''; position: absolute; left: -3px; width: 8px; height: 2px; border-radius: 2px; background: #1c1c1e; }
-.remark-guide-cursor::before { top: 0; }
-.remark-guide-cursor::after { bottom: 0; }
-.remark-guide-key { position: absolute; bottom: 22px; left: 28px; padding: 6px 10px; border: 1px solid #d2d2dc; border-bottom-width: 3px; border-radius: 7px; background: #fff; color: #555563; font-size: 11px; font-weight: 700; animation: remark-guide-key 5s linear infinite; }
-.remark-guide-result { position: absolute; right: 24px; bottom: 29px; color: #ff2d55; font-size: 11px; font-weight: 700; opacity: 0; animation: remark-guide-result 5s linear infinite; }
-.remark-guide-fallback { margin: 12px 0 0 !important; color: #8e8e93 !important; font-size: 11px !important; }
-.remark-guide-actions { display: flex; justify-content: center; align-items: center; gap: 14px; margin-top: 16px; }
-.remark-guide-start { min-width: 110px; padding: 8px 16px; border: 0; border-radius: 9px; background: #ff2d55; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; }
-.remark-guide-dismiss { border: 0; background: transparent; color: #8e8e93; font-size: 11px; cursor: pointer; }
-@keyframes remark-guide-select { 0%,18% { left:28px; width:0; opacity:0; background:#9ed7ff; } 22%,58% { left:52px; width:190px; opacity:1; background:#9ed7ff; } 62%,100% { left:52px; width:190px; opacity:1; background:#ffe066; } }
-@keyframes remark-guide-cursor { 0%,18% { left:35px; top:62px; } 22%,92% { left:242px; top:62px; } 100% { left:35px; top:62px; } }
-@keyframes remark-guide-key { 0%,10% { transform:translateY(0); box-shadow:0 2px 0 #d2d2dc; } 14%,58% { transform:translateY(2px); box-shadow:none; background:#fff7c7; } 70%,100% { transform:translateY(0); box-shadow:0 2px 0 #d2d2dc; } }
-@keyframes remark-guide-result { 0%,60% { opacity:0; transform:translateY(3px); } 64%,100% { opacity:1; transform:translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .remark-guide-selection, .remark-guide-cursor, .remark-guide-key, .remark-guide-result { animation:none; } .remark-guide-selection { left:52px; width:190px; opacity:1; background:#ffe066; } .remark-guide-cursor { left:242px; top:62px; } .remark-guide-key { background:#fff7c7; } .remark-guide-result { opacity:1; } }
-
-mark.remark-highlight-mark.remark-selected{outline:2px solid rgba(80,80,64,.28);outline-offset:3px;border-radius:2px}
-
-.remark-quick-note{position:fixed;z-index:2147483647;width:280px;padding:10px;border:1px solid rgba(31,35,40,.15);border-radius:10px;background:rgba(255,255,255,.98);box-shadow:0 12px 36px rgba(16,24,40,.18);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.remark-quick-note textarea{display:block;box-sizing:border-box;width:100%;min-height:58px;padding:0;border:0;resize:vertical;background:transparent;color:#25282d;font:13px/1.5 inherit;outline:0}.remark-quick-note span{display:block;margin-top:6px;color:#8b9097;font-size:10px}
-
-
-/* ReMark reading trace: muted 4px bottom band with restrained focus feedback. */
-mark.remark-highlight-mark { background: linear-gradient(to bottom, transparent calc(100% - 4px), rgba(230, 248, 97, .48) calc(100% - 4px)); border: 0; border-radius: 0; box-shadow: none; color: inherit; padding: 0 1px; transition: background .16s ease; }
-mark.remark-highlight-mark:hover { background: linear-gradient(to bottom, transparent calc(100% - 4px), rgba(230, 248, 97, .68) calc(100% - 4px)); border: 0; }
-mark.remark-highlight-mark.remark-locate-pulse { position: relative; z-index: auto; animation: remark-gentle-focus 1.25s ease-in-out; }
-@keyframes remark-gentle-focus { 0% { background: linear-gradient(to bottom, transparent calc(100% - 4px), rgba(230, 248, 97, .48) calc(100% - 4px)); } 18% { background: linear-gradient(to bottom, rgba(230, 248, 97, .24) 0%, rgba(230, 248, 97, .24) calc(100% - 4px), rgba(230, 248, 97, .82) calc(100% - 4px)); } 62% { background: linear-gradient(to bottom, rgba(230, 248, 97, .24) 0%, rgba(230, 248, 97, .24) calc(100% - 4px), rgba(230, 248, 97, .82) calc(100% - 4px)); } 100% { background: linear-gradient(to bottom, transparent calc(100% - 4px), rgba(230, 248, 97, .48) calc(100% - 4px)); } }
-mark.remark-highlight-mark.remark-selected { outline: 1px solid rgba(118, 105, 70, .26); outline-offset: 2px; border-radius: 1px; }
-
-/* Opaque lime wave: a light reading trace instead of a translucent band. */
-mark.remark-highlight-mark {
-  background: transparent;
-  text-decoration-line: underline;
-  text-decoration-style: wavy;
-  text-decoration-color: rgb(230, 248, 97);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
-}
-mark.remark-highlight-mark:hover {
-  background: transparent;
-  text-decoration-color: rgb(230, 248, 97);
-  text-decoration-thickness: 3px;
-}
 @keyframes remark-gentle-focus {
-  0% { background: transparent; }
-  18%, 62% { background: rgba(230, 248, 97, .28); }
-  100% { background: transparent; }
-}
-
-
-/* White pages need a deeper olive wave; dark pages retain the bright lime wave. */
-html.remark-page-light mark.remark-highlight-mark { text-decoration-color: rgb(114, 138, 0); text-decoration-thickness: 3px; }
-html.remark-page-light mark.remark-highlight-mark:hover { text-decoration-color: rgb(92, 112, 0); text-decoration-thickness: 3px; }
-html.remark-page-light mark.remark-highlight-mark.remark-locate-pulse { animation-name: remark-gentle-focus-light; }
-@keyframes remark-gentle-focus-light { 0% { background: transparent; } 18%, 62% { background: rgba(230, 248, 97, .52); } 100% { background: transparent; } }
-
-/* Apple Books-inspired Mark: solid rounded highlight, no underline or wave. */
-mark.remark-highlight-mark,
-html.remark-page-light mark.remark-highlight-mark {
-  background: rgb(250, 222, 74);
-  color: inherit;
-  border: 0;
-  border-radius: 3px;
-  box-shadow: none;
-  padding: 0 2px;
-  text-decoration: none;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
-  transition: background-color .16s ease;
-}
-mark.remark-highlight-mark:hover,
-html.remark-page-light mark.remark-highlight-mark:hover {
-  background: rgb(255, 233, 106);
-  text-decoration: none;
-}
-mark.remark-highlight-mark.remark-locate-pulse,
-html.remark-page-light mark.remark-highlight-mark.remark-locate-pulse {
-  animation: remark-books-focus 1.15s ease-in-out;
-}
-@keyframes remark-books-focus {
   0% { background: rgb(250, 222, 74); }
   18%, 62% { background: rgb(255, 241, 166); }
   100% { background: rgb(250, 222, 74); }
 }
 
-/* No horizontal padding: preserve the source page's inline text metrics. */
-mark.remark-highlight-mark,
+/* Removal fade. */
+mark.remark-highlight-mark.remark-remove-fade {
+  animation: remark-remove-collapse .28s ease forwards;
+}
+
+@keyframes remark-remove-collapse {
+  0%   { opacity: 1; transform: scale(1);    filter: brightness(1); }
+  50%  { opacity: .6; transform: scale(.96); filter: brightness(1.5); }
+  100% { opacity: 0; transform: scale(.85); filter: brightness(2); }
+}
+
+/* The page-brightness class is toggled by the script; the mark
+   stays identical on light and dark pages thanks to its fixed ink. */
 html.remark-page-light mark.remark-highlight-mark {
-  padding-inline: 0;
-  border-radius: 5px;
-  line-height: inherit;
-  vertical-align: baseline;
+  background: rgb(250, 222, 74);
+  color: #24220f;
 }
 
-/* Treat a wrapped Mark as one continuous selection-like background. */
-mark.remark-highlight-mark,
-html.remark-page-light mark.remark-highlight-mark {
-  -webkit-box-decoration-break: slice;
-  box-decoration-break: slice;
-  background-clip: border-box;
+@media (prefers-reduced-motion: reduce) {
+  mark.remark-highlight-mark,
+  mark.remark-highlight-mark.remark-locate-pulse,
+  mark.remark-highlight-mark.remark-remove-fade {
+    animation: none;
+  }
 }
 
+/* ---------- Video moment flags ---------- */
 
-/* ReMark Marker: one quiet dot in the Highlight color. */
-#remark-video-mark-btn, #remark-toast { display: none !important; }
-.remark-video-mark { width: 8px; height: 8px; background: rgb(250, 222, 74); border: 0; border-radius: 50%; box-shadow: none; }
-.remark-video-mark::after { display: none; }
-.remark-video-mark.pop { animation: remark-marker-settle .42s cubic-bezier(.22, 1.28, .36, 1) both; }
-@keyframes remark-marker-settle { 0% { opacity: .35; transform: translate(-50%, -50%) scale(.65); } 58% { opacity: 1; transform: translate(-50%, -50%) scale(1.28); } 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
-
-/* Marker landing: 10px drop → 2px impact → exact resting point. */
-.remark-video-mark.pop { animation: remark-marker-land .44s cubic-bezier(.22, .82, .32, 1) both; }
-@keyframes remark-marker-land {
-  0% { opacity: .35; transform: translate(-50%, -50%) translateY(-10px) scale(.92); }
-  58% { opacity: 1; transform: translate(-50%, -50%) translateY(2px) scale(1.04); }
-  78% { opacity: 1; transform: translate(-50%, -50%) translateY(-1px) scale(.99); }
-  100% { opacity: 1; transform: translate(-50%, -50%) translateY(0) scale(1); }
-}
-
-
-/* When controls are hidden, show the same Marker landing inside the video frame. */
-.remark-video-marker-feedback { position: fixed; z-index: 2147483646; width: 8px; height: 8px; border-radius: 50%; background: rgb(250, 222, 74); pointer-events: none; opacity: 0; transform: translate(-50%, -50%); }
-.remark-video-marker-feedback.land { animation: remark-marker-frame-land .44s cubic-bezier(.22, .82, .32, 1) both; }
-@keyframes remark-marker-frame-land { 0% { opacity: .35; transform: translate(-50%, -50%) translateY(-10px) scale(.92); } 58% { opacity: 1; transform: translate(-50%, -50%) translateY(2px) scale(1.04); } 78% { opacity: 1; transform: translate(-50%, -50%) translateY(-1px) scale(.99); } 100% { opacity: 1; transform: translate(-50%, -50%) translateY(0) scale(1); } }
-
-
-/* Fullscreen fallback timeline: it appears only for the Marker landing, then fades. */
-.remark-video-timeline-feedback { position: fixed; z-index: 2147483646; height: 3px; border-radius: 999px; background: rgba(255,255,255,.48); pointer-events: none; opacity: 0; transform: translateY(3px); transition: opacity .16s ease, transform .16s ease; }
-.remark-video-timeline-feedback.show { opacity: 1; transform: translateY(0); }
-.remark-video-timeline-feedback.fade { opacity: 0; transform: translateY(2px); transition-duration: .28s; }
-.remark-video-timeline-feedback i { position: absolute; top: 50%; width: 8px; height: 8px; border-radius: 50%; background: rgb(250,222,74); transform: translate(-50%,-50%); animation: remark-marker-land .44s cubic-bezier(.22,.82,.32,1) both; }
-
-
-/* Fullscreen Marker is a water-drop landing on ReMark's own temporary timeline. */
-.remark-video-timeline-feedback i { width: 9px; height: 9px; animation: remark-marker-waterdrop .42s cubic-bezier(.2,.8,.3,1) both; }
-@keyframes remark-marker-waterdrop {
-  0% { opacity: .25; transform: translate(-50%,-50%) translateY(-12px) scale(1.65); box-shadow: 0 0 0 0 rgba(250,222,74,0); }
-  56% { opacity: 1; transform: translate(-50%,-50%) translateY(2px) scale(.88); box-shadow: 0 0 0 5px rgba(250,222,74,0); }
-  78% { opacity: 1; transform: translate(-50%,-50%) translateY(-1px) scale(1.04); box-shadow: 0 0 0 0 rgba(250,222,74,0); }
-  100% { opacity: 1; transform: translate(-50%,-50%) translateY(0) scale(1); box-shadow: 0 0 0 0 rgba(250,222,74,0); }
-}
-
-
-/* Ink convergence: faint particles gather into a calm circular Marker. */
-.remark-video-mark.pop, .remark-video-timeline-feedback i { animation: remark-marker-ink-form .44s cubic-bezier(.2,.82,.3,1) both; }
-.remark-ink-particle { position: absolute; left: 50%; top: 50%; width: 2.5px; height: 2.5px; margin: -1.25px; border-radius: 50%; background: rgb(250,222,74); pointer-events: none; opacity: 0; animation: remark-ink-converge .28s ease-out both; }
-@keyframes remark-ink-converge { 0% { opacity: .38; transform: translate(var(--ink-x), var(--ink-y)) scale(.72); } 72% { opacity: .28; transform: translate(0,0) scale(.82); } 100% { opacity: 0; transform: translate(0,0) scale(.35); } }
-@keyframes remark-marker-ink-form { 0% { opacity: .25; transform: translate(-50%,-50%) scale(.58); } 62% { opacity: 1; transform: translate(-50%,-50%) scale(1.14); } 100% { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
-
-
-/* A restrained editorial stroke contracts while ink particles form the dot. */
-.remark-marker-stroke { position: absolute; left: 50%; top: 50%; width: 14px; height: 2px; border-radius: 999px; background: rgb(250,222,74); pointer-events: none; transform: translate(-50%,-50%); animation: remark-marker-stroke-contract .28s ease-in both; }
-@keyframes remark-marker-stroke-contract { 0% { opacity: .5; width: 14px; height: 2px; } 58% { opacity: .46; width: 5px; height: 3px; } 100% { opacity: 0; width: 3px; height: 3px; } }
-@keyframes remark-marker-ink-form { 0% { opacity: 0; transform: translate(-50%,-50%) scale(.38); } 42% { opacity: .18; transform: translate(-50%,-50%) scale(.72); } 72% { opacity: 1; transform: translate(-50%,-50%) scale(1.12); } 100% { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
-@keyframes remark-ink-converge { 0% { opacity: .3; transform: translate(var(--ink-x), var(--ink-y)) scale(.62); } 68% { opacity: .24; transform: translate(0,0) scale(.78); } 100% { opacity: 0; transform: translate(0,0) scale(.3); } }
-
-/* Final Cut Pro-inspired timeline marker: compact flag above a precise stem. */
-.remark-ink-particle,
-.remark-marker-stroke { display: none !important; }
+/* A compact flag above a precise stem, Final-Cut-style. */
 .remark-video-mark,
 .remark-video-timeline-feedback i {
   display: block;
@@ -435,6 +104,7 @@ html.remark-page-light mark.remark-highlight-mark {
   transform: translate(-50%, -100%);
   transform-origin: bottom center;
 }
+
 .remark-video-mark::before,
 .remark-video-timeline-feedback i::before {
   content: '';
@@ -446,19 +116,139 @@ html.remark-page-light mark.remark-highlight-mark {
   background: rgb(250, 222, 74);
   clip-path: polygon(0 0, 100% 0, 100% 64%, 50% 100%, 0 64%);
 }
+
 .remark-video-mark::after,
-.remark-video-timeline-feedback i::after { display: none; }
+.remark-video-timeline-feedback i::after {
+  display: none;
+}
+
+.remark-video-mark {
+  position: absolute;
+  top: 50%;
+  z-index: 90;
+  pointer-events: auto;
+}
+
 .remark-video-mark.pop,
 .remark-video-timeline-feedback i {
   animation: remark-fcp-marker-arrive .38s cubic-bezier(.2, .8, .28, 1) both;
 }
+
 @keyframes remark-fcp-marker-arrive {
   0% { opacity: 0; transform: translate(-50%, -100%) translateY(-5px) scale(.84); }
   64% { opacity: 1; transform: translate(-50%, -100%) translateY(1px) scale(1.04); }
   100% { opacity: 1; transform: translate(-50%, -100%) translateY(0) scale(1); }
 }
 
-/* ReMark onboarding: a small, interactive product demonstration. */
+/* Marker tooltip. */
+.remark-video-mark-tip {
+  position: fixed;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 9px;
+  background: rgba(26, 29, 34, .92);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 500;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .28);
+  white-space: nowrap;
+  pointer-events: auto;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI",
+    Roboto, sans-serif;
+}
+
+.remark-video-mark-tip-time {
+  color: #ffe9a8;
+  font-variant-numeric: tabular-nums;
+}
+
+.remark-video-mark-tip-del {
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  color: rgba(255, 255, 255, .75);
+  transition: transform .12s ease, color .12s ease;
+}
+
+.remark-video-mark-tip-del:hover {
+  transform: scale(1.2);
+  color: #fff;
+}
+
+/* Landing dot shown inside the video frame when controls are hidden. */
+.remark-video-marker-feedback {
+  position: fixed;
+  z-index: 2147483646;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgb(250, 222, 74);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+.remark-video-marker-feedback.land {
+  animation: remark-marker-frame-land .44s cubic-bezier(.22, .82, .32, 1) both;
+}
+
+@keyframes remark-marker-frame-land {
+  0% { opacity: .35; transform: translate(-50%, -50%) translateY(-10px) scale(.92); }
+  58% { opacity: 1; transform: translate(-50%, -50%) translateY(2px) scale(1.04); }
+  78% { opacity: 1; transform: translate(-50%, -50%) translateY(-1px) scale(.99); }
+  100% { opacity: 1; transform: translate(-50%, -50%) translateY(0) scale(1); }
+}
+
+/* Fullscreen fallback timeline: appears only for the landing, then fades. */
+.remark-video-timeline-feedback {
+  position: fixed;
+  z-index: 2147483646;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .42);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity .16s ease, transform .16s ease;
+}
+
+.remark-video-timeline-feedback.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.remark-video-timeline-feedback.fade {
+  opacity: 0;
+  transform: translateY(2px);
+  transition-duration: .28s;
+}
+
+.remark-video-timeline-feedback i {
+  position: absolute;
+  top: 50%;
+}
+
+/* Particle effects are disabled: the flag keeps the timeline quiet. */
+.remark-ink-particle,
+.remark-marker-stroke {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .remark-video-mark.pop,
+  .remark-video-marker-feedback.land,
+  .remark-video-timeline-feedback,
+  .remark-video-timeline-feedback i {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ---------- Onboarding ---------- */
+
 .remark-onboarding {
   position: fixed;
   inset: 0;
@@ -466,33 +256,213 @@ html.remark-page-light mark.remark-highlight-mark {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(20, 24, 30, .24);
+  background: rgba(18, 20, 24, .30);
 }
+
 .remark-onboarding-card {
   position: relative;
   width: min(440px, 100%);
-  padding: 26px;
-  border: 1px solid rgba(28, 32, 38, .1);
-  border-radius: 16px;
+  box-sizing: border-box;
+  padding: 26px 24px 22px;
+  border: 1px solid rgba(35, 37, 41, .08);
+  border-radius: 18px;
   background: #fff;
-  box-shadow: 0 18px 55px rgba(30, 36, 44, .2);
-  color: #20242a;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  box-shadow: 0 22px 60px rgba(20, 22, 26, .22);
+  color: #26282d;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
 }
-.remark-onboarding-card h2 { margin: 0; font-size: 22px; letter-spacing: -.03em; }
-.remark-onboarding-subtitle { margin: 5px 0 20px; color: #69707a; font-size: 13px; }
-.remark-onboarding-close { position: absolute; top: 12px; right: 12px; border: 0; background: transparent; color: #707782; font-size: 20px; cursor: pointer; }
-.remark-onboarding-step { position: relative; margin-top: 10px; padding: 15px; border: 1px solid #e7e9ed; border-radius: 12px; background: #fcfcfd; }
-.remark-onboarding-step h3 { margin: 0 0 4px; font-size: 14px; }
-.remark-onboarding-step p { margin: 0; color: #68707a; font-size: 12px; line-height: 1.5; }
-.remark-onboarding-sample { margin-top: 11px !important; padding: 10px; border-radius: 8px; background: #fff5bd; color: #31353a !important; cursor: text; user-select: text; }
-.remark-onboarding-done { display: inline-block; margin-top: 10px; color: #16845b; font-size: 12px; font-weight: 700; }
-................ng-step.is-complete { border-color: #98d9bd; background: #f2fcf6; }
-.remark-onboarding-links { display: flex; gap: 8px; margin-top: 11px; }
-.remark-onboarding-links button, .remark-onboarding-finish { border: 0; border-radius: 8px; background: #ff2d55; color: #fff; cursor: pointer; font-size: 12px; font-weight: 700; padding: 8px 11px; }
-.remark-onboarding-links button { background: #eef1f5; color: #333941; }
-.remark-onboarding-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 20px; }
-.remark-onboarding-dismiss { border: 0; background: transparent; color: #707782; cursor: pointer; font-size: 12px; }
-.remark-onboarding-finish:disabled { opacity: .42; cursor: default; }
-.remark-onboarding-card button:focus-visible { outline: 3px solid rgba(47, 111, 237, .3); outline-offset: 2px; }
-@media (max-width: 430px) { .remark-onboarding-card { padding: 20px; } .remark-onboarding-links { flex-direction: column; } }
+
+.remark-onboarding-card h2 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 750;
+  letter-spacing: -.02em;
+}
+
+.remark-onboarding-subtitle {
+  margin: 5px 0 20px;
+  color: #6e7480;
+  font-size: 13px;
+}
+
+.remark-onboarding-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: #f2f1ec;
+  color: #8b909a;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
+}
+
+.remark-onboarding-close:hover {
+  background: #e9e7e0;
+  color: #26282d;
+}
+
+.remark-onboarding-step {
+  position: relative;
+  margin-top: 10px;
+  padding: 14px 15px;
+  border: 1px solid #e9e6df;
+  border-radius: 12px;
+  background: #fcfbf9;
+}
+
+.remark-onboarding-step h3 {
+  margin: 0 0 4px;
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.remark-onboarding-step p {
+  margin: 0;
+  color: #6e7480;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.remark-onboarding-sample {
+  margin-top: 11px !important;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(250, 222, 74, .38);
+  color: #3a3626 !important;
+  cursor: text;
+  user-select: text;
+}
+
+.remark-onboarding-done {
+  display: inline-block;
+  margin-top: 9px;
+  color: #2f7d4f;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.remark-onboarding-step.is-complete {
+  border-color: rgba(200, 160, 46, .45);
+  background: rgba(250, 222, 74, .10);
+}
+
+.remark-onboarding-links {
+  display: flex;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.remark-onboarding-links button,
+.remark-onboarding-finish {
+  border: 0;
+  border-radius: 8px;
+  background: #26282d;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+  padding: 8px 11px;
+  transition: background-color .15s ease;
+}
+
+.remark-onboarding-links button {
+  background: #f1f0eb;
+  color: #4d525a;
+}
+
+.remark-onboarding-links button:hover {
+  background: #e9e7e0;
+  color: #26282d;
+}
+
+.remark-onboarding-finish:hover {
+  background: #1b1d21;
+}
+
+.remark-onboarding-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.remark-onboarding-dismiss {
+  border: 0;
+  background: transparent;
+  color: #8b909a;
+  cursor: pointer;
+  font-size: 12px;
+  transition: color .15s ease;
+}
+
+.remark-onboarding-dismiss:hover {
+  color: #4d525a;
+}
+
+.remark-onboarding-finish:disabled {
+  opacity: .4;
+  cursor: default;
+}
+
+.remark-onboarding-card button:focus-visible {
+  outline: 2px solid rgba(38, 40, 45, .25);
+  outline-offset: 2px;
+}
+
+@media (max-width: 430px) {
+  .remark-onboarding-card {
+    padding: 20px;
+  }
+
+  .remark-onboarding-links {
+    flex-direction: column;
+  }
+}
+
+/* ---------- Quick note ---------- */
+
+.remark-quick-note {
+  position: fixed;
+  z-index: 2147483647;
+  width: 280px;
+  box-sizing: border-box;
+  padding: 10px 11px;
+  border: 1px solid rgba(35, 37, 41, .14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .98);
+  box-shadow: 0 14px 40px rgba(16, 20, 26, .18);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+.remark-quick-note textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 58px;
+  padding: 0;
+  border: 0;
+  resize: vertical;
+  background: transparent;
+  color: #26282d;
+  font: 13px/1.5 inherit;
+  outline: 0;
+}
+
+.remark-quick-note textarea::placeholder {
+  color: #b0b4bc;
+}
+
+.remark-quick-note span {
+  display: block;
+  margin-top: 6px;
+  color: #8b909a;
+  font-size: 10px;
+}

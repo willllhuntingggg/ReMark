@@ -5,12 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ReMark — Mark it now. Find it later.</title>
   <link rel="stylesheet" href="sidepanel.css">
-  <link rel="stylesheet" href="tailwind.css">
 </head>
 <body>
   <div class="app-container">
     <header class="app-header">
-      <div class="brand"><span class="brand-title">ReMark</span></div>
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 4.5h10a.75.75 0 0 1 .75.75V19.5l-5.75-3.9L6.25 19.5V5.25A.75.75 0 0 1 7 4.5z"
+            fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        </svg>
+        <span class="brand-title">ReMark</span>
+      </div>
       <div class="view-identity">
         <button id="source-back" class="source-back" type="button" hidden>
           <span aria-hidden="true">←</span>
@@ -22,17 +27,27 @@
       </div>
       <button id="settings-open" class="settings-trigger" type="button"
         data-i18n-aria-label="open_more" aria-label="Open more menu">
-        <span aria-hidden="true">•••</span>
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx="3" cy="8" r="1.4" fill="currentColor"/>
+          <circle cx="8" cy="8" r="1.4" fill="currentColor"/>
+          <circle cx="13" cy="8" r="1.4" fill="currentColor"/>
+        </svg>
       </button>
     </header>
     <div id="timeline-controls" class="controls-bar">
       <div class="search-box">
-        <span class="search-icon" aria-hidden="true">/</span>
+        <span class="search-icon" aria-hidden="true">
+          <svg viewBox="0 0 16 16">
+            <circle cx="6.75" cy="6.75" r="4.25" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="9.9" y1="9.9" x2="13.5" y2="13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </span>
         <input type="text" id="search-input"
           data-i18n-placeholder="search_placeholder"
           data-i18n-aria-label="search_marks"
           placeholder="Search Marks, notes, sources, or timestamps"
           aria-label="Search Marks">
+        <span class="search-kbd" aria-hidden="true">/</span>
         <button id="search-clear" class="clear-btn" type="button"
           data-i18n-aria-label="clear_search" aria-label="Clear search" hidden>×</button>
       </div>
@@ -42,7 +57,12 @@
         <div id="collection-context" class="collection-context" hidden></div>
         <div id="clips-container" class="clips-list" aria-live="polite"></div>
         <div id="clips-empty-state" class="empty-state" hidden>
-          <div class="empty-icon" aria-hidden="true">—</div>
+          <div class="empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M7 4.5h10a.75.75 0 0 1 .75.75V19.5l-5.75-3.9L6.25 19.5V5.25A.75.75 0 0 1 7 4.5z"
+                fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            </svg>
+          </div>
           <h3 data-i18n="no_marks_title">No Marks yet</h3>
           <p data-i18n="no_marks_description">
             Select text while holding Command/Ctrl, or press Command/Ctrl+M in a video.
@@ -51,9 +71,10 @@
       </section>
       <section id="panel-settings" class="settings-panel" hidden>
         <div class="settings-heading">
-          <button id="settings-back" class="settings-back" type="button">
-            <span aria-hidden="true">←</span>
-            <span data-i18n="close_more">Back to timeline</span>
+          <h2 class="settings-title" data-i18n="more">More</h2>
+          <button id="settings-back" class="settings-back" type="button"
+            data-i18n-aria-label="close_more" aria-label="Close">
+            <span aria-hidden="true">✕</span>
           </button>
         </div>
         <section class="language-section" aria-labelledby="language-heading">

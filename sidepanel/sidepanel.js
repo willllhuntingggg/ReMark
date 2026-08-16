@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function all() {
     return [
-      ...clips.map((raw) => ({ id: raw.id, key: `h:${raw.id}`, type: 'highlight', raw, url: raw.url || '', title: raw.pageTitle || t('untitled_page'), text: raw.text || '', note: raw.note || '', createdAt: Number(raw.createdAt) || 0, position: Number.isFinite(Number(raw.sourcePosition)) ? Number(raw.sourcePosition) : null })),
+      ...clips.map((raw) => ({ id: raw.id, key: `h:${raw.id}`, type: 'highlight', raw, url: raw.url || '', title: raw.pageTitle || t('untitled_page'), text: raw.text || '', note: raw.note || '', createdAt: Number(raw.createdAt) || 0, position: Number.isFinite(Number(raw.sourcePosition)) ? Number(raw.sourcePosition) : null, posX: Number.isFinite(Number(raw.sourcePositionX)) ? Number(raw.sourcePositionX) : null })),
       ...videos.map((raw) => ({ id: raw.id, key: `v:${raw.id}`, type: 'video', raw, url: raw.url || '', title: raw.title || t('untitled_video'), text: '', note: raw.note || '', createdAt: Number(raw.createdAt) || 0, time: Number(raw.time) || 0, duration: Number(raw.duration) || 0 }))
     ];
   }
@@ -175,7 +175,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (sourceUrl === null) return rows.sort((a, b) => b.createdAt - a.createdAt);
     return rows.filter((item) => sameUrl(item.url, sourceUrl)).sort((a, b) => {
       if (a.type === 'video' && b.type === 'video') return a.time - b.time;
-      if (a.type === 'highlight' && b.type === 'highlight') { if (a.position !== null && b.position !== null) return a.position - b.position; if (a.position !== null) return -1; if (b.position !== null) return 1; }
+      if (a.type === 'highlight' && b.type === 'highlight') {
+        // Reading order: top → bottom, then left → right on the same line.
+        if (a.position !== null && b.position !== null) {
+          if (a.position !== b.position) return a.position - b.position;
+          return (a.posX ?? 0) - (b.posX ?? 0);
+        }
+        if (a.position !== null) return -1;
+        if (b.position !== null) return 1;
+        return a.createdAt - b.createdAt;
+      }
       return a.createdAt - b.createdAt;
     });
   }
@@ -223,10 +232,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       ? `<button class="mark-source" data-action="source" data-url="${esc(item.url)}" type="button" title="${esc(item.url)}">${sourceIcon}<span>${esc(source)}</span></button>`
       : '';
     const menu = [
+      `<button data-action="unmark" data-key="${esc(item.key)}" type="button">${esc(t('unmark'))}</button>`,
       `<button data-action="note" data-key="${esc(item.key)}" type="button">${esc(t(item.note ? 'edit_note' : 'add_note'))}</button>`,
-      item.note ? `<button data-action="remove-note" data-key="${esc(item.key)}" type="button">${esc(t('remove_note'))}</button>` : '',
-      `<button data-action="copy" data-key="${esc(item.key)}" type="button">${esc(t('copy'))}</button>`,
-      `<button data-action="delete" data-key="${esc(item.key)}" type="button">${esc(t('delete_mark'))}</button>`
+      `<button data-action="copy" data-key="${esc(item.key)}" type="button">${esc(t('copy'))}</button>`
     ].join('');
     const quote = item.type === 'highlight'
       ? '<span class="mark-quote" aria-hidden="true">“</span>'
@@ -412,6 +420,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       await Promise.all((tabs || []).filter((tab) => sameUrl(tab.url, item.url) && Number.isInteger(tab.id)).map((tab) => safeSendMessage(tab.id, message)));
     } catch (_) {}
   }
+  // If any highlight in this source still lacks page-position data and the
+  // source page is open in a tab, ask its content script to backfill it so
+  // the collection can be ordered top-to-bottom / left-to-right.
+  function syncSourcePositions(url) {
+    const rows = all().filter((item) => item.type === 'highlight' && sameUrl(item.url, url) && (item.position === null || item.posX === null));
+    if (!rows.length) return;
+    globalThis.chrome?.tabs?.query({}).then((tabs) => {
+      const tab = tabs.find((row) => sameUrl(row.url, url));
+      if (tab?.id) safeSendMessage(tab.id, { action: 'COMPUTE_CLIP_POSITIONS', url });
+    }).catch(() => {});
+  }
   function setActive(key) { selected = key; list.querySelectorAll('.mark-active').forEach((node) => node.classList.remove('mark-active')); cardFor(key)?.classList.add('mark-active'); }
   function clearActive(key) { if (selected === key) { selected = null; cardFor(key)?.classList.remove('mark-active'); } }
   function moveActive(delta) { const rows = visible(); if (!rows.length) return; let index = rows.findIndex((row) => row.key === selected); index = index < 0 ? (delta > 0 ? 0 : rows.length - 1) : Math.max(0, Math.min(rows.length - 1, index + delta)); const key = rows[index].key; setActive(key); cardFor(key)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
@@ -451,11 +470,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!control) return;
     const { action, key, url } = control.dataset;
     if (action === 'jump') { setActive(key); void jump(itemFor(key)); return; }
-    if (action === 'source') { sourceUrl = url || ''; selected = null; render(); return; }
+    if (action === 'source') { sourceUrl = url || ''; selected = null; render(); syncSourcePositions(sourceUrl); return; }
+    if (action === 'unmark') void deleteMark(key);
     if (action === 'note') { setActive(key); openNote(key); }
-    if (action === 'remove-note') { setActive(key); void saveNote(key, ''); }
     if (action === 'copy') void copyMark(key);
-    if (action === 'delete') void deleteMark(key);
     if (action === 'menu') {
       setActive(key);
       openMarkMenu(control.parentElement.querySelector('.mark-menu'));

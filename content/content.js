@@ -54,8 +54,20 @@
     restore();
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', restore, { once: true });
     window.addEventListener('load', restore, { once: true });
-    window.setTimeout(restore, 800);
-    window.setTimeout(restore, 2200);
+    // Fixed retries cover slow first paints...
+    [800, 2200, 4000, 7000].forEach((delay) => window.setTimeout(restore, delay));
+    // ...and a debounced MutationObserver catches content that renders much
+    // later (SPA routes, lazy loading, comments). It stops as soon as every
+    // clip is restored, and hard-stops after 20s.
+    let timer = null;
+    const observer = new MutationObserver(() => {
+      clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        restorePageHighlights().then((allDone) => { if (allDone) observer.disconnect(); });
+      }, 500);
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    window.setTimeout(() => observer.disconnect(), 20000);
   }
   let onboardingTutorial = null;
 
@@ -173,13 +185,27 @@
     document.addEventListener('click', swallow, true);
     setTimeout(() => document.removeEventListener('click', swallow, true), 650);
   }
+  function isEditableSelection(selection) {
+    const node = selection?.anchorNode;
+    if (!node) return false;
+    const parent = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    return Boolean(parent && parent.closest && parent.closest('input, textarea, [contenteditable]'));
+  }
   document.addEventListener('mouseup', (event) => {
-    if (event.button !== 0 || !(event.metaKey || event.ctrlKey)) return;
+    if (event.button !== 0) return;
     const selection = window.getSelection();
     const text = selection?.toString().trim();
-    if (!text || text.length < 2) return;
+    const range = (() => { try { return selection && selection.rangeCount ? selection.getRangeAt(0) : null; } catch (_) { return null; } })();
+    if (!text || text.length < 2 || !range || isEditableSelection(selection)) { hideMarkPill(); return; }
+    if (!(event.metaKey || event.ctrlKey)) {
+      // Plain selection: offer a one-click Mark pill next to the selection.
+      if (isTutorialTextRange(range)) { hideMarkPill(); return; }
+      const rect = range.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      showMarkPill({ text, range: range.cloneRange() }, { x: event.clientX, y: event.clientY });
+      return;
+    }
     try {
-      const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
       event.preventDefault();
@@ -211,6 +237,8 @@
       removeClipHighlightFromDOM(msg.clipId);
     } else if (msg.action === 'DELETE_PAGE_CLIPS_FROM_PAGE') {
       removeAllPageHighlightsFromDOM();
+    } else if (msg.action === 'COMPUTE_CLIP_POSITIONS') {
+      void computeClipPositionsForPage();
     } else if (msg.action === 'REFRESH_VIDEO_MARKS' || msg.action === 'VIDEO_MARK_DELETED') {
       renderVideoMarkers();
     } else if (msg.action === 'SEEK_VIDEO_MARK') {
@@ -415,6 +443,7 @@
       pageTitle: document.title,
       text,
       sourcePosition: range ? Math.round(range.getBoundingClientRect().top + window.scrollY) : null,
+      sourcePositionX: range ? Math.round(range.getBoundingClientRect().left) : null,
       color: colorCode,
       note: ''
     };
@@ -423,7 +452,7 @@
     await ReMarkStorage.pushUndo({ type: 'restore_clip', id: savedClip.id });
     if (range) {
       highlightDOMRange(range, savedClip, true);
-      showHighlightActions(savedClip.id, 2800);
+      if (!options.suppressActions) showHighlightActions(savedClip.id, 2800);
       window.getSelection()?.removeAllRanges();
     }
     notifyStorageUpdated();
@@ -436,6 +465,7 @@
         notifyStorageUpdated();
       }
     });
+    return savedClip;
   }
 
   function openQuickNoteInput({ rect, onSave, initialValue = '' }) {
@@ -510,6 +540,183 @@
     clearTimeout(showPageToast.timer);
     document.getElementById('remark-page-toast-root')?.remove();
   }
+
+  // ========= One-click Mark pill =========
+  // The floating action row is always [Mark] [Note] [Copy]. The Mark
+  // button is a toggle: unmarked → create the highlight; marked (filled
+  // pen + check) → click again to unmark. The state flips in place — the
+  // row never disappears or flashes. The row dismisses itself, but never
+  // while the pointer is over it; every button shows a hover tooltip
+  // (data-hint), like the anchored actions.
+  // Official Font Awesome solid icons (CC BY 4.0, Fonticons Inc.):
+  // fa-highlighter / fa-note-sticky / fa-copy. The marked state reuses the
+  // highlighter — the gold button background carries the state signal.
+  const MARK_PILL_ICON = '<svg viewBox="0 0 576 512" aria-hidden="true"><path fill="currentColor" d="M315 315l158.4-215L444.1 70.6 229 229 315 315zm-187 5l0 0V248.3c0-15.3 7.2-29.6 19.5-38.6L420.6 8.4C428 2.9 437 0 446.2 0c11.4 0 22.4 4.5 30.5 12.6l54.8 54.8c8.1 8.1 12.6 19 12.6 30.5c0 9.2-2.9 18.2-8.4 25.6L334.4 396.5c-9 12.3-23.4 19.5-38.6 19.5H224l-25.4 25.4c-12.5 12.5-32.8 12.5-45.3 0l-50.7-50.7c-12.5-12.5-12.5-32.8 0-45.3L128 320zM7 466.3l63-63 70.6 70.6-31 31c-4.5 4.5-10.6 7-17 7H24c-13.3 0-24-10.7-24-24v-4.7c0-6.4 2.5-12.5 7-17z"/></svg>';
+  const MARKED_PILL_ICON = MARK_PILL_ICON;
+  const NOTE_BTN_ICON = '<svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M64 32C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64H288V368c0-26.5 21.5-48 48-48H448V96c0-35.3-28.7-64-64-64H64zM448 352H402.7 336c-8.8 0-16 7.2-16 16v66.7V480l32-32 64-64 32-32z"/></svg>';
+  const COPY_BTN_ICON = '<svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M208 0H332.1c12.7 0 24.9 5.1 33.9 14.1l67.9 67.9c9 9 14.1 21.2 14.1 33.9V336c0 26.5-21.5 48-48 48H208c-26.5 0-48-21.5-48-48V48c0-26.5 21.5-48 48-48zM48 128h80v64H64V448H256V416h64v48c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V176c0-26.5 21.5-48 48-48z"/></svg>';
+  const DELETE_BTN_ICON = '<svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96H416c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 296.3 0 284.2 0H163.8c-12.1 0-23.2 6.8-28.6 17.7zM416 128H32L53.2 467c1.6 25.3 22.6 45 47.9 45H346.9c25.3 0 46.3-19.7 47.9-45L416 128z"/></svg>';
+  let markPillEl = null;
+  let markPillContext = null;  // { text, range } while in the selection state
+  let markPillClipId = null;   // clip id once the row morphed to the highlighted state
+  let markPillHideTimer = null;
+  function makePillAction(kind, icon, hint, onClick, extraClass = '') {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `remark-mark-action remark-mark-action--${kind}${extraClass ? ' ' + extraClass : ''}`;
+    button.dataset.hint = hint;
+    button.setAttribute('aria-label', hint);
+    button.innerHTML = icon;
+    button.__pillAction = onClick;
+    button.addEventListener('pointerdown', (event) => { event.preventDefault(); event.stopPropagation(); });
+    return button;
+  }
+  function setPillButtons(state, clipId) {
+    const el = markPillEl;
+    if (!el) return;
+    el.querySelectorAll('.remark-mark-action').forEach((node) => node.remove());
+    el.append(
+      makePillAction('mark', MARK_PILL_ICON, '', () => {}),
+      makePillAction('note', NOTE_BTN_ICON, '', () => {}),
+      makePillAction('copy', COPY_BTN_ICON, '', () => {})
+    );
+    updatePillMarkState(state === 'highlight', clipId);
+  }
+  // Flip only the buttons' state in place — the row never disappears.
+  function updatePillMarkState(marked, clipId) {
+    const el = markPillEl;
+    if (!el) return;
+    const markBtn = el.querySelector('.remark-mark-action--mark');
+    const noteBtn = el.querySelector('.remark-mark-action--note');
+    const copyBtn = el.querySelector('.remark-mark-action--copy');
+    if (markBtn) {
+      if (marked) {
+        markBtn.classList.add('remark-mark-action--marked');
+        markBtn.innerHTML = MARKED_PILL_ICON;
+        markBtn.dataset.hint = t('unmark');
+        markBtn.__pillAction = () => { hideMarkPill(); void deletePageClip(clipId); };
+      } else {
+        markBtn.classList.remove('remark-mark-action--marked');
+        markBtn.innerHTML = MARK_PILL_ICON;
+        markBtn.dataset.hint = t('mark_action');
+        markBtn.__pillAction = () => { void markFromPill(); };
+      }
+      markBtn.setAttribute('aria-label', markBtn.dataset.hint);
+    }
+    if (noteBtn) {
+      noteBtn.dataset.hint = marked ? `${t('add_note')} · Shift+Enter` : t('add_note');
+      noteBtn.setAttribute('aria-label', noteBtn.dataset.hint);
+      noteBtn.__pillAction = marked
+        ? () => { void openPageNoteEditor(clipId, getHighlightActionAnchor(clipId)); }
+        : () => { void markFromPill({ withNote: true }); };
+    }
+    if (copyBtn) {
+      copyBtn.dataset.hint = t('copy');
+      copyBtn.setAttribute('aria-label', t('copy'));
+      copyBtn.__pillAction = marked
+        ? () => { void copyPageClip(clipId); }
+        : () => { copySelectionFromPill(); };
+    }
+  }
+  function showMarkPill(context, point) {
+    clearTimeout(markPillHideTimer);
+    markPillContext = context;
+    markPillClipId = null;
+    let el = markPillEl;
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'remark-mark-actions remark-mark-pill';
+      el.addEventListener('mouseenter', () => clearTimeout(markPillHideTimer));
+      el.addEventListener('mouseleave', () => scheduleMarkPillHide(600));
+      el.addEventListener('click', (event) => {
+        const btn = event.target.closest('.remark-mark-action');
+        if (!btn) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (btn.__pillAction) btn.__pillAction();
+      });
+      document.body.appendChild(el);
+      markPillEl = el;
+    }
+    setPillButtons('selection');
+    positionMarkPill(el, point);
+    void el.offsetWidth;
+    el.classList.add('is-visible');
+    scheduleMarkPillHide();
+  }
+  function positionMarkPill(el, point) {
+    const rect = el.getBoundingClientRect();
+    const width = Math.max(rect.width, 70);
+    const height = Math.max(rect.height, 28);
+    let left = point.x - width / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+    let top = point.y + 12;
+    if (top + height > window.innerHeight - 8) top = point.y - height - 10;
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }
+  function scheduleMarkPillHide(delay = 2500) {
+    clearTimeout(markPillHideTimer);
+    markPillHideTimer = window.setTimeout(() => {
+      if (markPillEl) markPillEl.classList.remove('is-visible');
+    }, delay);
+  }
+  function hideMarkPill() {
+    clearTimeout(markPillHideTimer);
+    if (markPillEl) { markPillEl.remove(); markPillEl = null; }
+    markPillContext = null;
+    markPillClipId = null;
+  }
+  function copySelectionFromPill() {
+    const ctx = markPillContext;
+    if (!ctx || !ctx.text) return;
+    void copyTextToClipboard(ctx.text);
+    showPageToast(t('copied'));
+  }
+  async function markFromPill(options = {}) {
+    const ctx = markPillContext;
+    if (!ctx || !ctx.text || !ctx.range) return;
+    markPillContext = null;
+    try {
+      currentSelection = { text: ctx.text, range: ctx.range.cloneRange() };
+      const saved = await quickHighlightSelection(DEFAULT_HIGHLIGHT_COLOR, {
+        anchorRect: ctx.range.getBoundingClientRect(),
+        withNote: Boolean(options.withNote),
+        suppressActions: true
+      });
+      if (!saved || !markPillEl) { hideMarkPill(); return; }
+      markPillClipId = saved.id;
+      // Only the buttons' state flips — the row stays fixed, no flash.
+      updatePillMarkState(true, saved.id);
+      scheduleMarkPillHide(4000);
+    } catch (error) {
+      console.warn('[ReMark] Mark from pill failed:', error);
+      hideMarkPill();
+    }
+  }
+  // Reappear while the pointer is over the selected range.
+  document.addEventListener('mousemove', (event) => {
+    const ctx = markPillContext;
+    if (!ctx) return;
+    let inside = false;
+    try {
+      const rects = ctx.range.getClientRects();
+      for (const r of rects) {
+        if (event.clientX >= r.left && event.clientX <= r.right && event.clientY >= r.top && event.clientY <= r.bottom) { inside = true; break; }
+      }
+    } catch (_) {}
+    if (inside) {
+      if (!markPillEl || !markPillEl.classList.contains('is-visible')) showMarkPill(ctx, { x: event.clientX, y: event.clientY });
+      else clearTimeout(markPillHideTimer);
+    } else if (markPillEl?.classList.contains('is-visible')) {
+      scheduleMarkPillHide(500);
+    }
+  });
+  // Starting a new selection elsewhere hides the pill; clicking the pill itself must not.
+  document.addEventListener('mousedown', (event) => {
+    if (event.target.closest?.('.remark-mark-pill')) return;
+    hideMarkPill();
+  }, true);
 
   // DOM Highlighting Engine
   // fresh = true when the mark was just created by the user; it then lands
@@ -668,34 +875,36 @@
     actions.className = 'remark-mark-actions';
     actions.setAttribute('role', 'group');
     actions.setAttribute('aria-label', t('more_actions'));
+    // The row is [mark ✓][note][copy]: the mark button is a toggle — click
+    // it again to unmark (the previous delete).
+    const mark = document.createElement('button');
+    mark.type = 'button';
+    mark.className = 'remark-mark-action remark-mark-action--mark remark-mark-action--marked';
+    mark.dataset.hint = t('unmark');
+    mark.setAttribute('aria-label', t('unmark'));
+    mark.innerHTML = MARKED_PILL_ICON;
     const note = document.createElement('button');
     note.type = 'button';
     note.className = 'remark-mark-action remark-mark-action--note';
     note.dataset.hint = `${t('add_note')} · Shift+Enter`;
     note.setAttribute('aria-label', t('add_note'));
-    note.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h8v8.3L8.2 14H4z"></path><path d="M5.8 5.2h4.4M5.8 7.5h4.4"></path></svg>';
+    note.innerHTML = NOTE_BTN_ICON;
     const copy = document.createElement('button');
     copy.type = 'button';
     copy.className = 'remark-mark-action remark-mark-action--copy';
     copy.dataset.hint = t('copy');
     copy.setAttribute('aria-label', t('copy'));
-    copy.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.2" y="5.2" width="7.6" height="7.6" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.4"></rect><path d="M9.6 5.2V4.2c0-.7.6-1.3 1.3-1.3h1.8c.7 0 1.3.6 1.3 1.3v3.3c0 .7-.6 1.3-1.3 1.3h-.9" fill="none" stroke="currentColor" stroke-width="1.4"></path></svg>';
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'remark-mark-action remark-mark-action--delete';
-    remove.dataset.hint = `${t('delete_mark')} · Del`;
-    remove.setAttribute('aria-label', t('delete_mark'));
-    remove.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.2 4.6h9.6M6.2 2.7h3.6M5 4.6l.6 8.2h4.8l.6-8.2M6.8 6.7v3.9M9.2 6.7v3.9"></path></svg>';
+    copy.innerHTML = COPY_BTN_ICON;
     const stop = (event) => { event.preventDefault(); event.stopPropagation(); };
+    mark.addEventListener('pointerdown', stop);
     note.addEventListener('pointerdown', stop);
     copy.addEventListener('pointerdown', stop);
-    remove.addEventListener('pointerdown', stop);
+    mark.addEventListener('click', async (event) => { stop(event); await deletePageClip(clipId); });
     note.addEventListener('click', async (event) => { stop(event); await openPageNoteEditor(clipId, host); });
     copy.addEventListener('click', async (event) => { stop(event); await copyPageClip(clipId); });
-    remove.addEventListener('click', async (event) => { stop(event); await deletePageClip(clipId); });
     actions.addEventListener('mouseenter', () => cancelHighlightActionHide(clipId));
     actions.addEventListener('mouseleave', () => scheduleHighlightActionHide(clipId));
-    actions.append(note, copy, remove);
+    actions.append(mark, note, copy);
     mount.appendChild(actions);
     return actions;
   }
@@ -727,14 +936,51 @@
     }
   }
 
-  // Restore page highlights from storage.
+  // Backfill page positions for every clip of this page that is currently
+  // rendered, so older marks without position data can be ordered too.
+  async function computeClipPositionsForPage() {
+    const clips = await ReMarkStorage.getClips();
+    const currentUrl = window.location.href;
+    for (const clip of clips) {
+      if (!clip.url || !samePageUrl(clip.url, currentUrl)) continue;
+      if (Number.isFinite(Number(clip.sourcePosition)) && Number.isFinite(Number(clip.sourcePositionX))) continue;
+      const mark = [...document.querySelectorAll(`mark[data-clip-id="${clip.id}"]`)].at(-1);
+      if (!mark) continue;
+      const rect = mark.getBoundingClientRect();
+      await ReMarkStorage.updateClip(clip.id, {
+        sourcePosition: Math.round(rect.top + window.scrollY),
+        sourcePositionX: Math.round(rect.left)
+      });
+    }
+    notifyStorageUpdated();
+  }
+  // Two URLs belong to the same page when their host (sans www) and path
+  // match; hash, query strings and trailing slashes are ignored. If the
+  // marked text is absent from the page, the text matcher simply skips it,
+  // so loose URL matching is safe.
+  function samePageUrl(a, b) {
+    const norm = (value) => {
+      try {
+        const url = new URL(value);
+        return url.hostname.replace(/^www\./, '').toLowerCase() + url.pathname.replace(/\/+$/, '');
+      } catch (_) {
+        return String(value || '').split('#')[0].replace(/\/+$/, '');
+      }
+    };
+    return norm(a) === norm(b);
+  }
+  // Restore page highlights from storage. Returns true when every clip for
+  // this page is restored (or nothing is pending), which lets the caller
+  // stop watching the DOM.
   async function restorePageHighlights() {
     const clips = await ReMarkStorage.getClips();
-    const currentUrl = window.location.href.split('#')[0];
-    loadedClipsForPage = clips.filter((clip) => clip.url && clip.url.split('#')[0] === currentUrl);
+    const currentUrl = window.location.href;
+    loadedClipsForPage = clips.filter((clip) => clip.url && samePageUrl(clip.url, currentUrl));
+    let allDone = true;
     for (const clip of loadedClipsForPage) {
-      if (clip.text) highlightTextInBody(clip);
+      if (clip.text && !highlightTextInBody(clip)) allDone = false;
     }
+    return allDone;
   }
   function highlightTextInBody(clip) {
     if (document.querySelector(`mark[data-clip-id="${clip.id}"]`)) return true;
@@ -774,8 +1020,12 @@
     const range = document.createRange();
     range.setStart(start.node, startIndex - start.start);
     range.setEnd(end.node, endIndex - end.start);
-    if (!Number.isFinite(Number(clip.sourcePosition))) {
-      void ReMarkStorage.updateClip(clip.id, { sourcePosition: Math.round(range.getBoundingClientRect().top + window.scrollY) });
+    if (!Number.isFinite(Number(clip.sourcePosition)) || !Number.isFinite(Number(clip.sourcePositionX))) {
+      const rect = range.getBoundingClientRect();
+      void ReMarkStorage.updateClip(clip.id, {
+        sourcePosition: Math.round(rect.top + window.scrollY),
+        sourcePositionX: Math.round(rect.left)
+      });
     }
     highlightDOMRange(range, clip);
     return true;
@@ -787,6 +1037,7 @@
   let videoMarkRenderedIds = new Set();
   let markTooltipEl = null;
   let markTooltipHideTimer = null;
+  let markShowcaseTimer = null;
   const healedVideoKeys = new Set();
 
   function detectVideoPlatform() {
@@ -1007,19 +1258,37 @@
     e.preventDefault();
     recordVideoMark({ withNote: e.shiftKey });
   }
-  function pulseVideoMarker(markId, video) {
+  function pulseVideoMarker(mark, video) {
     const bar = findVideoProgressBar();
     if (!isTimelineVisible(bar)) {
       if (isFullscreenVideo(video)) revealFullscreenTimeline(video);
-      else showInVideoMarkerFeedback(video);
+      showVideoMarkActions(mark, video, true);
       return;
     }
-    const dot = document.querySelector(`.remark-video-mark[data-mark-id="${CSS.escape(String(markId))}"]`);
-    if (!dot) { showInVideoMarkerFeedback(video); return; }
+    const dot = document.querySelector(`.remark-video-mark[data-mark-id="${CSS.escape(String(mark.id))}"]`);
+    if (!dot) { showVideoMarkActions(mark, video, true); return; }
     addMarkerInkParticles(dot);
     dot.classList.remove('pop');
     void dot.offsetWidth;
     dot.classList.add('pop');
+  }
+  // After marking (or re-marking) a video, show the final flag's action row
+  // (note / copy / delete) directly — no temporary dot.
+  function showVideoMarkActions(mark, video, timelineHidden) {
+    const dot = document.querySelector(`.remark-video-mark[data-mark-id="${CSS.escape(String(mark.id))}"]`);
+    const rect = video.getBoundingClientRect();
+    if (dot && !timelineHidden) {
+      showMarkTooltip(dot, mark, { duration: 3000 });
+      return;
+    }
+    showMarkTooltip(video, mark, {
+      duration: 3000,
+      point: {
+        left: rect.left + rect.width / 2,
+        top: isFullscreenVideo(video) ? rect.bottom - Math.max(28, rect.height * .075) : rect.bottom - 6,
+        width: 0
+      }
+    });
   }
   async function recordVideoMark(options = {}) {
     const video = findVideoElement();
@@ -1057,15 +1326,20 @@
     const existing = marks.find(m => m.videoKey === vkey && Math.abs(m.time - t) < 1);
     const promptForNote = (mark) => {
       if (withNote) video.pause();
-      openQuickNoteInput({ rect: video.getBoundingClientRect(), onSave: async (note) => {
-        if (note) { await ReMarkStorage.updateVideoMark(mark.id, { note }); notifyStorageUpdated(); }
-        if (shouldResume) video.play().catch(() => {});
-      }});
+      // The note input appears at the flag (bottom centre of the video).
+      const rect = video.getBoundingClientRect();
+      openQuickNoteInput({
+        rect: { left: rect.left + rect.width / 2 - 140, bottom: rect.bottom - 10 },
+        onSave: async (note) => {
+          if (note) { await ReMarkStorage.updateVideoMark(mark.id, { note }); notifyStorageUpdated(); }
+          if (shouldResume) video.play().catch(() => {});
+        }
+      });
     };
     if (existing) {
       if (withNote) { promptForNote(existing); return; }
       video.currentTime = existing.time;
-      pulseVideoMarker(existing.id, video);
+      pulseVideoMarker(existing, video);
       return;
     }
     if (withNote) video.pause();
@@ -1077,9 +1351,9 @@
     const timelineHidden = !isTimelineVisible(findVideoProgressBar());
     if (timelineHidden && isFullscreenVideo(video)) revealFullscreenTimeline(video);
     renderVideoMarkers();
-    if (timelineHidden && !isFullscreenVideo(video)) showInVideoMarkerFeedback(video);
+    showVideoMarkActions(savedMark, video, timelineHidden);
     if (withNote) promptForNote(savedMark);
-    // No toast — the dot appearing on the progress bar is the visual confirmation
+    // The flag on the progress bar (with its action row) is the confirmation.
   }
   async function healVideoMarkTitles(vkey) {
     if (!vkey) return false;
@@ -1127,7 +1401,7 @@
 
     const host = getVideoMarkerHost(bar);
     host.querySelectorAll('.remark-video-mark').forEach(el => el.remove());
-    hideMarkTooltip();
+    if (!markShowcaseTimer && !(markTooltipEl && markTooltipEl.matches(':hover'))) hideMarkTooltip();
 
     const marks = await ReMarkStorage.getVideoMarks();
     const forVideo = marks.filter(m => m.videoKey === vkey);
@@ -1159,25 +1433,59 @@
     videoMarkRenderedIds = newIds;
   }
 
-  function showMarkTooltip(dot, mark) {
+  async function copyVideoMark(mark) {
+    const payload = `${mark.title || t('untitled_video')} — ${formatVideoTime(mark.time)}${mark.note ? `\n\n${mark.note}` : ''}`;
+    await copyTextToClipboard(payload);
+    showPageToast(t('copied'));
+  }
+  // Hovering a video mark reveals the same style of action row as the
+  // highlights: note / copy / delete, with Font Awesome icons.
+  function showMarkTooltip(dot, mark, options = {}) {
     if (markTooltipHideTimer) { clearTimeout(markTooltipHideTimer); markTooltipHideTimer = null; }
     hideMarkTooltip();
     const tip = document.createElement('div');
     tip.className = 'remark-video-mark-tip';
-    const notePreview = mark.note ? `<span class="remark-video-mark-tip-note">${escHtml(mark.note)}</span>` : '';
-    tip.innerHTML = `<span class="remark-video-mark-tip-time">${formatVideoTime(mark.time)}</span>${notePreview}<button class="remark-video-mark-tip-del" type="button" title="${t('delete_video_marker')}" aria-label="${t('delete_video_marker')}">×</button>`;
-    document.body.appendChild(tip);
-    markTooltipEl = tip;
-
-    const r = dot.getBoundingClientRect();
-    tip.style.left = `${r.left + r.width / 2}px`;
-    tip.style.top = `${r.top - 8}px`;
-    tip.style.transform = 'translate(-50%, -100%)';
-
-    tip.addEventListener('mouseenter', () => { if (markTooltipHideTimer) { clearTimeout(markTooltipHideTimer); markTooltipHideTimer = null; } });
-    tip.addEventListener('mouseleave', () => scheduleHideMarkTooltip());
-    tip.querySelector('.remark-video-mark-tip-del').addEventListener('click', async (e) => {
-      e.stopPropagation();
+    const time = document.createElement('span');
+    time.className = 'remark-video-mark-tip-time';
+    time.textContent = formatVideoTime(mark.time);
+    const noteBtn = document.createElement('button');
+    noteBtn.type = 'button';
+    noteBtn.className = 'remark-mark-action remark-mark-action--note';
+    noteBtn.dataset.hint = t('add_note');
+    noteBtn.setAttribute('aria-label', t('add_note'));
+    noteBtn.innerHTML = NOTE_BTN_ICON;
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'remark-mark-action remark-mark-action--copy';
+    copyBtn.dataset.hint = t('copy');
+    copyBtn.setAttribute('aria-label', t('copy'));
+    copyBtn.innerHTML = COPY_BTN_ICON;
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'remark-mark-action remark-mark-action--delete';
+    delBtn.dataset.hint = t('delete_video_marker');
+    delBtn.setAttribute('aria-label', t('delete_video_marker'));
+    delBtn.innerHTML = DELETE_BTN_ICON;
+    const stop = (event) => { event.preventDefault(); event.stopPropagation(); };
+    noteBtn.addEventListener('pointerdown', stop);
+    copyBtn.addEventListener('pointerdown', stop);
+    delBtn.addEventListener('pointerdown', stop);
+    noteBtn.addEventListener('click', (event) => {
+      stop(event);
+      hideMarkTooltip();
+      openQuickNoteInput({
+        rect: dot.getBoundingClientRect(),
+        initialValue: mark.note || '',
+        onSave: async (note) => {
+          if (!note) return;
+          await ReMarkStorage.updateVideoMark(mark.id, { note });
+          notifyStorageUpdated();
+        }
+      });
+    });
+    copyBtn.addEventListener('click', (event) => { stop(event); void copyVideoMark(mark); });
+    delBtn.addEventListener('click', async (event) => {
+      stop(event);
       await ReMarkStorage.deleteVideoMark(mark.id);
       await ReMarkStorage.pushUndo({ type: 'delete_video_mark', item: mark });
       hideMarkTooltip();
@@ -1190,14 +1498,38 @@
         }
       });
     });
+    tip.append(time, noteBtn, copyBtn, delBtn);
+    document.body.appendChild(tip);
+    markTooltipEl = tip;
+
+    // options.point overrides the anchor (used when the timeline is hidden);
+    // options.duration keeps the row visible for a while (creation showcase).
+    const anchor = options.point || dot.getBoundingClientRect();
+    tip.style.left = `${anchor.left + (anchor.width || 0) / 2}px`;
+    tip.style.top = `${anchor.top - 8}px`;
+    tip.style.transform = 'translate(-50%, -100%)';
+
+    tip.addEventListener('mouseenter', () => { if (markTooltipHideTimer) { clearTimeout(markTooltipHideTimer); markTooltipHideTimer = null; } });
+    tip.addEventListener('mouseleave', () => scheduleHideMarkTooltip());
+    if (options.duration) {
+      clearTimeout(markShowcaseTimer);
+      markShowcaseTimer = window.setTimeout(() => {
+        markShowcaseTimer = null;
+        if (markTooltipEl && markTooltipEl.matches(':hover')) return;  // hovering keeps it
+        hideMarkTooltip();
+      }, options.duration);
+    }
   }
 
-  function scheduleHideMarkTooltip() {
+  function scheduleHideMarkTooltip(delay = 320) {
+    if (markShowcaseTimer) return;  // keep during the creation showcase
     if (markTooltipHideTimer) clearTimeout(markTooltipHideTimer);
-    markTooltipHideTimer = setTimeout(() => { markTooltipHideTimer = null; hideMarkTooltip(); }, 320);
+    markTooltipHideTimer = setTimeout(() => { markTooltipHideTimer = null; hideMarkTooltip(); }, delay);
   }
 
   function hideMarkTooltip() {
+    clearTimeout(markShowcaseTimer);
+    markShowcaseTimer = null;
     if (markTooltipEl) { markTooltipEl.remove(); markTooltipEl = null; }
   }
 

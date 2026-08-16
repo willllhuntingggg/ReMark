@@ -138,7 +138,15 @@ mark.remark-highlight-mark {
 .remark-mark-action:focus-visible { background: rgb(241, 222, 117); outline: none; }
 .remark-mark-action--delete:hover,
 .remark-mark-action--delete:focus-visible { background: rgb(253, 218, 208); color: rgb(155, 50, 39); }
-.remark-mark-action svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.remark-mark-action--mark.remark-mark-action--marked {
+  background: rgb(241, 222, 117);
+}
+
+.remark-mark-action--mark.remark-mark-action--marked:hover,
+.remark-mark-action--mark.remark-mark-action--marked:focus-visible {
+  background: rgb(255, 233, 106);
+}
+.remark-mark-action svg { height: 1em; width: auto; fill: currentColor; pointer-events: none; }
 .remark-mark-action::after {
   content: attr(data-hint);
   position: absolute;
@@ -233,16 +241,18 @@ html.remark-page-light mark.remark-highlight-mark {
   transform-origin: bottom center;
 }
 
+/* Flag references the side panel's video marker (8×10 pennant); the pin
+   below stays 16px tall. */
 .remark-video-mark::before,
 .remark-video-timeline-feedback i::before {
   content: '';
   position: absolute;
-  left: -4px;
+  left: -3px;
   top: 0;
-  width: 10px;
-  height: 7px;
+  width: 8px;
+  height: 10px;
   background: rgb(250, 222, 74);
-  clip-path: polygon(0 0, 100% 0, 100% 64%, 50% 100%, 0 64%);
+  clip-path: polygon(0 0, 100% 0, 100% 68%, 50% 100%, 0 68%);
 }
 
 .remark-video-mark::after,
@@ -268,27 +278,24 @@ html.remark-page-light mark.remark-highlight-mark {
   100% { opacity: 1; transform: translate(-50%, -100%) translateY(0) scale(1); }
 }
 
-/* Marker tooltip. */
+/* Video mark hover: the same light action row as highlights — time label
+   plus note / copy / delete buttons (Font Awesome), with the shared
+   .remark-mark-action tooltips. */
 .remark-video-mark-tip {
   position: fixed;
   z-index: 2147483647;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 9px;
-  background: rgba(26, 29, 34, .92);
-  color: #fff;
-  font-size: 11.5px;
-  font-weight: 500;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid rgba(71, 56, 15, .18);
   border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, .28);
+  background: rgb(255, 250, 221);
+  box-shadow: 0 3px 10px rgba(47, 37, 11, .2);
   white-space: nowrap;
   pointer-events: auto;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI",
     Roboto, sans-serif;
-}
-
-.remark-video-mark-tip {
   animation: remark-tip-in .13s ease;
 }
 
@@ -298,30 +305,11 @@ html.remark-page-light mark.remark-highlight-mark {
 }
 
 .remark-video-mark-tip-time {
-  color: #ffe9a8;
+  padding: 0 4px 0 7px;
+  color: rgb(82, 64, 18);
+  font-size: 11px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-}
-
-.remark-video-mark-tip-note {
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: rgba(255, 255, 255, .82);
-  font-weight: 400;
-}
-
-.remark-video-mark-tip-del {
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1;
-  color: rgba(255, 255, 255, .75);
-  transition: transform .12s ease, color .12s ease;
-}
-
-.remark-video-mark-tip-del:hover {
-  transform: scale(1.2);
-  color: #fff;
 }
 
 /* Landing dot shown inside the video frame when controls are hidden. */
@@ -395,10 +383,34 @@ html.remark-page-light mark.remark-highlight-mark {
   .remark-video-mark-tip,
   .remark-note-hint,
   .remark-mark-actions,
-  .remark-mark-action::after {
+  .remark-mark-action::after,
+  .remark-mark-pill {
     animation: none;
     transition: none;
   }
+}
+
+/* ---------- Mark pill (plain selection → one-click mark) ---------- */
+
+/* The selection pill is the same action-row component in its un-marked
+   state: it floats next to the selection, and marking morphs it in place
+   into the highlighted state (note/copy/delete). Button tooltips come from
+   the shared .remark-mark-action::after rule. */
+.remark-mark-pill {
+  position: fixed;
+  top: auto;
+  right: auto;
+  z-index: 2147483646;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity .15s ease, transform .15s ease;
+  pointer-events: none;
+}
+
+.remark-mark-pill.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 /* ---------- Page feedback: saved chip & toast ---------- */

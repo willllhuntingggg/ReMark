@@ -11,7 +11,10 @@ const i18n = read('lib/i18n.js');
 assert.match(sidepanel, /await notifySourceTabs\(item, \{ action: 'DELETE_CLIP_FROM_PAGE', clipId: item\.id \}\)/);
 assert.match(sidepanel, /async function notifySourceTabs[\s\S]*Promise\.all/);
 assert.match(sidepanel, /action: 'RESTORE_HIGHLIGHTS'/);
-assert.match(content, /function schedulePageHighlightRestore\(\)[\s\S]*DOMContentLoaded[\s\S]*window\.setTimeout\(restore, 2200\)/);
+assert.match(content, /function schedulePageHighlightRestore\(\)[\s\S]*DOMContentLoaded[\s\S]*\[800, 2200, 4000, 7000\]\.forEach/);
+assert.match(content, /new MutationObserver\(\(\) => \{/);
+assert.match(content, /observer\.disconnect\(\), 20000\)/);
+assert.match(content, /function samePageUrl\(a, b\)/);
 assert.match(content, /const textSegments = \[\];[\s\S]*let startIndex = text\.indexOf\(clip\.text\)[\s\S]*highlightDOMRange\(range, clip\)/);
 assert.match(content, /function reportSourceUnavailable\(clipId\)[\s\S]*action: 'SOURCE_MARK_UNAVAILABLE'/);
 assert.match(sidepanel, /SOURCE_MARK_UNAVAILABLE[\s\S]*source_unavailable/);
@@ -33,7 +36,12 @@ assert.match(content, /event\.preventDefault\(\);[\s\S]*event\.stopPropagation\(
 assert.doesNotMatch(read('content/content.css'), /remark-selected \{[\s\S]*inset 0 -2px/);
 console.log('page-mark-interaction assertions passed');
 
-assert.match(content, /event\.button !== 0 \|\| !\(event\.metaKey \|\| event\.ctrlKey\)/);
+assert.match(content, /if \(event\.button !== 0\) return;/);
+assert.match(content, /showMarkPill\(\{ text, range: range\.cloneRange\(\) \}, \{ x: event\.clientX, y: event\.clientY \}\)/);
+assert.match(content, /remark-mark-pill/);
+assert.match(content, /t\('unmark'\)/);
+assert.match(content, /remark-mark-action--marked/);
+assert.match(read('content/content.css'), /\.remark-mark-pill \{/);
 assert.match(content, /async function undoPageAction\(\)[\s\S]*ReMarkStorage\.get\(ReMarkStorage\.KEYS\.UNDO\)[\s\S]*ReMarkStorage\.undoLast\(\)/);
 assert.match(content, /action\.type === 'restore_clip'[\s\S]*removeClipHighlightFromDOM\(action\.id, \{ immediate: true \}\)/);
 assert.match(content, /function cancelClipHighlightRemoval\(clipId\)[\s\S]*remarkRemovalPending/);
@@ -57,7 +65,7 @@ assert.match(content, /if \(mark\) \{[\s\S]*performLocateAnimation\(mark\)/);
 assert.match(content, /mark\.scrollIntoView\(\{ behavior: 'smooth', block: 'center', inline: 'nearest' \}\)/);
 console.log('viewport-mark-locate assertions passed');
 
-assert.match(content, /function ensureHighlightActions\(clipId\)[\s\S]*remark-mark-action--note[\s\S]*remark-mark-action--delete/);
+assert.match(content, /function ensureHighlightActions\(clipId\)[\s\S]*remark-mark-action--mark[\s\S]*remark-mark-action--note[\s\S]*remark-mark-action--copy/);
 assert.match(content, /showHighlightActions\(savedClip\.id, 2800\)/);
 assert.match(content, /element\.addEventListener\('mouseenter', \(\) => scheduleHighlightActionShow\(clip\.id\)\)/);
 assert.match(content, /HIGHLIGHT_ACTION_SHOW_DELAY = 350/);

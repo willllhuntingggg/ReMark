@@ -210,15 +210,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         + (item.duration ? `<span class="video-duration"> / ${clock(item.duration)}</span>` : '')
       : `“${esc(item.text)}”`;
     const note = item.note
-      ? `<button class="mark-note" data-action="note" data-key="${esc(item.key)}" type="button">${esc(item.note)}</button>`
+      ? `<button class="mark-note" data-action="note" data-key="${esc(item.key)}" type="button"><span class="mark-note-text">${esc(item.note)}</span></button>`
       : '';
-    const editor = [
-      `<div class="mark-note-editor" data-key="${esc(item.key)}" hidden>`,
-      `<textarea class="mark-note-textarea" aria-label="${esc(t('add_note'))}" placeholder="${esc(t('note_placeholder'))}">${esc(item.note)}</textarea>`,
-      `<div class="mark-note-editor-hint">${esc(t('note_save_hint'))}</div>`,
-      item.note ? `<button class="note-remove" data-action="remove-note" data-key="${esc(item.key)}" type="button">${esc(t('remove_note'))}</button>` : '',
-      '</div>'
-    ].join('');
+    // Inline editor: the visible note text itself becomes the field.
+    const editor = `<textarea class="mark-note-textarea" data-key="${esc(item.key)}" aria-label="${esc(t('add_note'))}" placeholder="${esc(t('note_placeholder'))}" rows="1" hidden>${esc(item.note)}</textarea>`;
     const source = `${item.title}${host(item.url) ? ` · ${host(item.url)}` : ''}`;
     const favicon = faviconUrl(item.url);
     const sourceIcon = favicon
@@ -315,7 +310,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       setTimeout(() => noteNode.classList.remove('note-just-saved'), 1100);
     }
   }
-  function openNote(key) { const card = cardFor(key), editor = $('.mark-note-editor', card); if (!editor) return; editor.hidden = false; $('.mark-note', card)?.setAttribute('hidden', ''); $('.note-add', card)?.setAttribute('hidden', ''); const input = $('textarea', editor); input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+  function resizeNoteInput(input) {
+    input.style.height = 'auto';
+    input.style.height = `${input.scrollHeight}px`;
+  }
+  function openNote(key) {
+    const card = cardFor(key);
+    if (!card) return;
+    const input = $('.mark-note-textarea', card);
+    if (!input) return;
+    $('.mark-note', card)?.setAttribute('hidden', '');
+    input.hidden = false;
+    resizeNoteInput(input);
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
   async function deleteMark(key) {
     const item = itemFor(key);
     if (!item) return;
@@ -377,9 +386,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       await Promise.all((tabs || []).filter((tab) => sameUrl(tab.url, item.url) && Number.isInteger(tab.id)).map((tab) => safeSendMessage(tab.id, message)));
     } catch (_) {}
   }
-  function syncSourceActive(item, active) { if (item?.type !== 'highlight') return; globalThis.chrome?.tabs?.query({}).then((tabs) => { const tab = tabs.find((row) => sameUrl(row.url, item.url)); if (tab?.id) safeSendMessage(tab.id, { action: active ? 'SET_ACTIVE_CLIP' : 'CLEAR_ACTIVE_CLIP', clipId: item.id }); }).catch(() => {}); }
-  function setActive(key) { selected = key; list.querySelectorAll('.mark-active').forEach((node) => node.classList.remove('mark-active')); const item = itemFor(key); cardFor(key)?.classList.add('mark-active'); syncSourceActive(item, true); }
-  function clearActive(key) { if (selected === key) { const item = itemFor(key); selected = null; cardFor(key)?.classList.remove('mark-active'); syncSourceActive(item, false); } }
+  function setActive(key) { selected = key; list.querySelectorAll('.mark-active').forEach((node) => node.classList.remove('mark-active')); cardFor(key)?.classList.add('mark-active'); }
+  function clearActive(key) { if (selected === key) { selected = null; cardFor(key)?.classList.remove('mark-active'); } }
   function moveActive(delta) { const rows = visible(); if (!rows.length) return; let index = rows.findIndex((row) => row.key === selected); index = index < 0 ? (delta > 0 ? 0 : rows.length - 1) : Math.max(0, Math.min(rows.length - 1, index + delta)); const key = rows[index].key; setActive(key); cardFor(key)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
   list.addEventListener('error', (event) => {
     if (event.target.matches?.('.mark-source-favicon')) event.target.remove();
@@ -418,17 +426,50 @@ document.addEventListener('DOMContentLoaded', async () => {
     const { action, key, url } = control.dataset;
     if (action === 'jump') { setActive(key); void jump(itemFor(key)); return; }
     if (action === 'source') { sourceUrl = url || ''; selected = null; render(); return; }
-    if (action === 'note') openNote(key);
-    if (action === 'remove-note') void saveNote(key, '');
+    if (action === 'note') { setActive(key); openNote(key); }
+    if (action === 'remove-note') { setActive(key); void saveNote(key, ''); }
     if (action === 'delete') void deleteMark(key);
     if (action === 'menu') {
-      const menu = control.parentElement.querySelector('.mark-menu');
-      document.querySelectorAll('.mark-menu:not([hidden])').forEach((node) => { if (node !== menu) node.hidden = true; });
-      menu.hidden = !menu.hidden;
+      setActive(key);
+      openMarkMenu(control.parentElement.querySelector('.mark-menu'));
     }
   });
-  list.addEventListener('keydown', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) { const key = input.closest('.mark-note-editor').dataset.key; if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void saveNote(key, input.value); } if (event.key === 'Escape') { event.preventDefault(); void saveNote(key, input.value); } } });
-  list.addEventListener('focusout', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) setTimeout(() => { if (!input.closest('.mark-note-editor')?.contains(document.activeElement)) void saveNote(input.closest('.mark-note-editor').dataset.key, input.value); }, 0); });
+  // Clicking the card body selects it (the gold row), so the note/delete
+  // shortcuts have a reliable "selected mark" to act on.
+  list.addEventListener('click', (event) => {
+    const card = event.target.closest('.mark-card');
+    if (!card || event.target.closest('[data-action], .mark-note-textarea')) return;
+    setActive(card.dataset.key);
+  });
+  // Hovering the ··· button reveals its menu; leaving the action area closes it.
+  let menuCloseTimer = null;
+  function openMarkMenu(menu) {
+    if (!menu) return;
+    clearTimeout(menuCloseTimer);
+    document.querySelectorAll('.mark-menu:not([hidden])').forEach((node) => { if (node !== menu) node.hidden = true; });
+    menu.hidden = false;
+  }
+  function closeMarkMenus() { document.querySelectorAll('.mark-menu:not([hidden])').forEach((node) => { node.hidden = true; }); }
+  function scheduleMenuClose() {
+    clearTimeout(menuCloseTimer);
+    menuCloseTimer = setTimeout(closeMarkMenus, 260);
+  }
+  list.addEventListener('mouseover', (event) => {
+    const card = event.target.closest('.mark-card');
+    if (!card) return;
+    const openMenu = document.querySelector('.mark-menu:not([hidden])');
+    if (openMenu && openMenu.closest('.mark-card') !== card) { closeMarkMenus(); return; }
+    clearTimeout(menuCloseTimer);
+    const more = event.target.closest('.mark-more');
+    if (more) openMarkMenu(more.closest('.mark-actions')?.querySelector('.mark-menu'));
+  });
+  list.addEventListener('mouseout', (event) => {
+    const to = event.relatedTarget;
+    if (!to || !to.closest || !to.closest('.mark-card')) scheduleMenuClose();
+  });
+  list.addEventListener('keydown', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) { const key = input.dataset.key; if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void saveNote(key, input.value); } if (event.key === 'Escape') { event.preventDefault(); void saveNote(key, input.value); } } });
+  list.addEventListener('input', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) resizeNoteInput(input); });
+  list.addEventListener('focusout', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) setTimeout(() => { if (!input.closest('.mark-note-area')?.contains(document.activeElement)) void saveNote(input.dataset.key, input.value); }, 0); });
   list.addEventListener('focusin', (event) => { const card = event.target.closest('.mark-card'); if (keyboardFocus && card) setActive(card.dataset.key); });
   list.addEventListener('focusout', (event) => { const card = event.target.closest('.mark-card'); if (!card) return; setTimeout(() => { if (!card.contains(document.activeElement)) clearActive(card.dataset.key); }, 0); });
   document.addEventListener('pointerdown', () => { keyboardFocus = false; if (selected) clearActive(selected); });

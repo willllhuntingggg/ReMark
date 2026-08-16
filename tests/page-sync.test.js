@@ -22,15 +22,14 @@ assert.match(i18n, /source_unavailable: '无法找到原网页或对应内容/);
 assert.match(i18n, /source_unavailable: 'The original page or marked content could not be found/);
 console.log('page-sync.test.js: all assertions passed');
 
-assert.match(content, /let selectedHighlight = null/);
-assert.match(content, /event\.key === 'Enter' && event\.shiftKey && selectedHighlight/);
+assert.doesNotMatch(content, /selectedHighlight/);
 assert.match(content, /initialValue: item\.note \|\| ''/);
 assert.match(content, /function openQuickNoteInput\(\{ rect, onSave, initialValue = '' \}\)/);
 assert.match(content, /input\.value = initialValue/);
-assert.match(content, /function bindHighlightClick\(element, clip\)[\s\S]*showHighlightActions\(clip\.id\)/);
+assert.match(content, /function bindHighlightClick\(element, clip\)[\s\S]*showHighlightActions\(clip\.id[,)]/);
 const clickHandler = content.slice(content.indexOf('function bindHighlightClick'), content.indexOf('function notifyStorageUpdated'));
 assert.doesNotMatch(clickHandler, /OPEN_SIDE_PANEL/);
-assert.match(content, /event\.preventDefault\(\);[\s\S]*event\.stopPropagation\(\);[\s\S]*selectedHighlight = element[\s\S]*showHighlightActions\(clip\.id\)/);
+assert.match(content, /event\.preventDefault\(\);[\s\S]*event\.stopPropagation\(\);[\s\S]*showHighlightActions\(clip\.id[,)]/);
 assert.doesNotMatch(read('content/content.css'), /remark-selected \{[\s\S]*inset 0 -2px/);
 console.log('page-mark-interaction assertions passed');
 
@@ -54,13 +53,18 @@ console.log('sidepanel-locate-recovery assertions passed');
 
 assert.match(sidepanel, /if \(action === 'jump'\) \{ setActive\(key\); void jump\(itemFor\(key\)\); return; \}/);
 assert.doesNotMatch(sidepanel.slice(sidepanel.indexOf("list.addEventListener('click'", sidepanel.indexOf('function isGlyphHit')), sidepanel.indexOf("list.addEventListener('click'", sidepanel.indexOf('function isGlyphHit')) + 1200), /isGlyphHit\(event, control\)/);
-assert.match(content, /if \(mark\) \{[\s\S]*setActiveClip\(clipId\);[\s\S]*performLocateAnimation\(mark\)/);
+assert.match(content, /if \(mark\) \{[\s\S]*performLocateAnimation\(mark\)/);
 assert.match(content, /mark\.scrollIntoView\(\{ behavior: 'smooth', block: 'center', inline: 'nearest' \}\)/);
 console.log('viewport-mark-locate assertions passed');
 
 assert.match(content, /function ensureHighlightActions\(clipId\)[\s\S]*remark-mark-action--note[\s\S]*remark-mark-action--delete/);
 assert.match(content, /showHighlightActions\(savedClip\.id, 2800\)/);
-assert.match(content, /element\.addEventListener\('mouseenter', \(\) => showHighlightActions\(clip\.id\)\)/);
+assert.match(content, /element\.addEventListener\('mouseenter', \(\) => scheduleHighlightActionShow\(clip\.id\)\)/);
+assert.match(content, /HIGHLIGHT_ACTION_SHOW_DELAY = 350/);
+assert.match(read('content/content.css'), /\.remark-mark-actions-anchor \{\n  position: relative;[\s\S]*vertical-align: bottom;/);
+assert.match(read('content/content.css'), /\.remark-mark-actions \{\n  position: absolute;[\s\S]*top: calc\(100% \+ \.1em\);[\s\S]*right: -\.1em;/);
+assert.match(content, /remark-mark-actions-anchor/);
+
 assert.match(content, /async function deletePageClip\(clipId\)[\s\S]*ReMarkStorage\.pushUndo/);
 assert.match(read('content/content.css'), /\.remark-mark-action::after \{[\s\S]*content: attr\(data-hint\)/);
 assert.match(read('content/content.css'), /remark-mark-actions\.is-visible/);

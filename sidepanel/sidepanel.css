@@ -362,8 +362,10 @@ button {
 /* ---------- Feed: entrance ---------- */
 
 /* On first load / view switch, Marks settle in like a stack of paper. */
+/* `backwards` (not `both`): a retained transform would give every card a
+   stacking context and trap the ··· menu underneath later cards. */
 .clips-list.is-entering > * {
-  animation: remark-card-in .3s cubic-bezier(.2, .8, .28, 1) both;
+  animation: remark-card-in .3s cubic-bezier(.2, .8, .28, 1) backwards;
   animation-delay: calc(var(--i, 0) * 18ms);
 }
 
@@ -390,19 +392,10 @@ button {
   transition: background-color .16s ease;
 }
 
-.mark-card:hover,
-.mark-card:focus-within {
-  background: rgba(38, 40, 45, .022);
-}
-
+/* The gold .mark-active row is the ONE selection indicator; hovering a card
+   or focusing a control inside it must not look like a second selection. */
 .mark-card:focus {
   outline: none;
-}
-
-.mark-card:focus-visible {
-  outline: 2px solid rgba(38, 40, 45, .16);
-  outline-offset: -2px;
-  border-radius: var(--radius-sm);
 }
 
 /* Active = keyboard focus state; a gold ledger line marks the row. */
@@ -497,6 +490,10 @@ button {
   padding: 0 14px 0 0;
 }
 
+.mark-note[hidden] {
+  display: none;
+}
+
 .mark-note {
   display: flex;
   align-items: flex-start;
@@ -549,68 +546,34 @@ button {
 }
 
 
-/* Note editor */
-.mark-note-editor {
-  margin: 4px 0 8px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow-2);
-}
-
-.mark-note-editor[hidden] {
-  display: none;
-}
-
+/* Inline note editor: the visible note text becomes the field, starting at
+   its own height and growing with what you type. */
 .mark-note-textarea {
   display: block;
   box-sizing: border-box;
   width: 100%;
-  min-height: 68px;
-  padding: 9px 10px;
+  min-height: 1.7em;
+  max-height: 240px;
+  padding: 0;
   border: 0;
-  resize: vertical;
-  background: var(--surface);
-  color: var(--ink);
+  border-bottom: 1px dashed var(--gold-line);
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: var(--ink-2);
   font: inherit;
-  font-size: 12.5px;
-  line-height: 1.55;
+  font-size: 12px;
+  line-height: 1.6;
   outline: none;
+  caret-color: var(--gold-deep);
+}
+
+.mark-note-textarea[hidden] {
+  display: none;
 }
 
 .mark-note-textarea::placeholder {
   color: var(--ink-4);
-}
-
-.mark-note-editor-hint {
-  padding: 0 10px 8px;
-  color: var(--ink-4);
-  font-size: 10px;
-  line-height: 1.4;
-}
-
-.note-remove {
-  display: block;
-  width: calc(100% - 20px);
-  margin: 0 10px 9px;
-  padding: 5px 0 0;
-  border: 0;
-  border-top: 1px solid var(--line);
-  background: transparent;
-  color: var(--danger);
-  font-size: 10.5px;
-  text-align: left;
-  cursor: pointer;
-  transition: color .15s ease;
-}
-
-.note-remove:hover,
-.note-remove:focus-visible {
-  color: var(--danger);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  outline: none;
 }
 
 /* ---------- Footer ---------- */
@@ -702,7 +665,7 @@ button {
 /* Action menu */
 .mark-menu {
   position: absolute;
-  z-index: 6;
+  z-index: 100;
   top: 26px;
   right: 0;
   min-width: 128px;

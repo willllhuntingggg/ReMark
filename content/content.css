@@ -55,7 +55,7 @@ mark.remark-highlight-mark {
 }
 .remark-note-control:hover,
 .remark-note-control:focus-visible { background: rgb(111, 85, 13); outline: 2px solid rgb(255, 246, 173); outline-offset: 1px; }
-.remark-note-control svg { width: .68em; height: .68em; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-l.remark-note-control slinejoin: round; pointer-events: none; }
+.remark-note-control svg { width: .68em; height: .68em; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linejoin: round; pointer-events: none; }
 .remark-note-hint {
   position: absolute;
   z-index: 5;
@@ -68,7 +68,7 @@ mark.remark-highlight-mark {
   background: rgb(45, 39, 23);
   color: rgb(255, 249, 219);
   box-shadow: 0 6px 18px rgba(0, 0, 0, .22);
-  font:   font:x/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font: 12px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: normal;
   word-spacing: normal;
   text-align: left;
@@ -80,13 +80,31 @@ mark.remark-highlight-mark {
 }
 .remark-note-control:hover + .remark-note-hint,
 .remark-note-control:focus-visible + .remark-note-hint { opacity: 1; transform: translateY(0); }
-/* End-of-Mark actions are visually ephemeral and never change text flow. */
+/* A zero-width in-flow anchor sits at the very end of the text, so the
+   actions land at the real end of the last line even when the highlight
+   wraps across several lines — and they scroll along with the page. */
+.remark-mark-actions-anchor {
+  position: relative;
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 0;
+  line-height: 0;
+  vertical-align: bottom;
+}
+
+/* End-of-Mark actions float at the highlight's bottom-right corner;
+   they are visually ephemeral and never change text flow. */
 .remark-mark-actions {
   position: absolute;
   z-index: 6;
-  top: 50%;
-  right: -3.25em;
+  top: calc(100% + .1em);
+  right: -.1em;
   display: flex;
+  font-size: 12px;
   gap: 3px;
   align-items: center;
   padding: 2px;
@@ -96,28 +114,30 @@ mark.remark-highlight-mark {
   box-shadow: 0 3px 10px rgba(47, 37, 11, .2);
   opacity: 0;
   pointer-events: none;
-  transform: translate(-4px, -50%);
+  transform: translateY(-3px);
   transition: opacity .15s ease, transform .15s ease;
 }
 .remark-mark-actions.is-visible,
 .remark-mark-actions:hover,
-.remark-mark-actions:focus-within { opacity: 1; pointer-events: auto; transform: translate(0, -50%); }
+.remark-mark-actions:focus-within { opacity: 1; pointer-events: auto; transform: translateY(0); }
 .remark-mark-action {
   position: relative;
+  display: grid;
+  place-items: center;
   width: 1.65em;
   height: 1.65em;
-  height: 1.65em;
-ve;ace-items: center;
   margin: 0;
   padding: 0;
-                                                   transparent;
+  border: 0;
+  border-radius: .34em;
+  background: transparent;
   color: rgb(82, 64, 18);
   cursor: pointer;
 }
 .remark-mark-action:hover,
 .remark-mark-action:focus-visible { background: rgb(241, 222, 117); outline: none; }
 .remark-mark-action--delete:hover,
-.remark-mark-action--delete:focus-visible { background: rgb(253, 218, 208); colo.remar(155, 50, 39); }
+.remark-mark-action--delete:focus-visible { background: rgb(253, 218, 208); color: rgb(155, 50, 39); }
 .remark-mark-action svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .remark-mark-action::after {
   content: attr(data-hint);
@@ -127,7 +147,8 @@ ve;ace-items: center;
   padding: .38em .52em;
   border-radius: .36em;
   background: rgb(45, 39, 23);
-  color: rgb(  color: rgb(  color: rgbdow: 0 4px 12px rgba(0, 0, 0, .2);
+  color: rgb(255, 249, 219);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .2);
   font: 500 12px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: normal;
   white-space: nowrap;
@@ -135,9 +156,16 @@ ve;ace-items: center;
   opacity: 0;
   transform: translateY(3px);
   transition: opacity .14s ease, transform .14s ease;
+  transition-delay: 0s;
 }
+/* Tooltip only appears after a dwell — familiar users never see it;
+   hiding stays instant. */
 .remark-mark-action:hover::after,
-.remark-mark-action:focus-visible::after { opacity: 1; transform: translateY(0); }
+.remark-mark-action:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: .65s;
+}
 /* Source-page interaction may retain keyboard focus internally but has no selected visual state. */
 mark.remark-highlight-mark.remark-selected { outline: none; }
 /* Locate pulse when jumping to a mark from the panel. */
@@ -146,9 +174,9 @@ mark.remark-highlight-mark.remark-locate-pulse {
 }
 
 @keyframes remark-gentle-focus {
-  0% { background: rgb(250, 222, 74); }
-  18%, 62% { background: rgb(255, 241, 166); }
-  100% { background: rgb(250, 222, 74); }
+  0% { background: rgb(250, 222, 74); box-shadow: 0 .08em 0 rgb(250, 222, 74), 0 -.08em 0 rgb(250, 222, 74); }
+  18%, 62% { background: rgb(229, 107, 78); box-shadow: 0 .08em 0 rgb(229, 107, 78), 0 -.08em 0 rgb(229, 107, 78); }
+  100% { background: rgb(250, 222, 74); box-shadow: 0 .08em 0 rgb(250, 222, 74), 0 -.08em 0 rgb(250, 222, 74); }
 }
 
 /* A just-saved highlight lands with a soft ink sweep. */
@@ -364,7 +392,10 @@ html.remark-page-light mark.remark-highlight-mark {
   .remark-note-saved-chip,
   .remark-toast,
   .remark-quick-note,
-  .remark-video-mark-tip {
+  .remark-video-mark-tip,
+  .remark-note-hint,
+  .remark-mark-actions,
+  .remark-mark-action::after {
     animation: none;
     transition: none;
   }

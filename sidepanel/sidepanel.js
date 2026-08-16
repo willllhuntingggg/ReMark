@@ -151,6 +151,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const videoKeyFromUrl = (value) => { try { const url = new URL(value); const host = url.hostname.replace(/^www\./, ''); if (host.endsWith('youtube.com') || host === 'youtu.be') { const v = url.searchParams.get('v'); if (v) return v; const match = url.pathname.match(/\/(?:shorts|embed|e|live)\/([\w-]{6,})/) || url.pathname.match(/^\/([\w-]{6,})/); return match ? match[1] : ''; } if (host.endsWith('bilibili.com')) { const match = url.pathname.match(/\/video\/(BV[a-zA-Z0-9]+)/i); if (!match) return ''; const p = url.searchParams.get('p'); return p ? match[1] + '?p=' + p : match[1]; } } catch (_) {} return ''; };
   const sameVideoTab = (item, tabUrl) => Boolean(item.raw?.videoKey) && item.raw.videoKey === videoKeyFromUrl(tabUrl);
   const host = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } };
+  const faviconUrl = (value) => {
+    try {
+      const page = new URL(value);
+      return ['http:', 'https:'].includes(page.protocol) ? new URL('/favicon.ico', page.origin).href : '';
+    } catch {
+      return '';
+    }
+  };
   const clock = (v) => { const n = Math.max(0, Math.floor(Number(v) || 0)), h = Math.floor(n / 3600), m = Math.floor((n % 3600) / 60), s = n % 60, p = (x) => String(x).padStart(2, '0'); return h ? `${h}:${p(m)}:${p(s)}` : `${m}:${p(s)}`; };
   const itemFor = (key) => all().find((item) => item.key === key);
   const cardFor = (key) => list.querySelector(`.mark-card[data-key="${CSS.escape(key)}"]`);
@@ -212,8 +220,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       '</div>'
     ].join('');
     const source = `${item.title}${host(item.url) ? ` · ${host(item.url)}` : ''}`;
+    const favicon = faviconUrl(item.url);
+    const sourceIcon = favicon
+      ? `<img class="mark-source-favicon" src="${esc(favicon)}" alt="" aria-hidden="true">`
+      : '';
     const sourceControl = sourceUrl === null
-      ? `<button class="mark-source" data-action="source" data-url="${esc(item.url)}" type="button" title="${esc(item.url)}">${esc(source)}</button>`
+      ? `<button class="mark-source" data-action="source" data-url="${esc(item.url)}" type="button" title="${esc(item.url)}">${sourceIcon}<span>${esc(source)}</span></button>`
       : '';
     const menu = [
       `<button data-action="note" data-key="${esc(item.key)}" type="button">${esc(t(item.note ? 'edit_note' : 'add_note'))}</button>`,
@@ -356,6 +368,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   function setActive(key) { selected = key; list.querySelectorAll('.mark-active').forEach((node) => node.classList.remove('mark-active')); const item = itemFor(key); cardFor(key)?.classList.add('mark-active'); syncSourceActive(item, true); }
   function clearActive(key) { if (selected === key) { const item = itemFor(key); selected = null; cardFor(key)?.classList.remove('mark-active'); syncSourceActive(item, false); } }
   function moveActive(delta) { const rows = visible(); if (!rows.length) return; let index = rows.findIndex((row) => row.key === selected); index = index < 0 ? (delta > 0 ? 0 : rows.length - 1) : Math.max(0, Math.min(rows.length - 1, index + delta)); const key = rows[index].key; setActive(key); cardFor(key)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  list.addEventListener('error', (event) => {
+    if (event.target.matches?.('.mark-source-favicon')) event.target.remove();
+  }, true);
   function focusFromSource(id) { const item = all().find((row) => row.id === id); if (!item) return; if (sourceUrl !== null && !sameUrl(sourceUrl, item.url)) sourceUrl = null; selected = item.key; render(); const card = list.querySelector(`.mark-card[data-id="${CSS.escape(id)}"]`); if (!card) return; card.scrollIntoView({ behavior: 'smooth', block: 'center' }); card.classList.add('remark-panel-focus'); setTimeout(() => card.classList.remove('remark-panel-focus'), 900); }
   async function jump(item) { if (!item) return; try { const tabs = await chrome.tabs.query({}), target = tabs.find((tab) => item.type === 'video' ? (sameVideoTab(item, tab.url) || sameUrl(tab.url, item.url)) : sameUrl(tab.url, item.url)); if (target?.id) { await chrome.tabs.update(target.id, { active:true }); if (target.windowId) await chrome.windows.update(target.windowId, { focused:true }); safeSendMessage(target.id, item.type === 'video' ? { action:'SEEK_VIDEO_MARK', time:item.time } : { action:'LOCATE_CLIP', clipId:item.id }); return; } if (item.type === 'highlight') { const tab = await chrome.tabs.create({ url:item.url, active:true }); setTimeout(() => safeSendMessage(tab.id, { action:'LOCATE_CLIP', clipId:item.id }), 1200); return; } } catch (e) { console.warn('[ReMark] Mark jump failed:', e); } if (item.url) window.open(item.type === 'video' ? `${item.url}${item.url.includes('?') ? '&' : '?'}t=${Math.floor(item.time)}` : item.url, '_blank'); }
 

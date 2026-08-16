@@ -1127,3 +1127,5 @@ button {
     animation: none;
   }
 }
+.mark-source { display: inline-flex; align-items: center; gap: 5px; }
+.mark-source-favicon { display: block; flex: 0 0 auto; width: 13px; height: 13px; border-radius: 3px; object-fit: contain; }

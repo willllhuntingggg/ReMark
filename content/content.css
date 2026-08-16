@@ -51,6 +51,7 @@ mark.remark-highlight-mark.remark-selected {
   --remark-highlight-bg: rgb(255, 233, 106);
   outline: none;
   border-radius: 0;
+  box-shadow: 0 .08em 0 var(--remark-highlight-bg), 0 -.08em 0 var(--remark-highlight-bg), inset 0 -2px 0 rgba(111, 85, 13, .82);
 }
 
 /* Locate pulse when jumping to a mark from the panel. */

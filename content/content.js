@@ -244,13 +244,16 @@
       }
       return;
     }
-    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && selectedHighlight && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
-      // ⌘/Ctrl + Enter on a selected highlight: attach a thought right there.
+    if (event.key === 'Enter' && event.shiftKey && selectedHighlight && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+      // Shift + Enter on a selected highlight adds a Note or opens the existing Note for editing.
       event.preventDefault();
       const clipId = selectedHighlight.getAttribute('data-clip-id');
+      const clips = await ReMarkStorage.getClips();
+      const item = clips.find((clip) => clip.id === clipId);
       const rect = selectedHighlight.getBoundingClientRect();
       openQuickNoteInput({
         rect,
+        initialValue: item?.note || '',
         onSave: async (note) => {
           if (!note) return;
           await ReMarkStorage.updateClip(clipId, { note });
@@ -398,7 +401,7 @@
     });
   }
 
-  function openQuickNoteInput({ rect, onSave }) {
+  function openQuickNoteInput({ rect, onSave, initialValue = '' }) {
     document.getElementById('remark-quick-note')?.remove();
     const anchor = rect || { left: window.innerWidth / 2 - 140, bottom: window.innerHeight / 2 };
     const shell = document.createElement('div');
@@ -409,6 +412,8 @@
     shell.innerHTML = `<textarea aria-label="${t('add_note')}" placeholder="${t('note_placeholder')}"></textarea><span>${t('note_save_hint')}</span>`;
     document.documentElement.appendChild(shell);
     const input = shell.querySelector('textarea');
+    input.value = initialValue;
+    input.setSelectionRange(initialValue.length, initialValue.length);
     let done = false;
     const finish = async () => {
       if (done) return;
@@ -541,6 +546,7 @@
     document.querySelectorAll('.remark-highlight-mark.remark-selected').forEach((node) => {
       if (!clipId || node.dataset.clipId === String(clipId)) node.classList.remove('remark-selected');
     });
+    if (!clipId || selectedHighlight?.dataset.clipId === String(clipId)) selectedHighlight = null;
   }
   function setClipNoteIndicator(clipId) {
     const marks = [...document.querySelectorAll(`mark[data-clip-id="${clipId}"]`)];
@@ -549,13 +555,17 @@
   }
   function setActiveClip(clipId) {
     clearActiveClip();
-    document.querySelectorAll(`mark[data-clip-id="${clipId}"]`).forEach((mark) => mark.classList.add('remark-selected'));
+    const marks = [...document.querySelectorAll(`mark[data-clip-id="${clipId}"]`)];
+    marks.forEach((mark) => mark.classList.add('remark-selected'));
+    selectedHighlight = marks.at(-1) || null;
   }
-  // Click highlight → select the source Mark and focus its matching panel card.
+  // Click highlight → select the source Mark and open/focus its matching side-panel card.
   function bindHighlightClick(element, clip) {
-    element.addEventListener('click', (e) => {
-      e.stopPropagation();
+    element.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       setActiveClip(clip.id);
+      selectedHighlight = element;
       try { chrome.runtime.sendMessage({ action: 'OPEN_SIDE_PANEL', clipId: clip.id }); } catch (_) {}
       element.classList.add('remark-locate-pulse');
       setTimeout(() => element.classList.remove('remark-locate-pulse'), 2200);

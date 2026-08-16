@@ -21,3 +21,14 @@ assert.ok(manifest.permissions.includes('webNavigation'));
 assert.match(i18n, /source_unavailable: '无法找到原网页或对应内容/);
 assert.match(i18n, /source_unavailable: 'The original page or marked content could not be found/);
 console.log('page-sync.test.js: all assertions passed');
+
+assert.match(content, /let selectedHighlight = null/);
+assert.match(content, /event\.key === 'Enter' && event\.shiftKey && selectedHighlight/);
+assert.match(content, /initialValue: item\?\.note \|\| ''/);
+assert.match(content, /function openQuickNoteInput\(\{ rect, onSave, initialValue = '' \}\)/);
+assert.match(content, /input\.value = initialValue/);
+assert.match(content, /setActiveClip\(clip\.id\);[\s\S]*selectedHighlight = element/);
+assert.match(content, /action: 'OPEN_SIDE_PANEL', clipId: clip\.id/);
+assert.match(content, /event\.preventDefault\(\);[\s\S]*event\.stopPropagation\(\);[\s\S]*setActiveClip\(clip\.id\);[\s\S]*selectedHighlight = element/);
+assert.match(read('content/content.css'), /remark-selected \{[\s\S]*inset 0 -2px 0 rgba\(111, 85, 13, \.82\)/);
+console.log('page-mark-interaction assertions passed');

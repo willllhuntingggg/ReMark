@@ -343,6 +343,7 @@
         if (!options.immediate && mark.dataset.remarkRemovalPending !== 'true') return;
         const parent = mark.parentNode;
         if (!parent) return;
+        mark.querySelectorAll('.remark-note-control, .remark-note-hint').forEach((node) => node.remove());
         while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
         parent.removeChild(mark);
         parents.add(parent);
@@ -364,6 +365,7 @@
         setTimeout(() => {
           const parent = mark.parentNode;
           if (parent) {
+            mark.querySelectorAll('.remark-note-control, .remark-note-hint').forEach((node) => node.remove());
             while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
             parent.removeChild(mark);
             parent.normalize();
@@ -542,25 +544,29 @@
     try {
       if (textSegments.length) {
         textSegments.slice().reverse().forEach((segment) => {
-          const mark = createMark(clip.note && segment === textSegments[textSegments.length - 1]);
+          const showNote = Boolean(clip.note && segment === textSegments[0]);
+          const mark = createMark(showNote);
           segment.surroundContents(mark);
           bindHighlightClick(mark, clip);
+          if (showNote) attachNoteControl(mark, clip);
         });
         return;
       }
       const mark = createMark(Boolean(clip.note));
       range.surroundContents(mark);
       bindHighlightClick(mark, clip);
-    } catch (e) {
-      console.warn('[ReMark] Highlight DOM range fallback:', e);
+      if (clip.note) attachNoteControl(mark, clip);
+    } catch (error) {
+      console.warn('[ReMark] Highlight DOM range fallback:', error);
       try {
         const mark = createMark(Boolean(clip.note));
         const contents = range.extractContents();
         mark.appendChild(contents);
         range.insertNode(mark);
         bindHighlightClick(mark, clip);
-      } catch (err) {
-        console.error('[ReMark] Fallback highlight failed:', err);
+        if (clip.note) attachNoteControl(mark, clip);
+      } catch (fallbackError) {
+        console.error('[ReMark] Fallback highlight failed:', fallbackError);
       }
     }
   }
@@ -570,10 +576,48 @@
     });
     if (!clipId || selectedHighlight?.dataset.clipId === String(clipId)) selectedHighlight = null;
   }
-  function setClipNoteIndicator(clipId) {
+  async function setClipNoteIndicator(clipId) {
     const marks = [...document.querySelectorAll(`mark[data-clip-id="${clipId}"]`)];
-    marks.forEach((mark) => mark.classList.remove('has-note'));
-    marks.at(-1)?.classList.add('has-note');
+    marks.forEach((mark) => {
+      mark.classList.remove('has-note');
+      mark.querySelectorAll('.remark-note-control, .remark-note-hint').forEach((node) => node.remove());
+    });
+    const clip = (await ReMarkStorage.getClips()).find((item) => item.id === clipId);
+    if (!clip?.note?.trim()) return;
+    const target = marks.at(0);
+    if (!target) return;
+    target.classList.add('has-note');
+    attachNoteControl(target, clip);
+  }
+  function attachNoteControl(mark, clip) {
+    const note = String(clip?.note || '').trim();
+    if (!mark || !note || mark.querySelector('.remark-note-control')) return;
+    mark.classList.add('has-note');
+    const control = document.createElement('button');
+    control.type = 'button';
+    control.className = 'remark-note-control';
+    control.setAttribute('aria-label', t('edit_note'));
+    control.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h8v8.3L8.2 14H4z"></path><path d="M5.8 5.2h4.4M5.8 7.5h4.4"></path></svg>';
+    const hint = document.createElement('span');
+    hint.className = 'remark-note-hint';
+    hint.textContent = note;
+    control.addEventListener('pointerdown', (event) => { event.preventDefault(); event.stopPropagation(); });
+    control.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const rect = mark.getBoundingClientRect();
+      openQuickNoteInput({
+        rect,
+        initialValue: note,
+        onSave: async (value) => {
+          if (!value) return;
+          const updated = await ReMarkStorage.updateClip(clip.id, { note: value });
+          if (updated) await setClipNoteIndicator(clip.id);
+          notifyStorageUpdated();
+        }
+      });
+    });
+    mark.append(control, hint);
   }
   function setActiveClip(clipId) {
     clearActiveClip();

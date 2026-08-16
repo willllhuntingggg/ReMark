@@ -40,3 +40,9 @@ assert.match(content, /action\.type === 'restore_clip'[\s\S]*removeClipHighlight
 assert.match(content, /function cancelClipHighlightRemoval\(clipId\)[\s\S]*remarkRemovalPending/);
 assert.match(content, /event\.key\.toLowerCase\(\) !== 'z'[\s\S]*await undoPageAction\(\)/);
 console.log('page-highlight-undo assertions passed');
+
+assert.match(content, /function attachNoteControl\(mark, clip\)[\s\S]*className = 'remark-note-control'/);
+assert.match(content, /control\.addEventListener\('click'[\s\S]*openQuickNoteInput\([\s\S]*initialValue: note/);
+assert.match(content, /const showNote = Boolean\(clip\.note && segment === textSegments\[0\]\)/);
+assert.match(content, /async function setClipNoteIndicator\(clipId\)[\s\S]*marks\.at\(0\)/);
+console.log('page-note-control assertions passed');

@@ -559,14 +559,13 @@
     marks.forEach((mark) => mark.classList.add('remark-selected'));
     selectedHighlight = marks.at(-1) || null;
   }
-  // Click highlight → select the source Mark and open/focus its matching side-panel card.
+  // Click highlight → select it locally for page-level keyboard actions.
   function bindHighlightClick(element, clip) {
     element.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
       setActiveClip(clip.id);
       selectedHighlight = element;
-      try { chrome.runtime.sendMessage({ action: 'OPEN_SIDE_PANEL', clipId: clip.id }); } catch (_) {}
       element.classList.add('remark-locate-pulse');
       setTimeout(() => element.classList.remove('remark-locate-pulse'), 2200);
     });

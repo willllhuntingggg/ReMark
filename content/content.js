@@ -670,9 +670,22 @@
       text += node.nodeValue;
       textSegments.push({ node, start, end: text.length });
     }
-    const startIndex = text.indexOf(clip.text);
-    const endIndex = startIndex + clip.text.length;
-    if (startIndex < 0) return false;
+    let startIndex = text.indexOf(clip.text);
+    let endIndex = startIndex + clip.text.length;
+    if (startIndex < 0) {
+      const normalizedClipText = String(clip.text).replace(/\s+/g, '');
+      const originalIndexes = [];
+      let normalizedPageText = '';
+      for (let index = 0; index < text.length; index += 1) {
+        if (/\s/.test(text[index])) continue;
+        originalIndexes.push(index);
+        normalizedPageText += text[index];
+      }
+      const normalizedStart = normalizedClipText ? normalizedPageText.indexOf(normalizedClipText) : -1;
+      if (normalizedStart < 0) return false;
+      startIndex = originalIndexes[normalizedStart];
+      endIndex = originalIndexes[normalizedStart + normalizedClipText.length - 1] + 1;
+    }
     const start = textSegments.find((segment) => startIndex >= segment.start && startIndex < segment.end);
     const end = textSegments.find((segment) => endIndex > segment.start && endIndex <= segment.end);
     if (!start || !end) return false;

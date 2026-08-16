@@ -12,7 +12,7 @@ assert.match(sidepanel, /await notifySourceTabs\(item, \{ action: 'DELETE_CLIP_F
 assert.match(sidepanel, /async function notifySourceTabs[\s\S]*Promise\.all/);
 assert.match(sidepanel, /action: 'RESTORE_HIGHLIGHTS'/);
 assert.match(content, /function schedulePageHighlightRestore\(\)[\s\S]*DOMContentLoaded[\s\S]*window\.setTimeout\(restore, 2200\)/);
-assert.match(content, /const textSegments = \[\];[\s\S]*const startIndex = text\.indexOf\(clip\.text\)[\s\S]*highlightDOMRange\(range, clip\)/);
+assert.match(content, /const textSegments = \[\];[\s\S]*let startIndex = text\.indexOf\(clip\.text\)[\s\S]*highlightDOMRange\(range, clip\)/);
 assert.match(content, /function reportSourceUnavailable\(clipId\)[\s\S]*action: 'SOURCE_MARK_UNAVAILABLE'/);
 assert.match(sidepanel, /SOURCE_MARK_UNAVAILABLE[\s\S]*source_unavailable/);
 assert.match(sidepanel, /action: 'TRACK_SOURCE_NAVIGATION'/);
@@ -46,3 +46,8 @@ assert.match(content, /control\.addEventListener\('click'[\s\S]*openQuickNoteInp
 assert.match(content, /const showNote = Boolean\(clip\.note && segment === textSegments\[0\]\)/);
 assert.match(content, /async function setClipNoteIndicator\(clipId\)[\s\S]*marks\.at\(0\)/);
 console.log('page-note-control assertions passed');
+
+assert.match(sidepanel, /action: 'RESTORE_HIGHLIGHTS'[\s\S]*action: 'LOCATE_CLIP'/);
+assert.match(content, /const normalizedClipText = String\(clip\.text\)\.replace\(\/\\s\+\/g, ''\)/);
+assert.match(content, /originalIndexes\.push\(index\)[\s\S]*normalizedPageText\.indexOf\(normalizedClipText\)/);
+console.log('sidepanel-locate-recovery assertions passed');

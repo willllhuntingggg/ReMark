@@ -393,13 +393,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (target?.id) {
         await chrome.tabs.update(target.id, { active: true });
         if (target.windowId) await chrome.windows.update(target.windowId, { focused: true });
-        safeSendMessage(target.id, item.type === 'video' ? { action: 'SEEK_VIDEO_MARK', time: item.time } : { action: 'LOCATE_CLIP', clipId: item.id });
+        if (item.type === 'video') safeSendMessage(target.id, { action: 'SEEK_VIDEO_MARK', time: item.time });
+        else { safeSendMessage(target.id, { action: 'RESTORE_HIGHLIGHTS' }); setTimeout(() => safeSendMessage(target.id, { action: 'LOCATE_CLIP', clipId: item.id }), 90); }
         return;
       }
       if (item.type === 'highlight') {
         const tab = await chrome.tabs.create({ url: item.url, active: true });
         try { chrome.runtime.sendMessage({ action: 'TRACK_SOURCE_NAVIGATION', tabId: tab.id, clipId: item.id, url: item.url }); } catch (_) {}
-        setTimeout(() => safeSendMessage(tab.id, { action: 'LOCATE_CLIP', clipId: item.id }), 1200);
+        setTimeout(() => { safeSendMessage(tab.id, { action: 'RESTORE_HIGHLIGHTS' }); safeSendMessage(tab.id, { action: 'LOCATE_CLIP', clipId: item.id }); }, 900);
         return;
       }
     } catch (error) {

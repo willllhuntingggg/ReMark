@@ -224,7 +224,7 @@
       if (item) {
         await ReMarkStorage.deleteClip(clipId);
         await ReMarkStorage.pushUndo({ type: 'delete_clip', item });
-        selectedHighlight.remove();
+        removeClipHighlightFromDOM(clipId);
         selectedHighlight = null;
         notifyStorageUpdated();
         showPageToast(t('mark_deleted'), {
@@ -246,7 +246,7 @@
         onSave: async (note) => {
           if (!note) return;
           await ReMarkStorage.updateClip(clipId, { note });
-          document.querySelector(`mark[data-clip-id="${clipId}"]`)?.classList.add('has-note');
+          setClipNoteIndicator(clipId);
           notifyStorageUpdated();
         }
       });
@@ -305,19 +305,21 @@
   }
 
   function removeClipHighlightFromDOM(clipId) {
-    const mark = document.querySelector(`mark[data-clip-id="${clipId}"]`);
-    if (!mark) return;
-    mark.classList.add('remark-remove-fade');
+    const marks = [...document.querySelectorAll(`mark[data-clip-id="${clipId}"]`)];
+    if (!marks.length) return;
+    marks.forEach((mark) => mark.classList.add('remark-remove-fade'));
     setTimeout(() => {
-      const parent = mark.parentNode;
-      if (parent) {
+      const parents = new Set();
+      marks.forEach((mark) => {
+        const parent = mark.parentNode;
+        if (!parent) return;
         while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
         parent.removeChild(mark);
-        parent.normalize();
-      }
+        parents.add(parent);
+      });
+      parents.forEach((parent) => parent.normalize());
     }, 280);
   }
-
   function removeAllPageHighlightsFromDOM() {
     const marks = document.querySelectorAll('mark.remark-highlight-mark');
     marks.forEach((mark, i) => {
@@ -379,7 +381,7 @@
       onSave: async (note) => {
         if (!note) return;
         await ReMarkStorage.updateClip(savedClip.id, { note });
-        document.querySelector(`mark[data-clip-id="${savedClip.id}"]`)?.classList.add('has-note');
+        setClipNoteIndicator(savedClip.id);
         notifyStorageUpdated();
       }
     });
@@ -466,39 +468,78 @@
         mark.addEventListener('animationend', () => mark.classList.remove('remark-fresh'), { once: true });
       }
     };
-    try {
+    const createMark = (showNote = false) => {
       const mark = document.createElement('mark');
-      mark.className = `remark-highlight-mark ${clip.note ? 'has-note' : ''}`;
+      mark.className = `remark-highlight-mark ${showNote ? 'has-note' : ''}`;
       mark.setAttribute('data-clip-id', clip.id);
       markWithFresh(mark);
-
-      if (range.startContainer === range.endContainer && range.startContainer.nodeType === Node.TEXT_NODE) {
-        range.surroundContents(mark);
-      } else {
-        const contents = range.extractContents();
-        mark.appendChild(contents);
-        range.insertNode(mark);
+      return mark;
+    };
+    const textSegments = [];
+    const root = range.commonAncestorContainer;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (!node.nodeValue?.length || !range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
+        const parent = node.parentElement;
+        if (parent?.closest('mark.remark-highlight-mark, script, style')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
       }
+    });
+    let node;
+    while ((node = walker.nextNode())) {
+      const start = node === range.startContainer ? range.startOffset : 0;
+      const end = node === range.endContainer ? range.endOffset : node.nodeValue.length;
+      if (start >= end) continue;
+      const segment = document.createRange();
+      segment.setStart(node, start);
+      segment.setEnd(node, end);
+      textSegments.push(segment);
+    }
+    if (root.nodeType === Node.TEXT_NODE && textSegments.length === 0) {
+      const segment = document.createRange();
+      segment.setStart(root, range.startOffset);
+      segment.setEnd(root, range.endOffset);
+      textSegments.push(segment);
+    }
+    try {
+      if (textSegments.length) {
+        textSegments.slice().reverse().forEach((segment) => {
+          const mark = createMark(clip.note && segment === textSegments[textSegments.length - 1]);
+          segment.surroundContents(mark);
+          bindHighlightClick(mark, clip);
+        });
+        return;
+      }
+      const mark = createMark(Boolean(clip.note));
+      range.surroundContents(mark);
       bindHighlightClick(mark, clip);
     } catch (e) {
       console.warn('[ReMark] Highlight DOM range fallback:', e);
       try {
-        const mark = document.createElement('mark');
-        mark.className = `remark-highlight-mark ${clip.note ? 'has-note' : ''}`;
-        mark.setAttribute('data-clip-id', clip.id);
-        mark.textContent = range.toString();
-        range.deleteContents();
+        const mark = createMark(Boolean(clip.note));
+        const contents = range.extractContents();
+        mark.appendChild(contents);
         range.insertNode(mark);
-        markWithFresh(mark);
         bindHighlightClick(mark, clip);
       } catch (err) {
         console.error('[ReMark] Fallback highlight failed:', err);
       }
     }
   }
-
-  function clearActiveClip(clipId) { document.querySelectorAll('.remark-highlight-mark.remark-selected').forEach((node) => { if (!clipId || node.dataset.clipId === String(clipId)) node.classList.remove('remark-selected'); }); }
-  function setActiveClip(clipId) { clearActiveClip(); const mark = document.querySelector(`mark[data-clip-id="${clipId}"]`); if (mark) mark.classList.add('remark-selected'); }
+  function clearActiveClip(clipId) {
+    document.querySelectorAll('.remark-highlight-mark.remark-selected').forEach((node) => {
+      if (!clipId || node.dataset.clipId === String(clipId)) node.classList.remove('remark-selected');
+    });
+  }
+  function setClipNoteIndicator(clipId) {
+    const marks = [...document.querySelectorAll(`mark[data-clip-id="${clipId}"]`)];
+    marks.forEach((mark) => mark.classList.remove('has-note'));
+    marks.at(-1)?.classList.add('has-note');
+  }
+  function setActiveClip(clipId) {
+    clearActiveClip();
+    document.querySelectorAll(`mark[data-clip-id="${clipId}"]`).forEach((mark) => mark.classList.add('remark-selected'));
+  }
   // Click highlight → select the source Mark and focus its matching panel card.
   function bindHighlightClick(element, clip) {
     element.addEventListener('click', (e) => {

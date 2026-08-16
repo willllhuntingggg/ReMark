@@ -14,17 +14,17 @@ mark.remark-highlight-mark {
   background: rgb(250, 222, 74);
   color: #24220f;
   border: 0;
-  border-radius: 5px;
+  border-radius: 2px;
   box-shadow: none;
-  padding: 0 1px;
+  padding: 0;
   line-height: inherit;
   vertical-align: baseline;
   font-weight: inherit;
   text-decoration: none;
   cursor: pointer;
-  -webkit-box-decoration-break: slice;
-  box-decoration-break: slice;
-  background-clip: border-box;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  background-clip: padding-box;
   transition: background-color .16s ease;
 }
 
@@ -46,9 +46,9 @@ mark.remark-highlight-mark.has-note::after {
 
 /* Clicking a mark focuses it in the side panel. */
 mark.remark-highlight-mark.remark-selected {
-  outline: 1.5px solid rgba(110, 98, 30, .35);
-  outline-offset: 2px;
-  border-radius: 5px;
+  background: rgb(255, 233, 106);
+  outline: none;
+  border-radius: 2px;
 }
 
 /* Locate pulse when jumping to a mark from the panel. */

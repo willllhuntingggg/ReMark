@@ -3,8 +3,12 @@ const path = require('path');
 const modulePath = path.resolve(__dirname, '../lib/i18n.js');
 
 function load(language) {
+  Object.defineProperty(global, 'navigator', {
+    value: { language },
+    configurable: true,
+    writable: true
+  });
   delete require.cache[modulePath];
-  global.navigator = { language };
   return require(modulePath);
 }
 

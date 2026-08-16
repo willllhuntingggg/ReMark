@@ -201,10 +201,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       ? `<span class="video-timestamp"><span aria-hidden="true">▶</span>${clock(item.time)}</span>`
         + (item.duration ? `<span class="video-duration"> / ${clock(item.duration)}</span>` : '')
       : `“${esc(item.text)}”`;
-    const noteGlyph = '<svg class="mark-note-glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3h7A1.5 1.5 0 0 1 13 4.5v4A1.5 1.5 0 0 1 11.5 10H8.2L5.8 12.4 6.4 10H4.5A1.5 1.5 0 0 1 3 8.5v-4A1.5 1.5 0 0 1 4.5 3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>';
     const note = item.note
-      ? `<button class="mark-note" data-action="note" data-key="${esc(item.key)}" type="button">${noteGlyph}<span class="mark-note-text">${esc(item.note)}</span></button>`
-      : `<button class="mark-note mark-note-empty" data-action="note" data-key="${esc(item.key)}" type="button">${noteGlyph}<span class="mark-note-text">${esc(t('add_note'))}</span></button>`;
+      ? `<button class="mark-note" data-action="note" data-key="${esc(item.key)}" type="button">${esc(item.note)}</button>`
+      : '';
     const editor = [
       `<div class="mark-note-editor" data-key="${esc(item.key)}" hidden>`,
       `<textarea class="mark-note-textarea" aria-label="${esc(t('add_note'))}" placeholder="${esc(t('note_placeholder'))}">${esc(item.note)}</textarea>`,

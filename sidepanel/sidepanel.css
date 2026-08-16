@@ -497,8 +497,7 @@ button {
   padding: 0 14px 0 0;
 }
 
-.mark-note,
-.mark-note-empty {
+.mark-note {
   display: flex;
   align-items: flex-start;
   gap: 6px;
@@ -549,36 +548,6 @@ button {
   outline: none;
 }
 
-/* An empty card gently invites a note on hover. */
-/* Empty cards keep zero height; hovering reveals the gentle invite. */
-.mark-note-empty {
-  max-height: 0;
-  margin: 0;
-  overflow: hidden;
-  opacity: 0;
-  color: var(--ink-3);
-  cursor: pointer;
-  pointer-events: none;
-  transition: opacity .16s ease, max-height .18s ease, margin .18s ease;
-}
-
-.mark-note-empty .mark-note-glyph {
-  color: var(--ink-4);
-}
-
-.mark-card:hover .mark-note-empty,
-.mark-card:focus-within .mark-note-empty {
-  opacity: .75;
-  max-height: 26px;
-  margin: 0 0 5px;
-  pointer-events: auto;
-}
-
-.mark-note-empty:hover,
-.mark-note-empty:focus-visible {
-  color: var(--ink);
-  opacity: 1;
-}
 
 /* Note editor */
 .mark-note-editor {
@@ -1135,7 +1104,6 @@ button {
   .mark-card,
   .mark-actions,
   .mark-note,
-  .mark-note-empty,
   .mark-action,
   .source-back,
   .settings-trigger,

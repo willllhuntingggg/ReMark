@@ -18,3 +18,10 @@ assert.match(css, /remark-selected \{[\s\S]*outline: none;/);
 assert.doesNotMatch(css.slice(0, 1200), /box-decoration-break: slice/);
 
 console.log('cross-line-highlight.test.js: all assertions passed');
+assert.match(css, /display: inline;/);
+assert.match(css, /box-shadow: 0 \.08em 0 var\(--remark-highlight-bg\), 0 -\.08em 0 var\(--remark-highlight-bg\);/);
+assert.match(css, /white-space: inherit;/);
+assert.match(css, /letter-spacing: inherit;/);
+assert.match(css, /word-spacing: inherit;/);
+assert.match(css, /mark\.remark-highlight-mark\.has-note::after \{[\s\S]*position: absolute;/);
+assert.doesNotMatch(css.slice(0, 1500), /padding: 0 1px/);

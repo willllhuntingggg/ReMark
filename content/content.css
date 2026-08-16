@@ -10,45 +10,47 @@
 /* ---------- Text highlights ---------- */
 
 mark.remark-highlight-mark {
+  --remark-highlight-bg: rgb(250, 222, 74);
   position: relative;
-  background: rgb(250, 222, 74);
+  display: inline;
+  background: var(--remark-highlight-bg);
   color: #24220f;
   border: 0;
-  border-radius: 2px;
-  box-shadow: none;
+  border-radius: 0;
+  box-shadow: 0 .08em 0 var(--remark-highlight-bg), 0 -.08em 0 var(--remark-highlight-bg);
   padding: 0;
   line-height: inherit;
   vertical-align: baseline;
+  white-space: inherit;
+  letter-spacing: inherit;
+  word-spacing: inherit;
   font-weight: inherit;
   text-decoration: none;
   cursor: pointer;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
-  background-clip: padding-box;
+  background-clip: border-box;
   transition: background-color .16s ease;
 }
 
-mark.remark-highlight-mark:hover {
-  background: rgb(255, 233, 106);
-  text-decoration: none;
-}
-
-/* A saved note is signalled by a quiet dot after the mark. */
+/* A saved note is signalled without adding inline width to page text. */
 mark.remark-highlight-mark.has-note::after {
   content: '•';
-  display: inline-block;
-  margin-left: 3px;
+  position: absolute;
+  top: -.42em;
+  right: -.22em;
+  margin: 0;
   color: #7a6416;
   font-size: 12px;
   line-height: 1;
-  vertical-align: super;
+  pointer-events: none;
 }
 
 /* Clicking a mark focuses it in the side panel. */
 mark.remark-highlight-mark.remark-selected {
-  background: rgb(255, 233, 106);
+  --remark-highlight-bg: rgb(255, 233, 106);
   outline: none;
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 /* Locate pulse when jumping to a mark from the panel. */

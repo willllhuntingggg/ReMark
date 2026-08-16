@@ -13,6 +13,7 @@ mark.remark-highlight-mark {
   --remark-highlight-bg: rgb(250, 222, 74);
   position: relative;
   display: inline;
+  overflow: visible;
   background: var(--remark-highlight-bg);
   color: #24220f;
   border: 0;
@@ -32,11 +33,10 @@ mark.remark-highlight-mark {
   background-clip: border-box;
   transition: background-color .16s ease, box-shadow .16s ease;
 }
-/* The Note affordance is absolutely positioned, so it never changes text flow. */
-mark.remark-highlight-mark.has-note { overflow: visible; }
+/* Persistent marker for a saved Note; it does not affect text layout. */
 .remark-note-control {
   position: absolute;
-  z-index: 2;
+  z-index: 4;
   top: -.58em;
   left: -.42em;
   width: 1em;
@@ -52,11 +52,13 @@ mark.remark-highlight-mark.has-note { overflow: visible; }
   box-shadow: 0 1px 2px rgba(0, 0, 0, .22);
   cursor: pointer;
   transform: rotate(-2deg);
-}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}rol:focus-visible { background: rgb(111, 85, 13); outline: 2px solid rgb(255, 246, 173); outline-offset: 1px; }
-.remark-note-control svg { width: .68em; height: .68em; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+}
+.remark-note-control:hover,
+.remark-note-control:focus-visible { background: rgb(111, 85, 13); outline: 2px solid rgb(255, 246, 173); outline-offset: 1px; }
+.remark-note-control svg { width: .68em; height: .68em; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-l.remark-note-control slinejoin: round; pointer-events: none; }
 .remark-note-hint {
   position: absolute;
-  z-index: 3;
+  z-index: 5;
   top: -3.2em;
   left: -.38em;
   width: min(240px, 56vw);
@@ -65,8 +67,8 @@ mark.remark-highlight-mark.has-note { overflow: visible; }
   border-radius: .48em;
   background: rgb(45, 39, 23);
   color: rgb(255, 249, 219);
-  box-sh  box-sh  box-sh  bba(0, 0, 0, .22);
-  font: 500 12px/1.4 system-ui, -apple-system, BlinkMacSystemFont,   font: 500 sans-serif;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .22);
+  font:   font:x/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: normal;
   word-spacing: normal;
   text-align: left;
@@ -78,14 +80,66 @@ mark.remark-highlight-mark.has-note { overflow: visible; }
 }
 .remark-note-control:hover + .remark-note-hint,
 .remark-note-control:focus-visible + .remark-note-hint { opacity: 1; transform: translateY(0); }
-/* Selected marks preserve the same rounded ink treatment. */
-mark.remark-highlight-mark.remark-selected {
-  --remark-highlight-bg: rgb(255, 233, 106);
-  outline: none;
-  border-radius: .2em;
-  box-shadow: 0 .08em 0 var(--remark-highlight-bg), 0 -.08em 0 var(--remark-highlight-bg), inset 0 -2px 0 rgba(111, 85, 13, .82);
+/* End-of-Mark actions are visually ephemeral and never change text flow. */
+.remark-mark-actions {
+  position: absolute;
+  z-index: 6;
+  top: 50%;
+  right: -3.25em;
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid rgba(71, 56, 15, .18);
+  border-radius: .48em;
+  background: rgb(255, 250, 221);
+  box-shadow: 0 3px 10px rgba(47, 37, 11, .2);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-4px, -50%);
+  transition: opacity .15s ease, transform .15s ease;
 }
-
+.remark-mark-actions.is-visible,
+.remark-mark-actions:hover,
+.remark-mark-actions:focus-within { opacity: 1; pointer-events: auto; transform: translate(0, -50%); }
+.remark-mark-action {
+  position: relative;
+  width: 1.65em;
+  height: 1.65em;
+  height: 1.65em;
+ve;ace-items: center;
+  margin: 0;
+  padding: 0;
+                                                   transparent;
+  color: rgb(82, 64, 18);
+  cursor: pointer;
+}
+.remark-mark-action:hover,
+.remark-mark-action:focus-visible { background: rgb(241, 222, 117); outline: none; }
+.remark-mark-action--delete:hover,
+.remark-mark-action--delete:focus-visible { background: rgb(253, 218, 208); colo.remar(155, 50, 39); }
+.remark-mark-action svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.remark-mark-action::after {
+  content: attr(data-hint);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  padding: .38em .52em;
+  border-radius: .36em;
+  background: rgb(45, 39, 23);
+  color: rgb(  color: rgb(  color: rgbdow: 0 4px 12px rgba(0, 0, 0, .2);
+  font: 500 12px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: normal;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity .14s ease, transform .14s ease;
+}
+.remark-mark-action:hover::after,
+.remark-mark-action:focus-visible::after { opacity: 1; transform: translateY(0); }
+/* Source-page interaction may retain keyboard focus internally but has no selected visual state. */
+mark.remark-highlight-mark.remark-selected { outline: none; }
 /* Locate pulse when jumping to a mark from the panel. */
 mark.remark-highlight-mark.remark-locate-pulse {
   animation: remark-gentle-focus 1.15s ease-in-out;

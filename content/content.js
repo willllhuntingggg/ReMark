@@ -221,50 +221,50 @@
       seekVideoToMark(msg.time);
     }
   });
-
   let selectedHighlight = null;
-  document.addEventListener('keydown', async (event) => {
-    if ((event.key === 'Delete' || event.key === 'Backspace') && selectedHighlight && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
-      event.preventDefault();
-      const clipId = selectedHighlight.getAttribute('data-clip-id');
-      const clips = await ReMarkStorage.getClips();
-      const item = clips.find(c => c.id === clipId);
-      if (item) {
-        await ReMarkStorage.deleteClip(clipId);
-        await ReMarkStorage.pushUndo({ type: 'delete_clip', item });
-        removeClipHighlightFromDOM(clipId);
-        selectedHighlight = null;
+  async function deletePageClip(clipId) {
+    const clips = await ReMarkStorage.getClips();
+    const item = clips.find((clip) => clip.id === clipId);
+    if (!item) return false;
+    await ReMarkStorage.deleteClip(clipId);
+    await ReMarkStorage.pushUndo({ type: 'delete_clip', item });
+    removeClipHighlightFromDOM(clipId);
+    clearActiveClip(clipId);
+    notifyStorageUpdated();
+    showPageToast(t('mark_deleted'), {
+      label: t('undo'),
+      onAction: async () => { await undoPageAction(); }
+    });
+    return true;
+  }
+  async function openPageNoteEditor(clipId, anchor) {
+    const item = (await ReMarkStorage.getClips()).find((clip) => clip.id === clipId);
+    if (!item) return;
+    const mark = anchor || getHighlightActionAnchor(clipId);
+    openQuickNoteInput({
+      rect: mark?.getBoundingClientRect(),
+      initialValue: item.note || '',
+      onSave: async (note) => {
+        if (!note) return;
+        await ReMarkStorage.updateClip(clipId, { note });
+        await setClipNoteIndicator(clipId);
         notifyStorageUpdated();
-        showPageToast(t('mark_deleted'), {
-          label: t('undo'),
-          onAction: async () => {
-            if (await undoPageAction()) return;
-          }
-        });
       }
-      return;
-    }
-    if (event.key === 'Enter' && event.shiftKey && selectedHighlight && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
-      // Shift + Enter on a selected highlight adds a Note or opens the existing Note for editing.
+    });
+  }
+  document.addEventListener('keydown', async (event) => {
+    const editing = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+    if (!editing && (event.key === 'Delete' || event.key === 'Backspace') && selectedHighlight) {
       event.preventDefault();
-      const clipId = selectedHighlight.getAttribute('data-clip-id');
-      const clips = await ReMarkStorage.getClips();
-      const item = clips.find((clip) => clip.id === clipId);
-      const rect = selectedHighlight.getBoundingClientRect();
-      openQuickNoteInput({
-        rect,
-        initialValue: item?.note || '',
-        onSave: async (note) => {
-          if (!note) return;
-          await ReMarkStorage.updateClip(clipId, { note });
-          setClipNoteIndicator(clipId);
-          notifyStorageUpdated();
-        }
-      });
+      await deletePageClip(selectedHighlight.getAttribute('data-clip-id'));
       return;
     }
-    if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return;
-    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+    if (!editing && event.key === 'Enter' && event.shiftKey && selectedHighlight) {
+      event.preventDefault();
+      await openPageNoteEditor(selectedHighlight.getAttribute('data-clip-id'), selectedHighlight);
+      return;
+    }
+    if (editing || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return;
     event.preventDefault();
     await undoPageAction();
   });
@@ -350,7 +350,7 @@
         if (!options.immediate && mark.dataset.remarkRemovalPending !== 'true') return;
         const parent = mark.parentNode;
         if (!parent) return;
-        mark.querySelectorAll('.remark-note-control, .remark-note-hint').forEach((node) => node.remove());
+        mark.querySelectorAll('.remark-note-control, .remark-note-hint, .remark-mark-actions').forEach((node) => node.remove());
         while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
         parent.removeChild(mark);
         parents.add(parent);
@@ -372,7 +372,7 @@
         setTimeout(() => {
           const parent = mark.parentNode;
           if (parent) {
-            mark.querySelectorAll('.remark-note-control, .remark-note-hint').forEach((node) => node.remove());
+            mark.querySelectorAll('.remark-note-control, .remark-note-hint, .remark-mark-actions').forEach((node) => node.remove());
             while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
             parent.removeChild(mark);
             parent.normalize();
@@ -418,6 +418,7 @@
     await ReMarkStorage.pushUndo({ type: 'restore_clip', id: savedClip.id });
     if (range) {
       highlightDOMRange(range, savedClip, true);
+      showHighlightActions(savedClip.id, 2800);
       window.getSelection()?.removeAllRanges();
     }
     notifyStorageUpdated();
@@ -587,7 +588,7 @@
     const marks = [...document.querySelectorAll(`mark[data-clip-id="${clipId}"]`)];
     marks.forEach((mark) => {
       mark.classList.remove('has-note');
-      mark.querySelectorAll('.remark-note-control, .remark-note-hint').forEach((node) => node.remove());
+      mark.querySelectorAll('.remark-note-control, .remark-note-hint, .remark-mark-actions').forEach((node) => node.remove());
     });
     const clip = (await ReMarkStorage.getClips()).find((item) => item.id === clipId);
     if (!clip?.note?.trim()) return;
@@ -629,19 +630,74 @@
   function setActiveClip(clipId) {
     clearActiveClip();
     const marks = [...document.querySelectorAll(`mark[data-clip-id="${clipId}"]`)];
-    marks.forEach((mark) => mark.classList.add('remark-selected'));
     selectedHighlight = marks.at(-1) || null;
   }
-  // Click highlight → select it locally for page-level keyboard actions.
+  const highlightActionTimers = new Map();
+  function getHighlightActionAnchor(clipId) {
+    return [...document.querySelectorAll(`mark[data-clip-id="${clipId}"]`)].at(-1) || null;
+  }
+  function cancelHighlightActionHide(clipId) {
+    const timer = highlightActionTimers.get(clipId);
+    if (timer) window.clearTimeout(timer);
+    highlightActionTimers.delete(clipId);
+  }
+  function scheduleHighlightActionHide(clipId, delay = 650) {
+    cancelHighlightActionHide(clipId);
+    highlightActionTimers.set(clipId, window.setTimeout(() => {
+      const actions = getHighlightActionAnchor(clipId)?.querySelector('.remark-mark-actions');
+      if (actions && !actions.matches(':hover')) actions.classList.remove('is-visible');
+    }, delay));
+  }
+  function ensureHighlightActions(clipId) {
+    const anchor = getHighlightActionAnchor(clipId);
+    if (!anchor) return null;
+    const existing = anchor.querySelector('.remark-mark-actions');
+    if (existing) return existing;
+    const actions = document.createElement('span');
+    actions.className = 'remark-mark-actions';
+    actions.setAttribute('role', 'group');
+    actions.setAttribute('aria-label', t('more_actions'));
+    const note = document.createElement('button');
+    note.type = 'button';
+    note.className = 'remark-mark-action remark-mark-action--note';
+    note.dataset.hint = t('add_note');
+    note.setAttribute('aria-label', t('add_note'));
+    note.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h8v8.3L8.2 14H4z"></path><path d="M5.8 5.2h4.4M5.8 7.5h4.4"></path></svg>';
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'remark-mark-action remark-mark-action--delete';
+    remove.dataset.hint = t('delete_mark');
+    remove.setAttribute('aria-label', t('delete_mark'));
+    remove.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.2 4.6h9.6M6.2 2.7h3.6M5 4.6l.6 8.2h4.8l.6-8.2M6.8 6.7v3.9M9.2 6.7v3.9"></path></svg>';
+    const stop = (event) => { event.preventDefault(); event.stopPropagation(); };
+    note.addEventListener('pointerdown', stop);
+    remove.addEventListener('pointerdown', stop);
+    note.addEventListener('click', async (event) => { stop(event); await openPageNoteEditor(clipId, anchor); });
+    remove.addEventListener('click', async (event) => { stop(event); await deletePageClip(clipId); });
+    actions.addEventListener('mouseenter', () => cancelHighlightActionHide(clipId));
+    actions.addEventListener('mouseleave', () => scheduleHighlightActionHide(clipId));
+    actions.append(note, remove);
+    anchor.appendChild(actions);
+    return actions;
+  }
+  function showHighlightActions(clipId, duration = 0) {
+    const actions = ensureHighlightActions(clipId);
+    if (!actions) return;
+    cancelHighlightActionHide(clipId);
+    actions.classList.add('is-visible');
+    if (duration) window.setTimeout(() => scheduleHighlightActionHide(clipId, 0), duration);
+  }
+  // Page interaction shows ephemeral tools but deliberately has no persistent visual selection.
   function bindHighlightClick(element, clip) {
     element.addEventListener('click', (event) => {
+      if (event.target.closest('.remark-note-control, .remark-mark-actions')) return;
       event.preventDefault();
       event.stopPropagation();
-      setActiveClip(clip.id);
       selectedHighlight = element;
-      element.classList.add('remark-locate-pulse');
-      setTimeout(() => element.classList.remove('remark-locate-pulse'), 2200);
+      showHighlightActions(clip.id);
     });
+    element.addEventListener('mouseenter', () => showHighlightActions(clip.id));
+    element.addEventListener('mouseleave', () => scheduleHighlightActionHide(clip.id));
   }
 
   function notifyStorageUpdated() {

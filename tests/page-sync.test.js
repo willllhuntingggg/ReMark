@@ -24,14 +24,14 @@ console.log('page-sync.test.js: all assertions passed');
 
 assert.match(content, /let selectedHighlight = null/);
 assert.match(content, /event\.key === 'Enter' && event\.shiftKey && selectedHighlight/);
-assert.match(content, /initialValue: item\?\.note \|\| ''/);
+assert.match(content, /initialValue: item\.note \|\| ''/);
 assert.match(content, /function openQuickNoteInput\(\{ rect, onSave, initialValue = '' \}\)/);
 assert.match(content, /input\.value = initialValue/);
-assert.match(content, /setActiveClip\(clip\.id\);[\s\S]*selectedHighlight = element/);
+assert.match(content, /function bindHighlightClick\(element, clip\)[\s\S]*showHighlightActions\(clip\.id\)/);
 const clickHandler = content.slice(content.indexOf('function bindHighlightClick'), content.indexOf('function notifyStorageUpdated'));
 assert.doesNotMatch(clickHandler, /OPEN_SIDE_PANEL/);
-assert.match(content, /event\.preventDefault\(\);[\s\S]*event\.stopPropagation\(\);[\s\S]*setActiveClip\(clip\.id\);[\s\S]*selectedHighlight = element/);
-assert.match(read('content/content.css'), /remark-selected \{[\s\S]*inset 0 -2px 0 rgba\(111, 85, 13, \.82\)/);
+assert.match(content, /event\.preventDefault\(\);[\s\S]*event\.stopPropagation\(\);[\s\S]*selectedHighlight = element[\s\S]*showHighlightActions\(clip\.id\)/);
+assert.doesNotMatch(read('content/content.css'), /remark-selected \{[\s\S]*inset 0 -2px/);
 console.log('page-mark-interaction assertions passed');
 
 assert.match(content, /event\.button !== 0 \|\| !\(event\.metaKey \|\| event\.ctrlKey\)/);
@@ -57,3 +57,11 @@ assert.doesNotMatch(sidepanel.slice(sidepanel.indexOf("list.addEventListener('cl
 assert.match(content, /if \(mark\) \{[\s\S]*setActiveClip\(clipId\);[\s\S]*performLocateAnimation\(mark\)/);
 assert.match(content, /mark\.scrollIntoView\(\{ behavior: 'smooth', block: 'center', inline: 'nearest' \}\)/);
 console.log('viewport-mark-locate assertions passed');
+
+assert.match(content, /function ensureHighlightActions\(clipId\)[\s\S]*remark-mark-action--note[\s\S]*remark-mark-action--delete/);
+assert.match(content, /showHighlightActions\(savedClip\.id, 2800\)/);
+assert.match(content, /element\.addEventListener\('mouseenter', \(\) => showHighlightActions\(clip\.id\)\)/);
+assert.match(content, /async function deletePageClip\(clipId\)[\s\S]*ReMarkStorage\.pushUndo/);
+assert.match(read('content/content.css'), /\.remark-mark-action::after \{[\s\S]*content: attr\(data-hint\)/);
+assert.match(read('content/content.css'), /remark-mark-actions\.is-visible/);
+console.log('page-highlight-actions assertions passed');

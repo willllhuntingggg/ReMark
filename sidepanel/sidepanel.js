@@ -206,11 +206,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       ? t('jump_to_time', { time: clock(item.time) })
       : item.text;
     const content = item.type === 'video'
-      ? `<span class="video-timestamp"><span aria-hidden="true">▶</span>${clock(item.time)}</span>`
+      ? `<span class="video-timestamp">${clock(item.time)}</span>`
         + (item.duration ? `<span class="video-duration"> / ${clock(item.duration)}</span>` : '')
-      : `“${esc(item.text)}”`;
+      : esc(item.text);
     const note = item.note
-      ? `<button class="mark-note" data-action="note" data-key="${esc(item.key)}" type="button"><span class="mark-note-text">${esc(item.note)}</span></button>`
+      ? `<button class="mark-note" data-action="note" data-key="${esc(item.key)}" type="button"><span class="mark-note-arrow" aria-hidden="true">↳</span><span class="mark-note-text">${esc(item.note)}</span></button>`
       : '';
     // Inline editor: the visible note text itself becomes the field.
     const editor = `<textarea class="mark-note-textarea" data-key="${esc(item.key)}" aria-label="${esc(t('add_note'))}" placeholder="${esc(t('note_placeholder'))}" rows="1" hidden>${esc(item.note)}</textarea>`;
@@ -225,11 +225,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const menu = [
       `<button data-action="note" data-key="${esc(item.key)}" type="button">${esc(t(item.note ? 'edit_note' : 'add_note'))}</button>`,
       item.note ? `<button data-action="remove-note" data-key="${esc(item.key)}" type="button">${esc(t('remove_note'))}</button>` : '',
+      `<button data-action="copy" data-key="${esc(item.key)}" type="button">${esc(t('copy'))}</button>`,
       `<button data-action="delete" data-key="${esc(item.key)}" type="button">${esc(t('delete_mark'))}</button>`
     ].join('');
+    const quote = item.type === 'highlight'
+      ? '<span class="mark-quote" aria-hidden="true">“</span>'
+      : '<span class="mark-quote mark-quote--video" aria-hidden="true"></span>';
     return [
       `<article class="mark-card mark-card--${item.type}" data-key="${esc(item.key)}" data-id="${esc(item.id)}" tabindex="0" style="--i:${index}">`,
-      `<div class="mark-content"><button class="mark-content-text" data-action="jump" data-key="${esc(item.key)}" type="button" title="${esc(jumpTitle)}">${content}</button></div>`,
+      `<div class="mark-content">${quote}<button class="mark-content-text" data-action="jump" data-key="${esc(item.key)}" type="button" title="${esc(jumpTitle)}">${content}</button></div>`,
       `<div class="mark-note-area">${note}${editor}</div>`,
       `<footer class="mark-footer">${sourceControl}`,
       `<span class="mark-created">${ago(item.createdAt)}</span><div class="mark-actions">`,
@@ -351,6 +355,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   }
+  async function copyMark(key) {
+    const item = itemFor(key);
+    if (!item) return;
+    const text = item.type === 'video'
+      ? `${item.title || t('untitled_video')} — ${clock(item.time)}`
+      : `“${item.text}”`;
+    const payload = item.note ? `${text}\n\n${item.note}` : text;
+    try {
+      await navigator.clipboard.writeText(payload);
+    } catch (_) {
+      const area = document.createElement('textarea');
+      area.value = payload;
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      area.remove();
+    }
+    showToast(t('copied'));
+  }
+
   // Lightweight toast: reversible actions stay quiet and auto-dismiss.
   let toastTimer = null;
   function showToast(message, options = {}) {
@@ -428,6 +454,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (action === 'source') { sourceUrl = url || ''; selected = null; render(); return; }
     if (action === 'note') { setActive(key); openNote(key); }
     if (action === 'remove-note') { setActive(key); void saveNote(key, ''); }
+    if (action === 'copy') void copyMark(key);
     if (action === 'delete') void deleteMark(key);
     if (action === 'menu') {
       setActive(key);

@@ -385,7 +385,7 @@ button {
   position: relative;
   display: block;
   margin: 0;
-  padding: 13px 6px 14px 16px;
+  padding: 13px 6px 14px 32px;
   border: 0;
   border-bottom: 1px solid var(--line);
   background: transparent;
@@ -416,6 +416,7 @@ button {
 
 /* Mark glyph — only the actual text navigates; card space selects. */
 .mark-content {
+  position: relative;
   display: block;
   width: 100%;
   margin: 0 0 7px;
@@ -424,10 +425,12 @@ button {
 }
 
 .mark-content-text {
+  flex: 1 1 auto;
+  min-width: 0;
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   max-width: 100%;
   margin: 0;
   padding: 0;
@@ -451,6 +454,43 @@ button {
   outline: none;
 }
 
+/* Type marker in the left rail: the only thing visible there, with all
+   other content indented right. */
+.mark-quote {
+  position: absolute;
+  left: -27px;
+  top: -0.05em;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.4em;
+  line-height: .8;
+  color: var(--gold);
+  opacity: .55;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Video type marker: a Final-Cut marker — a small flag on a stem
+   (keyframes are diamonds; markers are flags), in the mark-gold so the
+   rail reads as one family. */
+.mark-quote--video {
+  width: 8px;
+  height: 10px;
+  clip-path: polygon(0 0, 100% 0, 100% 68%, 50% 100%, 0 68%);
+  background: var(--gold);
+  top: 4px;
+}
+
+.mark-quote--video::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 100%;
+  width: 2px;
+  height: 4px;
+  border-radius: 1px;
+  background: var(--gold);
+}
+
 /* Video mark — a precise timestamp reads like a control, not a quote. */
 .mark-card--video .mark-content-text {
   display: flex;
@@ -462,25 +502,19 @@ button {
 }
 
 .video-timestamp {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  color: var(--teal);
-  font-size: 12.5px;
   font-variant-numeric: tabular-nums;
   letter-spacing: .01em;
-}
-
-.video-timestamp span {
-  font-size: 8px;
-  transform: translateY(-.5px);
+  color: var(--ink);
 }
 
 .video-duration {
-  color: var(--ink-4);
-  font-size: 10.5px;
-  font-weight: 400;
+  display: none;
   font-variant-numeric: tabular-nums;
+}
+
+.mark-card--video:hover .video-duration,
+.mark-card--video:focus-within .video-duration {
+  display: inline;
 }
 
 /* ---------- Notes ---------- */
@@ -520,11 +554,18 @@ button {
   color: var(--ink-3);
 }
 
+.mark-note-arrow {
+  flex: 0 0 auto;
+  color: var(--ink-4);
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+
 .mark-note-text {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   min-width: 0;
 }
 

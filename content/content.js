@@ -231,6 +231,28 @@
     });
     return true;
   }
+  async function copyTextToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (_) {
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      area.remove();
+    }
+  }
+  async function copyPageClip(clipId) {
+    const clips = await ReMarkStorage.getClips();
+    const item = clips.find((clip) => clip.id === clipId);
+    if (!item) return;
+    const payload = `“${item.text}”${item.note ? `\n\n${item.note}` : ''}`;
+    await copyTextToClipboard(payload);
+    showPageToast(t('copied'));
+  }
   async function openPageNoteEditor(clipId, anchor) {
     const item = (await ReMarkStorage.getClips()).find((clip) => clip.id === clipId);
     if (!item) return;
@@ -652,6 +674,12 @@
     note.dataset.hint = `${t('add_note')} · Shift+Enter`;
     note.setAttribute('aria-label', t('add_note'));
     note.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h8v8.3L8.2 14H4z"></path><path d="M5.8 5.2h4.4M5.8 7.5h4.4"></path></svg>';
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'remark-mark-action remark-mark-action--copy';
+    copy.dataset.hint = t('copy');
+    copy.setAttribute('aria-label', t('copy'));
+    copy.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.2" y="5.2" width="7.6" height="7.6" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.4"></rect><path d="M9.6 5.2V4.2c0-.7.6-1.3 1.3-1.3h1.8c.7 0 1.3.6 1.3 1.3v3.3c0 .7-.6 1.3-1.3 1.3h-.9" fill="none" stroke="currentColor" stroke-width="1.4"></path></svg>';
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'remark-mark-action remark-mark-action--delete';
@@ -660,12 +688,14 @@
     remove.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.2 4.6h9.6M6.2 2.7h3.6M5 4.6l.6 8.2h4.8l.6-8.2M6.8 6.7v3.9M9.2 6.7v3.9"></path></svg>';
     const stop = (event) => { event.preventDefault(); event.stopPropagation(); };
     note.addEventListener('pointerdown', stop);
+    copy.addEventListener('pointerdown', stop);
     remove.addEventListener('pointerdown', stop);
     note.addEventListener('click', async (event) => { stop(event); await openPageNoteEditor(clipId, host); });
+    copy.addEventListener('click', async (event) => { stop(event); await copyPageClip(clipId); });
     remove.addEventListener('click', async (event) => { stop(event); await deletePageClip(clipId); });
     actions.addEventListener('mouseenter', () => cancelHighlightActionHide(clipId));
     actions.addEventListener('mouseleave', () => scheduleHighlightActionHide(clipId));
-    actions.append(note, remove);
+    actions.append(note, copy, remove);
     mount.appendChild(actions);
     return actions;
   }

@@ -1,0 +1,23 @@
+const assert = require('assert').strict;
+const fs = require('fs');
+const path = require('path');
+const read = (file) => fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8');
+const content = read('content/content.js');
+const sidepanel = read('sidepanel/sidepanel.js');
+const background = read('background.js');
+const manifest = JSON.parse(read('manifest.json'));
+const i18n = read('lib/i18n.js');
+
+assert.match(sidepanel, /await notifySourceTabs\(item, \{ action: 'DELETE_CLIP_FROM_PAGE', clipId: item\.id \}\)/);
+assert.match(sidepanel, /async function notifySourceTabs[\s\S]*Promise\.all/);
+assert.match(sidepanel, /action: 'RESTORE_HIGHLIGHTS'/);
+assert.match(content, /function schedulePageHighlightRestore\(\)[\s\S]*DOMContentLoaded[\s\S]*window\.setTimeout\(restore, 2200\)/);
+assert.match(content, /const textSegments = \[\];[\s\S]*const startIndex = text\.indexOf\(clip\.text\)[\s\S]*highlightDOMRange\(range, clip\)/);
+assert.match(content, /function reportSourceUnavailable\(clipId\)[\s\S]*action: 'SOURCE_MARK_UNAVAILABLE'/);
+assert.match(sidepanel, /SOURCE_MARK_UNAVAILABLE[\s\S]*source_unavailable/);
+assert.match(sidepanel, /action: 'TRACK_SOURCE_NAVIGATION'/);
+assert.match(background, /chrome\.webNavigation\.onErrorOccurred\.addListener/);
+assert.ok(manifest.permissions.includes('webNavigation'));
+assert.match(i18n, /source_unavailable: '无法找到原网页或对应内容/);
+assert.match(i18n, /source_unavailable: 'The original page or marked content could not be found/);
+console.log('page-sync.test.js: all assertions passed');

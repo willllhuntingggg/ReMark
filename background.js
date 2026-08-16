@@ -49,8 +49,21 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
+const pendingSourceNavigations = new Map();
+chrome.webNavigation.onErrorOccurred.addListener((details) => {
+  if (details.frameId !== 0) return;
+  const pending = pendingSourceNavigations.get(details.tabId);
+  if (!pending) return;
+  pendingSourceNavigations.delete(details.tabId);
+  chrome.runtime.sendMessage({ action: 'SOURCE_UNAVAILABLE', clipId: pending.clipId, url: pending.url }).catch(() => {});
+});
+chrome.tabs.onRemoved.addListener((tabId) => pendingSourceNavigations.delete(tabId));
 // Handle messages from content script or sidepanel
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'TRACK_SOURCE_NAVIGATION' && Number.isInteger(message.tabId) && message.clipId) {
+    pendingSourceNavigations.set(message.tabId, { clipId: message.clipId, url: message.url || '' });
+    setTimeout(() => pendingSourceNavigations.delete(message.tabId), 15000);
+  }
   if (message.action === 'OPEN_SIDE_PANEL') {
     if (sender.tab?.windowId) {
       const focus = { clipId: message.clipId, markId: message.markId };

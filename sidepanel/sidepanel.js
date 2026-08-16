@@ -327,15 +327,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       await ReMarkStorage.deleteClip(item.id);
       await ReMarkStorage.pushUndo({ type: 'delete_clip', item: item.raw });
+      // Storage is authoritative, while this message removes stale visual state immediately.
+      await notifySourceTabs(item, { action: 'DELETE_CLIP_FROM_PAGE', clipId: item.id });
     }
     selected = null;
     await load();
     showToast(t(messageKey), {
       label: t('undo'),
-      onAction: async () => { if (await ReMarkStorage.undoLast()) await load(); }
+      onAction: async () => {
+        if (await ReMarkStorage.undoLast()) {
+          await notifySourceTabs(item, { action: 'RESTORE_HIGHLIGHTS' });
+          await load();
+        }
+      }
     });
   }
-
   // Lightweight toast: reversible actions stay quiet and auto-dismiss.
   let toastTimer = null;
   function showToast(message, options = {}) {
@@ -364,6 +370,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     toastTimer = setTimeout(() => { root.textContent = ''; }, options.duration ?? 4200);
   }
   function safeSendMessage(tabId, message) { const tabs = globalThis.chrome?.tabs; if (!tabs?.sendMessage || !Number.isInteger(tabId)) return Promise.resolve(); return tabs.sendMessage(tabId, message).catch((error) => { if (!/Receiving end does not exist/i.test(error?.message || "")) console.debug("[ReMark] Message delivery skipped:", error); }); }
+  async function notifySourceTabs(item, message) {
+    if (item?.type !== 'highlight' || !item.url) return;
+    try {
+      const tabs = await globalThis.chrome?.tabs?.query({});
+      await Promise.all((tabs || []).filter((tab) => sameUrl(tab.url, item.url) && Number.isInteger(tab.id)).map((tab) => safeSendMessage(tab.id, message)));
+    } catch (_) {}
+  }
   function syncSourceActive(item, active) { if (item?.type !== 'highlight') return; globalThis.chrome?.tabs?.query({}).then((tabs) => { const tab = tabs.find((row) => sameUrl(row.url, item.url)); if (tab?.id) safeSendMessage(tab.id, { action: active ? 'SET_ACTIVE_CLIP' : 'CLEAR_ACTIVE_CLIP', clipId: item.id }); }).catch(() => {}); }
   function setActive(key) { selected = key; list.querySelectorAll('.mark-active').forEach((node) => node.classList.remove('mark-active')); const item = itemFor(key); cardFor(key)?.classList.add('mark-active'); syncSourceActive(item, true); }
   function clearActive(key) { if (selected === key) { const item = itemFor(key); selected = null; cardFor(key)?.classList.remove('mark-active'); syncSourceActive(item, false); } }
@@ -372,7 +385,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (event.target.matches?.('.mark-source-favicon')) event.target.remove();
   }, true);
   function focusFromSource(id) { const item = all().find((row) => row.id === id); if (!item) return; if (sourceUrl !== null && !sameUrl(sourceUrl, item.url)) sourceUrl = null; selected = item.key; render(); const card = list.querySelector(`.mark-card[data-id="${CSS.escape(id)}"]`); if (!card) return; card.scrollIntoView({ behavior: 'smooth', block: 'center' }); card.classList.add('remark-panel-focus'); setTimeout(() => card.classList.remove('remark-panel-focus'), 900); }
-  async function jump(item) { if (!item) return; try { const tabs = await chrome.tabs.query({}), target = tabs.find((tab) => item.type === 'video' ? (sameVideoTab(item, tab.url) || sameUrl(tab.url, item.url)) : sameUrl(tab.url, item.url)); if (target?.id) { await chrome.tabs.update(target.id, { active:true }); if (target.windowId) await chrome.windows.update(target.windowId, { focused:true }); safeSendMessage(target.id, item.type === 'video' ? { action:'SEEK_VIDEO_MARK', time:item.time } : { action:'LOCATE_CLIP', clipId:item.id }); return; } if (item.type === 'highlight') { const tab = await chrome.tabs.create({ url:item.url, active:true }); setTimeout(() => safeSendMessage(tab.id, { action:'LOCATE_CLIP', clipId:item.id }), 1200); return; } } catch (e) { console.warn('[ReMark] Mark jump failed:', e); } if (item.url) window.open(item.type === 'video' ? `${item.url}${item.url.includes('?') ? '&' : '?'}t=${Math.floor(item.time)}` : item.url, '_blank'); }
+  async function jump(item) {
+    if (!item) return;
+    try {
+      const tabs = await chrome.tabs.query({});
+      const target = tabs.find((tab) => item.type === 'video' ? (sameVideoTab(item, tab.url) || sameUrl(tab.url, item.url)) : sameUrl(tab.url, item.url));
+      if (target?.id) {
+        await chrome.tabs.update(target.id, { active: true });
+        if (target.windowId) await chrome.windows.update(target.windowId, { focused: true });
+        safeSendMessage(target.id, item.type === 'video' ? { action: 'SEEK_VIDEO_MARK', time: item.time } : { action: 'LOCATE_CLIP', clipId: item.id });
+        return;
+      }
+      if (item.type === 'highlight') {
+        const tab = await chrome.tabs.create({ url: item.url, active: true });
+        try { chrome.runtime.sendMessage({ action: 'TRACK_SOURCE_NAVIGATION', tabId: tab.id, clipId: item.id, url: item.url }); } catch (_) {}
+        setTimeout(() => safeSendMessage(tab.id, { action: 'LOCATE_CLIP', clipId: item.id }), 1200);
+        return;
+      }
+    } catch (error) {
+      console.warn('[ReMark] Mark jump failed:', error);
+      showToast(t('source_unavailable'));
+      return;
+    }
+    if (item.url) window.open(item.type === 'video' ? `${item.url}${item.url.includes('?') ? '&' : '?'}t=${Math.floor(item.time)}` : item.url, '_blank');
+  }
 
   function isGlyphHit(event, element) { const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT); let node; while ((node = walker.nextNode())) { if (!node.nodeValue.trim()) continue; const range = document.createRange(); range.selectNodeContents(node); for (const rect of range.getClientRects()) { if (event.clientX >= rect.left - 1 && event.clientX <= rect.right + 1 && event.clientY >= rect.top - 1 && event.clientY <= rect.bottom + 1) return true; } } return false; }
   list.addEventListener('click', (event) => { const control = event.target.closest('[data-action]'); if (!control) return; const { action, key, url } = control.dataset; if (action === 'jump') { if (isGlyphHit(event, control)) void jump(itemFor(key)); else setActive(key); } if (action === 'source') { sourceUrl = url || ''; selected = null; render(); } if (action === 'note') openNote(key); if (action === 'remove-note') void saveNote(key, ''); if (action === 'delete') void deleteMark(key); if (action === 'menu') { const menu = control.parentElement.querySelector('.mark-menu'); document.querySelectorAll('.mark-menu:not([hidden])').forEach((node) => { if (node !== menu) node.hidden = true; }); menu.hidden = !menu.hidden; } });
@@ -389,7 +425,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   search.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.stopPropagation(); clearSearch(); } });
   clear.addEventListener('click', () => { clearSearch(); search.focus(); });
   document.addEventListener('keydown', async (event) => { if (event.key === 'Tab' || event.key.startsWith('Arrow')) keyboardFocus = true; const editing = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName); if (!editing && event.key === 'ArrowDown') { event.preventDefault(); moveActive(1); return; } if (!editing && event.key === 'ArrowUp') { event.preventDefault(); moveActive(-1); return; } if (!editing && event.key === 'Enter' && event.shiftKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); openNote(selected); return; } if (!editing && (event.metaKey || event.ctrlKey) && event.key === 'Enter' && selected) { event.preventDefault(); openNote(selected); } else if (!editing && ['Delete','Backspace'].includes(event.key) && selected) { event.preventDefault(); await deleteMark(selected); } else if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (await ReMarkStorage.undoLast()) await load(); } else if (!editing && event.key === '/') { event.preventDefault(); search.focus(); } else if (!editing && event.key === 'Escape' && showingSettings) { showTimeline(); } else if (!editing && event.key === 'Escape' && sourceUrl !== null) { sourceUrl = null; selected = null; render(true); } });
-  globalThis.chrome?.runtime?.onMessage?.addListener((message) => { if (message?.action === 'REMARK_STORAGE_UPDATED') void load(); if (message?.action === 'FOCUS_CLIP') focusFromSource(message.clipId || message.markId); });
+  globalThis.chrome?.runtime?.onMessage?.addListener((message) => {
+    if (message?.action === 'REMARK_STORAGE_UPDATED') void load();
+    if (message?.action === 'FOCUS_CLIP') focusFromSource(message.clipId || message.markId);
+    if (message?.action === 'SOURCE_MARK_UNAVAILABLE' || message?.action === 'SOURCE_UNAVAILABLE') showToast(t('source_unavailable'));
+  });
   async function consumePendingFocus() { try { const session = globalThis.chrome?.storage?.local; if (!session) return; const data = await session.get('remark_pending_focus'); const id = data?.remark_pending_focus?.clipId || data?.remark_pending_focus?.markId; if (id) { await session.remove('remark_pending_focus'); focusFromSource(id); } } catch (_) {} }
   globalThis.chrome?.storage?.onChanged?.addListener((changes) => { const pending = changes?.remark_pending_focus?.newValue; if (pending) focusFromSource(pending.clipId || pending.markId); void load(); });
   try {

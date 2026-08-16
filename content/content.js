@@ -32,7 +32,7 @@
     ReMarkI18n.setLocale(settings.language);
     ReMarkI18n.apply();
     showFirstUseGuide();
-    restorePageHighlights();
+    schedulePageHighlightRestore();
     watchForUrlChanges();
     initVideoMarkFeature();
   });
@@ -49,6 +49,14 @@
     });
   }
 
+  function schedulePageHighlightRestore() {
+    const restore = () => { void restorePageHighlights(); };
+    restore();
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', restore, { once: true });
+    window.addEventListener('load', restore, { once: true });
+    window.setTimeout(restore, 800);
+    window.setTimeout(restore, 2200);
+  }
   let onboardingTutorial = null;
 
   async function showFirstUseGuide(options = {}) {
@@ -279,16 +287,19 @@
     window.addEventListener('remark:urlchange', () => restorePageHighlights());
   }
 
-  // Locate clip by ID, scroll into view and play animation
+  // Locate clip by ID, scroll into view and play animation.
   function locateAndAnimateClip(clipId, attempt = 0) {
     const mark = document.querySelector(`mark[data-clip-id="${clipId}"]`);
     if (mark) { performLocateAnimation(mark); return; }
-    if (attempt >= 5) return;
+    if (attempt >= 5) { reportSourceUnavailable(clipId); return; }
     Promise.resolve(restorePageHighlights()).finally(() => {
       setTimeout(() => locateAndAnimateClip(clipId, attempt + 1), 250 + attempt * 300);
     });
   }
-
+  function reportSourceUnavailable(clipId) {
+    showPageToast(t('source_unavailable'));
+    try { chrome.runtime?.sendMessage({ action: 'SOURCE_MARK_UNAVAILABLE', clipId, url: window.location.href }); } catch (_) {}
+  }
   function performLocateAnimation(mark) {
     const focus = () => {
       mark.classList.remove('remark-locate-pulse');
@@ -559,41 +570,46 @@
     }
   }
 
-  // Restore page highlights from storage
+  // Restore page highlights from storage.
   async function restorePageHighlights() {
     const clips = await ReMarkStorage.getClips();
     const currentUrl = window.location.href.split('#')[0];
-    loadedClipsForPage = clips.filter((c) => c.url && c.url.split('#')[0] === currentUrl);
-    if (!loadedClipsForPage.length) return;
-
-    const bodyText = document.body.innerText;
-    loadedClipsForPage.forEach((clip) => {
-      if (clip.text && bodyText.includes(clip.text)) highlightTextInBody(clip);
-    });
-  }
-
-  function highlightTextInBody(clip) {
-    if (document.querySelector(`mark[data-clip-id="${clip.id}"]`)) return;
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-    let node;
-    while ((node = walker.nextNode())) {
-      const parent = node.parentElement;
-      if (parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE') continue;
-      const val = node.nodeValue;
-      const index = val.indexOf(clip.text);
-      if (index !== -1) {
-        const range = document.createRange();
-        range.setStart(node, index);
-        range.setEnd(node, index + clip.text.length);
-        if (!Number.isFinite(Number(clip.sourcePosition))) {
-          void ReMarkStorage.updateClip(clip.id, { sourcePosition: Math.round(range.getBoundingClientRect().top + window.scrollY) });
-        }
-        highlightDOMRange(range, clip);
-        break;
-      }
+    loadedClipsForPage = clips.filter((clip) => clip.url && clip.url.split('#')[0] === currentUrl);
+    for (const clip of loadedClipsForPage) {
+      if (clip.text) highlightTextInBody(clip);
     }
   }
-
+  function highlightTextInBody(clip) {
+    if (document.querySelector(`mark[data-clip-id="${clip.id}"]`)) return true;
+    const textSegments = [];
+    let text = '';
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const parent = node.parentElement;
+        return !node.nodeValue?.length || parent?.closest('mark.remark-highlight-mark, script, style') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    let node;
+    while ((node = walker.nextNode())) {
+      const start = text.length;
+      text += node.nodeValue;
+      textSegments.push({ node, start, end: text.length });
+    }
+    const startIndex = text.indexOf(clip.text);
+    const endIndex = startIndex + clip.text.length;
+    if (startIndex < 0) return false;
+    const start = textSegments.find((segment) => startIndex >= segment.start && startIndex < segment.end);
+    const end = textSegments.find((segment) => endIndex > segment.start && endIndex <= segment.end);
+    if (!start || !end) return false;
+    const range = document.createRange();
+    range.setStart(start.node, startIndex - start.start);
+    range.setEnd(end.node, endIndex - end.start);
+    if (!Number.isFinite(Number(clip.sourcePosition))) {
+      void ReMarkStorage.updateClip(clip.id, { sourcePosition: Math.round(range.getBoundingClientRect().top + window.scrollY) });
+    }
+    highlightDOMRange(range, clip);
+    return true;
+  }
   // ========= Video Timestamp Marks (YouTube & Bilibili) =========
 
   const MARKER_POLL_INTERVAL = 1200;

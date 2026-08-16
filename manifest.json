@@ -10,6 +10,7 @@
     "tabs",
     "scripting",
     "sidePanel",
+    "webNavigation",
     "contextMenus"
   ],
   "host_permissions": [

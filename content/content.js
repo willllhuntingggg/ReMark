@@ -174,7 +174,7 @@
     setTimeout(() => document.removeEventListener('click', swallow, true), 650);
   }
   document.addEventListener('mouseup', (event) => {
-    if (!(event.metaKey || event.ctrlKey)) return;
+    if (event.button !== 0 || !(event.metaKey || event.ctrlKey)) return;
     const selection = window.getSelection();
     const text = selection?.toString().trim();
     if (!text || text.length < 2) return;
@@ -238,7 +238,7 @@
         showPageToast(t('mark_deleted'), {
           label: t('undo'),
           onAction: async () => {
-            if (await ReMarkStorage.undoLast()) { restorePageHighlights(); notifyStorageUpdated(); }
+            if (await undoPageAction()) return;
           }
         });
       }
@@ -266,12 +266,22 @@
     if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'z') return;
     if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
     event.preventDefault();
-    if (await ReMarkStorage.undoLast()) {
-      restorePageHighlights();
-      renderVideoMarkers();
-      notifyStorageUpdated();
-    }
+    await undoPageAction();
   });
+  async function undoPageAction() {
+    const action = await ReMarkStorage.get(ReMarkStorage.KEYS.UNDO);
+    if (!action || !(await ReMarkStorage.undoLast())) return false;
+    if (action.type === 'restore_clip' && action.id) {
+      clearActiveClip(action.id);
+      removeClipHighlightFromDOM(action.id, { immediate: true });
+    } else if (action.type === 'delete_clip' && action.item?.id) {
+      cancelClipHighlightRemoval(action.item.id);
+      await restorePageHighlights();
+    }
+    renderVideoMarkers();
+    notifyStorageUpdated();
+    return true;
+  }
   // Re-run per-page restore when the URL changes without a full reload (SPA)
   function watchForUrlChanges() {
     const dispatchUrlChange = () => window.dispatchEvent(new Event('remark:urlchange'));
@@ -318,13 +328,19 @@
     setTimeout(focus, 460);
   }
 
-  function removeClipHighlightFromDOM(clipId) {
+  function cancelClipHighlightRemoval(clipId) {
+    document.querySelectorAll(`mark[data-clip-id="${clipId}"]`).forEach((mark) => {
+      delete mark.dataset.remarkRemovalPending;
+      mark.classList.remove('remark-remove-fade');
+    });
+  }
+  function removeClipHighlightFromDOM(clipId, options = {}) {
     const marks = [...document.querySelectorAll(`mark[data-clip-id="${clipId}"]`)];
     if (!marks.length) return;
-    marks.forEach((mark) => mark.classList.add('remark-remove-fade'));
-    setTimeout(() => {
+    const remove = () => {
       const parents = new Set();
       marks.forEach((mark) => {
+        if (!options.immediate && mark.dataset.remarkRemovalPending !== 'true') return;
         const parent = mark.parentNode;
         if (!parent) return;
         while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
@@ -332,7 +348,13 @@
         parents.add(parent);
       });
       parents.forEach((parent) => parent.normalize());
-    }, 280);
+    };
+    if (options.immediate) { remove(); return; }
+    marks.forEach((mark) => {
+      mark.dataset.remarkRemovalPending = 'true';
+      mark.classList.add('remark-remove-fade');
+    });
+    setTimeout(remove, 280);
   }
   function removeAllPageHighlightsFromDOM() {
     const marks = document.querySelectorAll('mark.remark-highlight-mark');

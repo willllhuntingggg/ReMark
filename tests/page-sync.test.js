@@ -33,3 +33,10 @@ assert.doesNotMatch(clickHandler, /OPEN_SIDE_PANEL/);
 assert.match(content, /event\.preventDefault\(\);[\s\S]*event\.stopPropagation\(\);[\s\S]*setActiveClip\(clip\.id\);[\s\S]*selectedHighlight = element/);
 assert.match(read('content/content.css'), /remark-selected \{[\s\S]*inset 0 -2px 0 rgba\(111, 85, 13, \.82\)/);
 console.log('page-mark-interaction assertions passed');
+
+assert.match(content, /event\.button !== 0 \|\| !\(event\.metaKey \|\| event\.ctrlKey\)/);
+assert.match(content, /async function undoPageAction\(\)[\s\S]*ReMarkStorage\.get\(ReMarkStorage\.KEYS\.UNDO\)[\s\S]*ReMarkStorage\.undoLast\(\)/);
+assert.match(content, /action\.type === 'restore_clip'[\s\S]*removeClipHighlightFromDOM\(action\.id, \{ immediate: true \}\)/);
+assert.match(content, /function cancelClipHighlightRemoval\(clipId\)[\s\S]*remarkRemovalPending/);
+assert.match(content, /event\.key\.toLowerCase\(\) !== 'z'[\s\S]*await undoPageAction\(\)/);
+console.log('page-highlight-undo assertions passed');

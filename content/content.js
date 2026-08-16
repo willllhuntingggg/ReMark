@@ -303,7 +303,11 @@
   // Locate clip by ID, scroll into view and play animation.
   function locateAndAnimateClip(clipId, attempt = 0) {
     const mark = document.querySelector(`mark[data-clip-id="${clipId}"]`);
-    if (mark) { performLocateAnimation(mark); return; }
+    if (mark) {
+      setActiveClip(clipId);
+      performLocateAnimation(mark);
+      return;
+    }
     if (attempt >= 5) { reportSourceUnavailable(clipId); return; }
     Promise.resolve(restorePageHighlights()).finally(() => {
       setTimeout(() => locateAndAnimateClip(clipId, attempt + 1), 250 + attempt * 300);
@@ -323,9 +327,12 @@
     const rect = mark.getBoundingClientRect();
     const visible = rect.top >= 0 && rect.bottom <= window.innerHeight;
     if (visible) { focus(); return; }
-    const top = Math.max(0, window.scrollY + rect.top - window.innerHeight * 0.4);
-    window.scrollTo({ top, behavior: 'smooth' });
-    setTimeout(focus, 460);
+    try {
+      mark.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    } catch (_) {
+      window.scrollTo({ top: Math.max(0, window.scrollY + rect.top - window.innerHeight * 0.4), behavior: 'smooth' });
+    }
+    setTimeout(focus, 520);
   }
 
   function cancelClipHighlightRemoval(clipId) {

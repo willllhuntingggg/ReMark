@@ -51,3 +51,9 @@ assert.match(sidepanel, /action: 'RESTORE_HIGHLIGHTS'[\s\S]*action: 'LOCATE_CLIP
 assert.match(content, /const normalizedClipText = String\(clip\.text\)\.replace\(\/\\s\+\/g, ''\)/);
 assert.match(content, /originalIndexes\.push\(index\)[\s\S]*normalizedPageText\.indexOf\(normalizedClipText\)/);
 console.log('sidepanel-locate-recovery assertions passed');
+
+assert.match(sidepanel, /if \(action === 'jump'\) \{ setActive\(key\); void jump\(itemFor\(key\)\); return; \}/);
+assert.doesNotMatch(sidepanel.slice(sidepanel.indexOf("list.addEventListener('click'", sidepanel.indexOf('function isGlyphHit')), sidepanel.indexOf("list.addEventListener('click'", sidepanel.indexOf('function isGlyphHit')) + 1200), /isGlyphHit\(event, control\)/);
+assert.match(content, /if \(mark\) \{[\s\S]*setActiveClip\(clipId\);[\s\S]*performLocateAnimation\(mark\)/);
+assert.match(content, /mark\.scrollIntoView\(\{ behavior: 'smooth', block: 'center', inline: 'nearest' \}\)/);
+console.log('viewport-mark-locate assertions passed');

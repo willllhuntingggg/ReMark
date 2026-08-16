@@ -412,8 +412,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function isGlyphHit(event, element) { const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT); let node; while ((node = walker.nextNode())) { if (!node.nodeValue.trim()) continue; const range = document.createRange(); range.selectNodeContents(node); for (const rect of range.getClientRects()) { if (event.clientX >= rect.left - 1 && event.clientX <= rect.right + 1 && event.clientY >= rect.top - 1 && event.clientY <= rect.bottom + 1) return true; } } return false; }
-  list.addEventListener('click', (event) => { const control = event.target.closest('[data-action]'); if (!control) return; const { action, key, url } = control.dataset; if (action === 'jump') { if (isGlyphHit(event, control)) void jump(itemFor(key)); else setActive(key); } if (action === 'source') { sourceUrl = url || ''; selected = null; render(); } if (action === 'note') openNote(key); if (action === 'remove-note') void saveNote(key, ''); if (action === 'delete') void deleteMark(key); if (action === 'menu') { const menu = control.parentElement.querySelector('.mark-menu'); document.querySelectorAll('.mark-menu:not([hidden])').forEach((node) => { if (node !== menu) node.hidden = true; }); menu.hidden = !menu.hidden; } });
-  list.addEventListener('click', (event) => { const card = event.target.closest('.mark-card'); if (!card || event.target.closest('.mark-content-text, [data-action], .mark-note-editor')) return; setActive(card.dataset.key); });
+  list.addEventListener('click', (event) => {
+    const control = event.target.closest('[data-action]');
+    if (!control) return;
+    const { action, key, url } = control.dataset;
+    if (action === 'jump') { setActive(key); void jump(itemFor(key)); return; }
+    if (action === 'source') { sourceUrl = url || ''; selected = null; render(); return; }
+    if (action === 'note') openNote(key);
+    if (action === 'remove-note') void saveNote(key, '');
+    if (action === 'delete') void deleteMark(key);
+    if (action === 'menu') {
+      const menu = control.parentElement.querySelector('.mark-menu');
+      document.querySelectorAll('.mark-menu:not([hidden])').forEach((node) => { if (node !== menu) node.hidden = true; });
+      menu.hidden = !menu.hidden;
+    }
+  });
   list.addEventListener('keydown', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) { const key = input.closest('.mark-note-editor').dataset.key; if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void saveNote(key, input.value); } if (event.key === 'Escape') { event.preventDefault(); void saveNote(key, input.value); } } });
   list.addEventListener('focusout', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) setTimeout(() => { if (!input.closest('.mark-note-editor')?.contains(document.activeElement)) void saveNote(input.closest('.mark-note-editor').dataset.key, input.value); }, 0); });
   list.addEventListener('focusin', (event) => { const card = event.target.closest('.mark-card'); if (keyboardFocus && card) setActive(card.dataset.key); });

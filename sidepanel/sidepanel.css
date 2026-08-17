@@ -396,31 +396,46 @@ button {
   padding: 13px 58px 14px 50px;
   border: 0;
   background: transparent;
-  transition: background-color .16s ease;
+  transition: background-color .14s ease, box-shadow .14s ease;
 }
 
-/* The gold .mark-active row is the ONE selection indicator; hovering a card
-   or focusing a control inside it must not look like a second selection. */
+/* A quiet graphite wash makes the entire interactive row discoverable without
+   competing with the warm saved-Mark state. It applies equally to text, notes,
+   timestamps and whitespace inside the card. */
+.mark-card:hover,
+.mark-card:focus-within {
+  background: rgba(71, 85, 105, .065);
+}
+
 .mark-card:focus {
   outline: none;
 }
 
-/* Active = keyboard focus state; a gold ledger line marks the row. */
+/* Active is the primary selection; multi-selection is deliberately quieter so
+   the keyboard endpoint remains easy to find in a Shift range. */
 .mark-card.mark-active {
-  background: var(--gold-soft);
+  background: rgba(200, 160, 46, .19);
   box-shadow: none;
 }
 
-/* Multi-selection keeps a quiet ledger fill, while the active endpoint retains
-   the stronger gold rule so Shift ranges remain legible. */
 .mark-card.mark-selected {
-  background: color-mix(in srgb, var(--gold-soft) 72%, var(--surface));
+  background: rgba(200, 160, 46, .12);
   box-shadow: none;
 }
 
 .mark-card.mark-selected.mark-active {
-  background: var(--gold-soft);
+  background: rgba(200, 160, 46, .22);
   box-shadow: none;
+}
+
+.mark-card.mark-active:hover,
+.mark-card.mark-active:focus-within {
+  background: rgba(200, 160, 46, .24);
+}
+
+.mark-card.mark-selected:hover,
+.mark-card.mark-selected:focus-within {
+  background: rgba(200, 160, 46, .16);
 }
 
 .mark-card.mark-active .mark-content-text,

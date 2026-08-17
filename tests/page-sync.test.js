@@ -66,8 +66,14 @@ assert.match(content, /originalIndexes\.push\(index\)[\s\S]*normalizedPageText\.
 console.log('sidepanel-locate-recovery assertions passed');
 
 assert.match(sidepanel, /if \(action === 'jump' && \(event\.shiftKey \|\| event\.metaKey \|\| event\.ctrlKey\)\) \{ selectCard\(key, event\); return; \}/);
-assert.match(sidepanel, /if \(action === 'jump'\) \{ setSelection\(\[key\], key\); setActive\(key\); void jump\(itemFor\(key\)\); return; \}/);
-assert.doesNotMatch(sidepanel.slice(sidepanel.indexOf("list.addEventListener('click'", sidepanel.indexOf('function isGlyphHit')), sidepanel.indexOf("list.addEventListener('click'", sidepanel.indexOf('function isGlyphHit')) + 1200), /isGlyphHit\(event, control\)/);
+assert.match(sidepanel, /if \(action === 'jump'\) \{[\s\S]*setSelection\(\[key\], key\);[\s\S]*setActive\(key\);[\s\S]*if \(isGlyphHit\(event, control\)\) void jump\(itemFor\(key\)\);[\s\S]*return;/);
+assert.match(sidepanel.slice(sidepanel.indexOf("list.addEventListener('click'", sidepanel.indexOf('function isGlyphHit')), sidepanel.indexOf("list.addEventListener('click'", sidepanel.indexOf('function isGlyphHit')) + 1400), /isGlyphHit\(event, control\)/);
+assert.match(sidepanel, /const createdTime = \(value\) =>[\s\S]*hour: '2-digit'/);
+assert.match(sidepanel, /feed-day-label" title="\$\{esc\(fullDate\(item\.createdAt\)\)\}/);
+assert.doesNotMatch(sidepanel, /list\.addEventListener\('mouseover'/);
+assert.match(sidepanel, /if \(sourceUrl !== null\) rows = rows\.filter\(\(item\) => sameUrl\(item\.url, sourceUrl\)\)/);
+assert.match(sidepanel.slice(sidepanel.indexOf('function visible()'), sidepanel.indexOf('function day(value)')), /item\.title,[\s\S]*item\.url/);
+assert.match(sidepanel, /pointermove[\s\S]*is-glyph-hover[\s\S]*isGlyphHit\(event, control\)/);
 assert.match(content, /if \(mark\) \{[\s\S]*performLocateAnimation\(mark\)/);
 assert.match(content, /mark\.scrollIntoView\(\{ behavior: 'smooth', block: 'center', inline: 'nearest' \}\)/);
 console.log('viewport-mark-locate assertions passed');

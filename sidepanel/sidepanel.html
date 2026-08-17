@@ -9,9 +9,9 @@
 <body>
   <div class="app-container">
     <header class="app-header">
-      <button id="source-back" class="source-back" type="button" hidden>
+      <button id="source-back" class="source-back" type="button" hidden
+        data-i18n-aria-label="back_to_timeline" aria-label="Back to Mark timeline">
         <span aria-hidden="true">←</span>
-        <span data-i18n="back_to_timeline">Back to Mark timeline</span>
       </button>
       <div class="view-identity">
         <span id="view-subtitle" class="view-subtitle" data-i18n="timeline">
@@ -29,18 +29,11 @@
     </header>
     <div id="timeline-controls" class="controls-bar">
       <div class="search-box">
-        <span class="search-icon" aria-hidden="true">
-          <svg viewBox="0 0 16 16">
-            <circle cx="6.75" cy="6.75" r="4.25" fill="none" stroke="currentColor" stroke-width="1.5"/>
-            <line x1="9.9" y1="9.9" x2="13.5" y2="13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-        </span>
         <input type="text" id="search-input"
           data-i18n-placeholder="search_placeholder"
           data-i18n-aria-label="search_marks"
           placeholder="Search Marks, notes, sources, or timestamps"
           aria-label="Search Marks">
-        <span class="search-kbd" aria-hidden="true">/</span>
         <button id="search-clear" class="clear-btn" type="button"
           data-i18n-aria-label="clear_search" aria-label="Clear search" hidden>×</button>
       </div>

@@ -159,7 +159,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       return '';
     }
   };
+  // Font Awesome Free 6.7.2 — fa-globe (CC BY 4.0, Fonticons Inc.).
+  const SOURCE_FALLBACK_SVG = '<svg viewBox="0 0 512 512" aria-hidden="true"><path fill="currentColor" d="M352 256c0 22.2-1.2 43.6-3.3 64l-185.3 0c-2.2-20.4-3.3-41.8-3.3-64s1.2-43.6 3.3-64l185.3 0c2.2 20.4 3.3 41.8 3.3 64zm28.8-64l123.1 0c5.3 20.5 8.1 41.9 8.1 64s-2.8 43.5-8.1 64l-123.1 0c2.1-20.6 3.2-42 3.2-64s-1.1-43.4-3.2-64zm112.6-32l-116.7 0c-10-63.9-29.8-117.4-55.3-151.6c78.3 20.7 142 77.5 171.9 151.6zm-149.1 0l-176.6 0c6.1-36.4 15.5-68.6 27-94.7c10.5-23.6 22.2-40.7 33.5-51.5C239.4 3.2 248.7 0 256 0s16.6 3.2 27.8 13.8c11.3 10.8 23 27.9 33.5 51.5c11.6 26 20.9 58.2 27 94.7zm-209 0L18.6 160C48.6 85.9 112.2 29.1 190.6 8.4C165.1 42.6 145.3 96.1 135.3 160zM8.1 192l123.1 0c-2.1 20.6-3.2 42-3.2 64s1.1 43.4 3.2 64L8.1 320C2.8 299.5 0 278.1 0 256s2.8-43.5 8.1-64zM194.7 446.6c-11.6-26-20.9-58.2-27-94.6l176.6 0c-6.1 36.4-15.5 68.6-27 94.6c-10.5 23.6-22.2 40.7-33.5 51.5C272.6 508.8 263.3 512 256 512s-16.6-3.2-27.8-13.8c-11.3-10.8-23-27.9-33.5-51.5zM135.3 352c10 63.9 29.8 117.4 55.3 151.6C112.2 482.9 48.6 426.1 18.6 352l116.7 0zm358.1 0c-30 74.1-93.6 130.9-171.9 151.6c25.5-34.2 45.2-87.7 55.3-151.6l116.7 0z"/></svg>';
+  function sourceIconHtml(value, faviconClass, fallbackClass) {
+    const favicon = faviconUrl(value);
+    return favicon
+      ? `<img class="${faviconClass}" src="${esc(favicon)}" alt="" aria-hidden="true">`
+      : `<span class="${fallbackClass}" aria-hidden="true">${SOURCE_FALLBACK_SVG}</span>`;
+  }
+  function sourceFallbackElement(className) {
+    const fallback = document.createElement('span');
+    fallback.className = className;
+    fallback.setAttribute('aria-hidden', 'true');
+    fallback.innerHTML = SOURCE_FALLBACK_SVG;
+    return fallback;
+  }
   const clock = (v) => { const n = Math.max(0, Math.floor(Number(v) || 0)), h = Math.floor(n / 3600), m = Math.floor((n % 3600) / 60), s = n % 60, p = (x) => String(x).padStart(2, '0'); return h ? `${h}:${p(m)}:${p(s)}` : `${m}:${p(s)}`; };
+  const dateLocale = () => ReMarkI18n.locale === 'zh' ? 'zh-CN' : 'en-US';
+  const fullDate = (value) => new Intl.DateTimeFormat(dateLocale(), { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }).format(new Date(value));
+  const createdTime = (value) => new Intl.DateTimeFormat(dateLocale(), { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
   const itemFor = (key) => all().find((item) => item.key === key);
   const cardFor = (key) => list.querySelector(`.mark-card[data-key="${CSS.escape(key)}"]`);
 
@@ -171,9 +189,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   function visible() {
     const q = query.trim().toLowerCase();
-    let rows = all().filter((item) => !q || [item.text, item.note, item.title, item.url, item.type === 'video' ? clock(item.time) : '', item.caption?.text || '', item.chapter?.text || ''].some((v) => String(v).toLowerCase().includes(q)));
+    let rows = all();
+    if (sourceUrl !== null) rows = rows.filter((item) => sameUrl(item.url, sourceUrl));
+    if (q) {
+      rows = rows.filter((item) => [
+        item.text,
+        item.note,
+        item.title,
+        item.url,
+        item.type === 'video' ? clock(item.time) : '',
+        item.caption?.text || '',
+        item.chapter?.text || ''
+      ].some((value) => String(value).toLowerCase().includes(q)));
+    }
     if (sourceUrl === null) return rows.sort((a, b) => b.createdAt - a.createdAt);
-    return rows.filter((item) => sameUrl(item.url, sourceUrl)).sort((a, b) => {
+    return rows.sort((a, b) => {
       if (a.type === 'video' && b.type === 'video') return a.time - b.time;
       if (a.type === 'highlight' && b.type === 'highlight') {
         // Reading order: top → bottom, then left → right on the same line.
@@ -201,15 +231,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     return new Intl.DateTimeFormat(locale, { month: 'long', day: 'numeric' }).format(date);
   }
 
-  function ago(value) {
-    const elapsed = Math.max(0, Date.now() - value);
-    if (elapsed < 60000) return t('just_now');
-    if (elapsed < 3600000) return t('minutes_ago', { count: Math.floor(elapsed / 60000) });
-    if (elapsed < 86400000) return t('hours_ago', { count: Math.floor(elapsed / 3600000) });
-    if (elapsed < 604800000) return t('days_ago', { count: Math.floor(elapsed / 86400000) });
-    const locale = ReMarkI18n.locale === 'zh' ? 'zh-CN' : 'en-US';
-    return new Intl.DateTimeFormat(locale, { month: 'numeric', day: 'numeric' }).format(new Date(value));
-  }
   function markHtml(item, index = 0) {
     const jumpTitle = item.type === 'video'
       ? t('jump_to_time', { time: clock(item.time) })
@@ -229,13 +250,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       : '';
     // Inline editor: the visible note text itself becomes the field.
     const editor = `<textarea class="mark-note-textarea" data-key="${esc(item.key)}" aria-label="${esc(t('add_note'))}" placeholder="${esc(t('note_placeholder'))}" rows="1" hidden>${esc(item.note)}</textarea>`;
-    const source = `${item.title}${host(item.url) ? ` · ${host(item.url)}` : ''}`;
-    const favicon = faviconUrl(item.url);
-    const sourceIcon = favicon
-      ? `<img class="mark-source-favicon" src="${esc(favicon)}" alt="" aria-hidden="true">`
-      : '';
+    const source = item.title || host(item.url) || item.url;
+    const sourceIcon = sourceIconHtml(item.url, 'mark-source-favicon', 'mark-source-fallback');
     const sourceControl = sourceUrl === null
-      ? `<button class="mark-source" data-action="source" data-url="${esc(item.url)}" type="button" title="${esc(item.url)}">${sourceIcon}<span>${esc(source)}</span></button>`
+      ? `<span class="mark-source-slot"><button class="mark-source" data-action="source" data-url="${esc(item.url)}" type="button" title="${esc(item.url)}">${sourceIcon}<span class="mark-source-label">${esc(source)}</span><span class="mark-source-arrow" aria-hidden="true">›</span></button></span>`
       : '';
     const menu = [
       `<button data-action="unmark" data-key="${esc(item.key)}" type="button">${esc(t('unmark'))}</button>`,
@@ -247,13 +265,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       : '<span class="mark-quote mark-quote--video" aria-hidden="true"></span>';
     return [
       `<article class="mark-card mark-card--${item.type}" data-key="${esc(item.key)}" data-id="${esc(item.id)}" tabindex="0" aria-selected="${selectedKeys.has(item.key)}" style="--i:${index}">`,
-      `<div class="mark-content">${quote}<button class="mark-content-text" data-action="jump" data-key="${esc(item.key)}" type="button" title="${esc(jumpTitle)}">${content}</button></div>`,
+      `<div class="mark-content">${quote}<button class="mark-content-text" data-action="jump" data-key="${esc(item.key)}" type="button" title="${esc(jumpTitle)}">${content}</button><div class="mark-card-tools"><div class="mark-actions">`,
+      `<button class="mark-action mark-more" data-action="menu" data-key="${esc(item.key)}" type="button" aria-label="${esc(t('more_actions'))}">···</button>`,
+      `<div class="mark-menu" hidden>${menu}</div></div></div></div>`,
       caption + chapter,
       `<div class="mark-note-area">${note}${editor}</div>`,
-      `<footer class="mark-footer">${sourceControl}`,
-      `<span class="mark-created">${ago(item.createdAt)}</span><div class="mark-actions">`,
-      `<button class="mark-action mark-more" data-action="menu" data-key="${esc(item.key)}" type="button" aria-label="${esc(t('more_actions'))}">···</button>`,
-      `<div class="mark-menu" hidden>${menu}</div></div></footer></article>`
+      `<footer class="mark-footer"><time class="mark-created" datetime="${new Date(item.createdAt).toISOString()}" title="${esc(fullDate(item.createdAt))}">${esc(createdTime(item.createdAt))}</time>${sourceControl}</footer></article>`
     ].join('');
   }
   function render(animated = false) {
@@ -261,24 +278,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     const rows = visible();
     const inSource = sourceUrl !== null;
     back.hidden = !inSource;
+    viewIdentity.hidden = false;
+    settingsOpenButton.hidden = inSource;
+    appContainer.classList.toggle('is-source-view', inSource);
+    search.placeholder = t('search_placeholder');
     if (inSource) {
+      subtitle.textContent = t('source_marks');
       const sourceRows = all().filter((item) => sameUrl(item.url, sourceUrl));
-      const title = sourceRows[0]?.title || t('source_collection');
-      subtitle.hidden = false;
-      subtitle.textContent = title;
+      const sourceTitle = sourceRows[0]?.title || t('source_collection');
+      const sourceIcon = sourceIconHtml(sourceUrl, 'source-collection-favicon', 'source-collection-fallback');
       context.hidden = false;
       const count = sourceRows.length;
       context.innerHTML = [
         '<div class="source-collection-summary">',
-        `<span>${esc(t('marks_in_source'))}</span>`,
-        `<strong>${esc(count === 1 ? t('one_mark') : t('marks_count', { count }))}</strong>`,
+        `<strong class="source-collection-page-title" title="${esc(sourceTitle)}">${esc(sourceTitle)}</strong>`,
+        '<div class="source-collection-source-row">',
+        sourceIcon,
+        `<span class="source-collection-url" title="${esc(sourceUrl)}">${esc(host(sourceUrl) || sourceUrl)}</span>`,
+        `<span>${esc(count === 1 ? t('one_mark') : t('marks_count', { count }))}</span>`,
+        '</div>',
         '</div>'
       ].join('');
     } else if (query) {
       subtitle.hidden = false;
       subtitle.textContent = t('timeline');
-      context.hidden = false;
-      context.innerHTML = `<div class="search-summary">${esc(rows.length === 1 ? t('one_mark_found') : t('marks_found', { count: rows.length }))}</div>`;
+      context.hidden = true;
+      context.innerHTML = '';
     } else {
       subtitle.hidden = false;
       subtitle.textContent = t('timeline');
@@ -291,7 +316,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     rows.forEach((item, index) => {
       const label = day(item.createdAt);
       if (!inSource && label !== previous) {
-        html.push(`<div class="feed-day-heading" style="--i:${html.length}">${label}</div>`);
+        html.push(`<div class="feed-day-heading" style="--i:${html.length}"><span class="feed-day-label" title="${esc(fullDate(item.createdAt))}">${label}</span></div>`);
         previous = label;
       }
       html.push(markHtml(item, html.length));
@@ -506,8 +531,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     setActive(key);
   }
   function moveActive(delta) { const rows = visible(); if (!rows.length) return; let index = rows.findIndex((row) => row.key === selected); index = index < 0 ? (delta > 0 ? 0 : rows.length - 1) : Math.max(0, Math.min(rows.length - 1, index + delta)); const key = rows[index].key; setSelection([key], key); setActive(key); cardFor(key)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
-  list.addEventListener('error', (event) => {
-    if (event.target.matches?.('.mark-source-favicon')) event.target.remove();
+  clipsPanel.addEventListener('error', (event) => {
+    const icon = event.target;
+    if (!icon.matches?.('.mark-source-favicon, .source-collection-favicon')) return;
+    icon.replaceWith(sourceFallbackElement(icon.classList.contains('source-collection-favicon') ? 'source-collection-fallback' : 'mark-source-fallback'));
   }, true);
   function focusFromSource(id) { const item = all().find((row) => row.id === id); if (!item) return; if (sourceUrl !== null && !sameUrl(sourceUrl, item.url)) sourceUrl = null; selected = item.key; selectedKeys = new Set([item.key]); selectionAnchor = item.key; render(); const card = list.querySelector(`.mark-card[data-id="${CSS.escape(id)}"]`); if (!card) return; card.scrollIntoView({ behavior: 'smooth', block: 'center' }); card.classList.add('remark-panel-focus'); setTimeout(() => card.classList.remove('remark-panel-focus'), 900); }
   async function jump(item) {
@@ -537,6 +564,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function isGlyphHit(event, element) { const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT); let node; while ((node = walker.nextNode())) { if (!node.nodeValue.trim()) continue; const range = document.createRange(); range.selectNodeContents(node); for (const rect of range.getClientRects()) { if (event.clientX >= rect.left - 1 && event.clientX <= rect.right + 1 && event.clientY >= rect.top - 1 && event.clientY <= rect.bottom + 1) return true; } } return false; }
+  list.addEventListener('pointermove', (event) => {
+    const control = event.target.closest('.mark-content-text[data-action="jump"]');
+    if (!control) return;
+    control.classList.toggle('is-glyph-hover', isGlyphHit(event, control));
+  });
+  list.addEventListener('pointerout', (event) => {
+    const control = event.target.closest('.mark-content-text[data-action="jump"]');
+    if (control && !control.contains(event.relatedTarget)) control.classList.remove('is-glyph-hover');
+  });
   // Prevent the browser from extending a text range before the Shift-click event
   // is converted into a Marks range selection. Regular text copying is unchanged.
   list.addEventListener('mousedown', (event) => {
@@ -549,7 +585,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!control) return;
     const { action, key, url } = control.dataset;
     if (action === 'jump' && (event.shiftKey || event.metaKey || event.ctrlKey)) { selectCard(key, event); return; }
-    if (action === 'jump') { setSelection([key], key); setActive(key); void jump(itemFor(key)); return; }
+    if (action === 'jump') {
+      setSelection([key], key);
+      setActive(key);
+      if (isGlyphHit(event, control)) void jump(itemFor(key));
+      return;
+    }
     if (action === 'source') { sourceUrl = url || ''; clearSelection(); render(); syncSourcePositions(sourceUrl); return; }
     if (action === 'unmark') void deleteMark(key);
     if (action === 'note') { setSelection([key], key); setActive(key); openNote(key); }
@@ -567,32 +608,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!card || event.target.closest('[data-action], .mark-note-textarea')) return;
     selectCard(card.dataset.key, event);
   });
-  // Hovering the ··· button reveals its menu; leaving the action area closes it.
-  let menuCloseTimer = null;
+  // The ··· menu is intentionally explicit: opening it requires a click.
   function openMarkMenu(menu) {
     if (!menu) return;
-    clearTimeout(menuCloseTimer);
     document.querySelectorAll('.mark-menu:not([hidden])').forEach((node) => { if (node !== menu) node.hidden = true; });
-    menu.hidden = false;
+    menu.hidden = !menu.hidden;
   }
   function closeMarkMenus() { document.querySelectorAll('.mark-menu:not([hidden])').forEach((node) => { node.hidden = true; }); }
-  function scheduleMenuClose() {
-    clearTimeout(menuCloseTimer);
-    menuCloseTimer = setTimeout(closeMarkMenus, 260);
-  }
-  list.addEventListener('mouseover', (event) => {
-    const card = event.target.closest('.mark-card');
-    if (!card) return;
-    const openMenu = document.querySelector('.mark-menu:not([hidden])');
-    if (openMenu && openMenu.closest('.mark-card') !== card) { closeMarkMenus(); return; }
-    clearTimeout(menuCloseTimer);
-    const more = event.target.closest('.mark-more');
-    if (more) openMarkMenu(more.closest('.mark-actions')?.querySelector('.mark-menu'));
-  });
-  list.addEventListener('mouseout', (event) => {
-    const to = event.relatedTarget;
-    if (!to || !to.closest || !to.closest('.mark-card')) scheduleMenuClose();
-  });
   list.addEventListener('keydown', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) { const key = input.dataset.key; if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void saveNote(key, input.value); } if (event.key === 'Escape') { event.preventDefault(); void saveNote(key, input.value); } } });
   list.addEventListener('input', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) resizeNoteInput(input); });
   list.addEventListener('focusout', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) setTimeout(() => { if (!input.closest('.mark-note-area')?.contains(document.activeElement)) void saveNote(input.dataset.key, input.value); }, 0); });

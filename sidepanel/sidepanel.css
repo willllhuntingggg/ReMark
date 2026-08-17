@@ -117,7 +117,7 @@ button {
 .view-identity {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 6px;
   min-width: 0;
   flex: 1;
@@ -131,9 +131,11 @@ button {
 .source-back {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
   flex: 0 0 auto;
-  padding: 4px 9px 4px 7px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border: 1px solid transparent;
   border-radius: 7px;
   background: var(--surface-2);
@@ -158,12 +160,13 @@ button {
 }
 
 .view-subtitle {
-  max-width: 168px;
+  max-width: 220px;
   overflow: hidden;
-  color: var(--ink-3);
-  font-size: 10.5px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
   line-height: 1.35;
-  text-align: right;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -226,7 +229,7 @@ button {
 .search-box input {
   width: 100%;
   height: 34px;
-  padding: 7px 44px 7px 31px;
+  padding: 7px 34px 7px 11px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: var(--surface-2);
@@ -359,6 +362,10 @@ button {
   padding-top: 6px;
 }
 
+.feed-day-label {
+  display: inline-block;
+}
+
 /* ---------- Feed: entrance ---------- */
 
 /* On first load / view switch, Marks settle in like a stack of paper. */
@@ -384,10 +391,10 @@ button {
 .mark-card {
   position: relative;
   display: block;
-  margin: 0;
-  padding: 13px 6px 14px 32px;
+  width: calc(100% + 36px);
+  margin: 0 -18px;
+  padding: 13px 58px 14px 50px;
   border: 0;
-  border-bottom: 1px solid var(--line);
   background: transparent;
   transition: background-color .16s ease;
 }
@@ -401,19 +408,19 @@ button {
 /* Active = keyboard focus state; a gold ledger line marks the row. */
 .mark-card.mark-active {
   background: var(--gold-soft);
-  box-shadow: inset 2px 0 0 var(--gold-deep);
+  box-shadow: none;
 }
 
 /* Multi-selection keeps a quiet ledger fill, while the active endpoint retains
    the stronger gold rule so Shift ranges remain legible. */
 .mark-card.mark-selected {
   background: color-mix(in srgb, var(--gold-soft) 72%, var(--surface));
-  box-shadow: inset 2px 0 0 var(--gold-line), inset 0 0 0 1px color-mix(in srgb, var(--gold-line) 36%, transparent);
+  box-shadow: none;
 }
 
 .mark-card.mark-selected.mark-active {
   background: var(--gold-soft);
-  box-shadow: inset 3px 0 0 var(--gold-deep), inset 0 0 0 1px color-mix(in srgb, var(--gold-deep) 28%, transparent);
+  box-shadow: none;
 }
 
 .mark-card.mark-active .mark-content-text,
@@ -436,7 +443,7 @@ button {
   display: block;
   width: 100%;
   margin: 0 0 7px;
-  padding: 0 14px 0 0;
+  padding: 0;
   cursor: default;
 }
 
@@ -458,6 +465,10 @@ button {
   font-weight: 440;
   line-height: 1.66;
   text-align: left;
+  cursor: default;
+}
+
+.mark-content-text.is-glyph-hover {
   cursor: pointer;
 }
 
@@ -583,7 +594,7 @@ button {
 
 .mark-note-area {
   min-height: 0;
-  padding: 0 14px 0 0;
+  padding: 0;
 }
 
 .mark-note[hidden] {
@@ -690,15 +701,20 @@ button {
 }
 
 .mark-source {
-  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  gap: 5px;
+  max-width: 100%;
   min-width: 0;
+  margin: 0;
   overflow: hidden;
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--ink-3);
+  color: var(--ink-4);
   font: inherit;
-  font-size: 10.5px;
+  font-size: 10px;
   line-height: 1.35;
   text-align: left;
   text-overflow: ellipsis;
@@ -707,19 +723,57 @@ button {
   transition: color .15s ease;
 }
 
+.mark-source > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .mark-source:hover,
 .mark-source:focus-visible {
-  color: var(--ink);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  color: var(--ink-2);
   outline: none;
+}
+
+.mark-source-arrow {
+  flex: 0 0 auto;
+  margin-left: -1px;
+  color: var(--ink-3);
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0;
+  transform: translate(-2px, -1px);
+  transition: opacity .14s ease, transform .14s ease;
+}
+
+.mark-source:hover .mark-source-arrow,
+.mark-source:focus-visible .mark-source-arrow {
+  opacity: 1;
+  transform: translate(0, -1px);
 }
 
 .mark-created {
   flex: 0 0 auto;
+  width: 4.25rem;
   color: var(--ink-4);
   font-size: 10px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.mark-source-slot {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mark-card-tools {
+  position: absolute;
+  top: 50%;
+  right: -36px;
+  z-index: 20;
+  transform: translateY(-50%);
 }
 
 .mark-actions {
@@ -727,7 +781,7 @@ button {
   display: flex;
   align-items: center;
   gap: 1px;
-  margin-left: auto;
+  margin: 0;
   opacity: 0;
   transition: opacity .16s ease;
 }
@@ -842,30 +896,92 @@ button {
 /* ---------- Source collection context ---------- */
 
 .collection-context {
-  margin: 0 0 14px;
+  margin: 2px 0 14px;
 }
 
 .source-collection-summary {
   display: grid;
-  gap: 3px;
-  padding: 11px 13px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
+  gap: 5px;
+  padding: 4px 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
 }
 
-.source-collection-summary > span {
+.source-collection-heading {
   color: var(--ink-3);
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 650;
-  letter-spacing: .07em;
+  letter-spacing: .05em;
   text-transform: uppercase;
 }
 
-.source-collection-summary > strong {
+.source-collection-page-title {
+  overflow: hidden;
   color: var(--ink);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-collection-source-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.source-collection-favicon {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  object-fit: contain;
+}
+
+.mark-source-fallback,
+.source-collection-fallback {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  color: var(--ink-3);
+}
+
+.mark-source-favicon,
+.mark-source-fallback {
+  opacity: .62;
+  filter: grayscale(.72);
+}
+
+.mark-source-fallback svg,
+.source-collection-fallback svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
+
+.source-collection-url {
+  color: var(--ink-3);
+  font-size: 10.5px;
+}
+
+.source-collection-source-row > span:last-child {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: 10.5px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.source-collection-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .search-summary {

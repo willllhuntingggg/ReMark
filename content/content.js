@@ -185,11 +185,35 @@
     document.addEventListener('click', swallow, true);
     setTimeout(() => document.removeEventListener('click', swallow, true), 650);
   }
+  // AI chat UIs (e.g. ChatGPT writing blocks and code blocks) render generated
+  // content inside contenteditable editors (ProseMirror / CodeMirror). Those
+  // blocks are page content the user wants to mark, not user input, so they
+  // stay markable while real inputs remain protected.
+  const AI_GENERATED_BLOCK_SELECTOR = [
+    // ChatGPT writing blocks — inline and full-screen editor.
+    '[data-testid="writing-block-container"]',
+    '[data-writing-block="true"]',
+    '[data-writing-block-fullscreen-editor-region="true"]',
+    // ChatGPT / Claude code blocks (classic <pre> render).
+    'pre.code-block__code',
+    // Editable CodeMirror / ProseMirror editors inside assistant replies.
+    // Matches both the classic article wrapper and the newer turn containers.
+    '[data-message-author-role] .cm-editor',
+    '[data-message-author-role] .cm-content',
+    '[data-message-author-role] .ProseMirror',
+    '.agent-turn .cm-editor',
+    '.agent-turn .cm-content',
+    '.agent-turn .ProseMirror'
+  ].join(',');
   function isEditableSelection(selection) {
     const node = selection?.anchorNode;
     if (!node) return false;
     const parent = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-    return Boolean(parent && parent.closest && parent.closest('input, textarea, [contenteditable]'));
+    if (!parent?.closest) return false;
+    if (parent.closest('input, textarea')) return true;
+    const editable = parent.closest('[contenteditable]');
+    if (!editable) return false;
+    return !editable.closest(AI_GENERATED_BLOCK_SELECTOR);
   }
   document.addEventListener('mouseup', (event) => {
     if (event.button !== 0) return;
@@ -468,16 +492,21 @@
     return savedClip;
   }
 
-  function openQuickNoteInput({ rect, onSave, initialValue = '' }) {
+  function openQuickNoteInput({ rect, onSave, initialValue = '', above = false }) {
     document.getElementById('remark-quick-note')?.remove();
     const anchor = rect || { left: window.innerWidth / 2 - 140, bottom: window.innerHeight / 2 };
     const shell = document.createElement('div');
     shell.id = 'remark-quick-note';
     shell.className = 'remark-quick-note';
     shell.style.left = `${Math.max(12, Math.min(anchor.left || 12, window.innerWidth - 292))}px`;
-    shell.style.top = `${Math.max(12, Math.min((anchor.bottom || 12) + 8, window.innerHeight - 118))}px`;
     shell.innerHTML = `<textarea aria-label="${t('add_note')}" placeholder="${t('note_placeholder')}"></textarea><span>${t('note_save_hint')}</span>`;
     document.documentElement.appendChild(shell);
+    if (above) {
+      // Place the note field above the anchor so it never covers the flag.
+      shell.style.top = `${Math.max(12, Math.min((anchor.top || 12) - shell.offsetHeight - 8, window.innerHeight - shell.offsetHeight - 8))}px`;
+    } else {
+      shell.style.top = `${Math.max(12, Math.min((anchor.bottom || 12) + 8, window.innerHeight - 118))}px`;
+    }
     const input = shell.querySelector('textarea');
     input.value = initialValue;
     input.setSelectionRange(initialValue.length, initialValue.length);
@@ -488,7 +517,7 @@
       const value = input.value.trim();
       try {
         await onSave(value);
-        if (value) showNoteSavedChip(rect);
+        if (value) showNoteSavedChip(shell.getBoundingClientRect());
       } finally { shell.remove(); }
     };
     input.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void finish(); } if (event.key === 'Escape') { event.preventDefault(); void finish(); } });
@@ -721,7 +750,20 @@
   // DOM Highlighting Engine
   // fresh = true when the mark was just created by the user; it then lands
   // with a short ink sweep so the capture moment feels immediate.
+  // ChatGPT writing/code blocks are editors (ProseMirror / CodeMirror) that
+  // own and re-render their content DOM, so no durable page highlight can be
+  // painted there. The clip is still saved — the sidebar record is the mark.
+  function isAiEditorRange(range) {
+    const node = range?.commonAncestorContainer;
+    const el = node && node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    if (!el?.closest) return false;
+    return Boolean(
+      el.closest(AI_GENERATED_BLOCK_SELECTOR) ||
+      el.closest('[contenteditable], .cm-editor, .cm-content, .ProseMirror')
+    );
+  }
   function highlightDOMRange(range, clip, fresh = false) {
+    if (isAiEditorRange(range)) return;
     const markWithFresh = (mark) => {
       if (fresh) {
         mark.classList.add('remark-fresh');
@@ -1038,6 +1080,12 @@
   let markTooltipEl = null;
   let markTooltipHideTimer = null;
   let markShowcaseTimer = null;
+  let markCreationCardEl = null;
+  let markCreationOverlayEl = null;
+  let markCreationFlagEl = null;
+  let markCreationTime = null;
+  let markCreationAnchor = null;
+  let markCreationPointerHandler = null;
   const healedVideoKeys = new Set();
 
   function detectVideoPlatform() {
@@ -1239,6 +1287,9 @@
     document.addEventListener('keydown', onVideoMarkKeydown);
     document.getElementById('remark-video-mark-btn')?.remove();
     renderVideoMarkers();
+    if (detectVideoPlatform() === 'bilibili') {
+      try { chrome.runtime?.sendMessage({ action: 'INSTALL_BILI_SUBTITLE_CAPTURE' }); } catch (_) {}
+    }
 
     setInterval(() => renderVideoMarkersIfChanged(), MARKER_POLL_INTERVAL);
 
@@ -1259,36 +1310,288 @@
     recordVideoMark({ withNote: e.shiftKey });
   }
   function pulseVideoMarker(mark, video) {
-    const bar = findVideoProgressBar();
-    if (!isTimelineVisible(bar)) {
-      if (isFullscreenVideo(video)) revealFullscreenTimeline(video);
-      showVideoMarkActions(mark, video, true);
-      return;
-    }
-    const dot = document.querySelector(`.remark-video-mark[data-mark-id="${CSS.escape(String(mark.id))}"]`);
-    if (!dot) { showVideoMarkActions(mark, video, true); return; }
-    addMarkerInkParticles(dot);
-    dot.classList.remove('pop');
-    void dot.offsetWidth;
-    dot.classList.add('pop');
+    showMarkCreationFeedback(mark, video);
   }
-  // After marking (or re-marking) a video, show the final flag's action row
-  // (note / copy / delete) directly — no temporary dot.
-  function showVideoMarkActions(mark, video, timelineHidden) {
-    const dot = document.querySelector(`.remark-video-mark[data-mark-id="${CSS.escape(String(mark.id))}"]`);
+  // Creation confirmation: one unit — a self-drawn fake progress bar with a
+  // flag at the mark position, plus its action card — that appears and
+  // disappears together. The flag is positioned over the real progress bar
+  // (same time→x mapping) but is fixed to the viewport, so it never
+  // disappears when the player controls auto-hide. The fake bar is always
+  // shown so the insert position is obvious in any mode. The card tells the
+  // user two things: the mark was saved, and they can add a note there.
+  function showMarkCreationFeedback(mark, video) {
+    dismissMarkCreationFeedback(true);
     const rect = video.getBoundingClientRect();
-    if (dot && !timelineHidden) {
-      showMarkTooltip(dot, mark, { duration: 3000 });
-      return;
-    }
-    showMarkTooltip(video, mark, {
-      duration: 3000,
-      point: {
-        left: rect.left + rect.width / 2,
-        top: isFullscreenVideo(video) ? rect.bottom - Math.max(28, rect.height * .075) : rect.bottom - 6,
-        width: 0
-      }
+    if (rect.width < 40 || rect.height < 40) return;
+    markCreationTime = Number(mark.time) || 0;
+    const geometry = markCreationGeometry(video, markCreationTime);
+    if (!geometry) return;
+
+    const flag = document.createElement('div');
+    flag.className = 'remark-video-mark-flag';
+    flag.style.left = `${geometry.flagX}px`;
+    flag.style.top = `${geometry.flagY}px`;
+    addMarkerInkParticles(flag);
+    document.body.appendChild(flag);
+    void flag.offsetWidth;
+    flag.classList.add('pop');
+    markCreationFlagEl = flag;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'remark-video-timeline-feedback';
+    overlay.style.left = `${geometry.line.left}px`;
+    overlay.style.top = `${geometry.line.top}px`;
+    overlay.style.width = `${geometry.line.width}px`;
+    document.body.appendChild(overlay);
+    void overlay.offsetWidth;
+    overlay.classList.add('show');
+    markCreationOverlayEl = overlay;
+
+    const anchor = { left: geometry.flagX, top: geometry.flagY };
+    markCreationAnchor = anchor;
+
+    const card = document.createElement('div');
+    card.className = 'remark-video-mark-card';
+    const head = document.createElement('div');
+    head.className = 'remark-video-mark-card-head';
+    const time = document.createElement('span');
+    time.className = 'remark-video-mark-card-time';
+    time.textContent = formatVideoTime(mark.time);
+    const status = document.createElement('span');
+    status.className = 'remark-video-mark-card-status';
+    status.textContent = '✓ ' + t('video_mark_created');
+    head.append(time, status);
+    const hint = document.createElement('span');
+    hint.className = 'remark-video-mark-card-hint';
+    hint.textContent = t('video_mark_note_hint');
+
+    const actions = document.createElement('div');
+    actions.className = 'remark-video-mark-card-actions';
+    const noteBtn = document.createElement('button');
+    noteBtn.type = 'button';
+    noteBtn.className = 'remark-mark-action remark-mark-action--note remark-video-mark-card-note';
+    noteBtn.dataset.hint = t('add_note');
+    noteBtn.setAttribute('aria-label', t('add_note'));
+    noteBtn.innerHTML = NOTE_BTN_ICON + `<span>${escHtml(t('video_mark_add_note'))}</span>`;
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'remark-mark-action remark-mark-action--copy';
+    copyBtn.dataset.hint = t('copy');
+    copyBtn.setAttribute('aria-label', t('copy'));
+    copyBtn.innerHTML = COPY_BTN_ICON;
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'remark-mark-action remark-mark-action--delete';
+    delBtn.dataset.hint = t('delete_video_marker');
+    delBtn.setAttribute('aria-label', t('delete_video_marker'));
+    delBtn.innerHTML = DELETE_BTN_ICON;
+    const stop = (event) => { event.preventDefault(); event.stopPropagation(); };
+    noteBtn.addEventListener('pointerdown', stop);
+    copyBtn.addEventListener('pointerdown', stop);
+    delBtn.addEventListener('pointerdown', stop);
+    noteBtn.addEventListener('click', (event) => {
+      stop(event);
+      const wasPlaying = !video.paused;
+      if (wasPlaying) video.pause();
+      hideMarkCreationCard();
+      openQuickNoteInput({
+        rect: { left: anchor.left - 140, top: anchor.top },
+        above: true,
+        initialValue: mark.note || '',
+        onSave: async (note) => {
+          if (wasPlaying) video.play().catch(() => {});
+          if (note) { await ReMarkStorage.updateVideoMark(mark.id, { note }); notifyStorageUpdated(); }
+          dismissMarkCreationFeedback(false);
+        }
+      });
     });
+    copyBtn.addEventListener('click', (event) => { stop(event); void copyVideoMark(mark); });
+    delBtn.addEventListener('click', async (event) => {
+      stop(event);
+      dismissMarkCreationFeedback(true);
+      await ReMarkStorage.deleteVideoMark(mark.id);
+      await ReMarkStorage.pushUndo({ type: 'delete_video_mark', item: mark });
+      renderVideoMarkers();
+      notifyStorageUpdated();
+      showPageToast(t('video_mark_deleted'), {
+        label: t('undo'),
+        onAction: async () => {
+          if (await ReMarkStorage.undoLast()) { renderVideoMarkers(); notifyStorageUpdated(); }
+        }
+      });
+    });
+    actions.append(noteBtn, copyBtn, delBtn);
+    card.append(head, hint, actions);
+    document.body.appendChild(card);
+    positionMarkCreationCard(card, anchor);
+    markCreationCardEl = card;
+
+    card.addEventListener('mouseenter', () => {
+      if (markShowcaseTimer) { clearTimeout(markShowcaseTimer); markShowcaseTimer = null; }
+    });
+    card.addEventListener('mouseleave', () => scheduleMarkCreationDismiss(1500));
+    markCreationPointerHandler = (event) => {
+      if (markCreationCardEl?.contains(event.target)) return;
+      if (document.getElementById('remark-quick-note')?.contains(event.target)) return;
+      dismissMarkCreationFeedback(false);
+    };
+    document.addEventListener('pointerdown', markCreationPointerHandler, true);
+    scheduleMarkCreationDismiss();
+  }
+  // Position the showcase flag exactly where the native progress bar would put
+  // it (same time→x mapping), falling back to the video frame when the bar
+  // cannot be measured.
+  function markCreationGeometry(video, time) {
+    const duration = Number(video.duration);
+    const progress = isFinite(duration) && duration > 0
+      ? Math.max(0, Math.min(1, time / duration))
+      : 0.5;
+    const rect = video.getBoundingClientRect();
+    const bar = findVideoProgressBar();
+    let barRect = null;
+    try { if (bar) barRect = bar.getBoundingClientRect(); } catch (_) {}
+    if (barRect && barRect.width >= 16) {
+      return {
+        flagX: barRect.left + progress * barRect.width,
+        flagY: barRect.top + barRect.height / 2,
+        line: { left: barRect.left, top: barRect.top + barRect.height / 2 - 2, width: barRect.width }
+      };
+    }
+    const lineLeft = rect.left + Math.max(16, rect.width * 0.035);
+    const lineTop = rect.bottom - Math.max(30, rect.height * 0.075);
+    const lineWidth = Math.max(36, rect.width * 0.93);
+    return {
+      flagX: lineLeft + progress * lineWidth,
+      flagY: lineTop,
+      line: { left: lineLeft, top: lineTop, width: lineWidth }
+    };
+  }
+  // Editing an existing mark's note: show the same fake progress bar + flag at
+  // the mark position while the note editor is open, so the location stays
+  // obvious (and survives control auto-hide).
+  function showMarkEditingBar(mark) {
+    dismissMarkCreationFeedback(true);
+    const video = findVideoElement();
+    if (!video) return;
+    markCreationTime = Number(mark.time) || 0;
+    const geometry = markCreationGeometry(video, markCreationTime);
+    if (!geometry) return;
+    const flag = document.createElement('div');
+    flag.className = 'remark-video-mark-flag';
+    flag.style.left = `${geometry.flagX}px`;
+    flag.style.top = `${geometry.flagY}px`;
+    addMarkerInkParticles(flag);
+    document.body.appendChild(flag);
+    void flag.offsetWidth;
+    flag.classList.add('pop');
+    markCreationFlagEl = flag;
+    const overlay = document.createElement('div');
+    overlay.className = 'remark-video-timeline-feedback';
+    overlay.style.left = `${geometry.line.left}px`;
+    overlay.style.top = `${geometry.line.top}px`;
+    overlay.style.width = `${geometry.line.width}px`;
+    document.body.appendChild(overlay);
+    void overlay.offsetWidth;
+    overlay.classList.add('show');
+    markCreationOverlayEl = overlay;
+    markCreationAnchor = { left: geometry.flagX, top: geometry.flagY };
+  }
+  function positionVideoMarkPanel(panel, anchor) {
+    const edge = 10;
+    const gap = 14;
+    const panelRect = panel.getBoundingClientRect();
+    const maxLeft = Math.max(edge, window.innerWidth - panelRect.width - edge);
+    const left = Math.max(edge, Math.min(anchor.left - panelRect.width / 2, maxLeft));
+    const aboveTop = anchor.top - panelRect.height - gap;
+    const belowTop = anchor.top + gap;
+    const aboveFits = aboveTop >= edge;
+    const belowFits = belowTop + panelRect.height <= window.innerHeight - edge;
+    const above = aboveFits || (!belowFits && anchor.top > window.innerHeight / 2);
+    const desiredTop = above ? aboveTop : belowTop;
+    const maxTop = Math.max(edge, window.innerHeight - panelRect.height - edge);
+
+    panel.classList.toggle('is-above', above);
+    panel.classList.toggle('is-below', !above);
+    panel.style.left = `${left}px`;
+    panel.style.top = `${Math.max(edge, Math.min(desiredTop, maxTop))}px`;
+  }
+  function positionMarkCreationCard(card, anchor) {
+    positionVideoMarkPanel(card, anchor);
+  }
+  function scheduleMarkCreationDismiss(delay = 4200) {
+    clearTimeout(markShowcaseTimer);
+    markShowcaseTimer = window.setTimeout(() => {
+      markShowcaseTimer = null;
+      if (markCreationCardEl?.matches(':hover')) { scheduleMarkCreationDismiss(1500); return; }
+      dismissMarkCreationFeedback(false);
+    }, delay);
+  }
+  // Keep the flag (and the fullscreen overlay) visible while the note editor
+  // is open; only the action card steps aside so it never overlaps the input.
+  function hideMarkCreationCard() {
+    clearTimeout(markShowcaseTimer);
+    markShowcaseTimer = null;
+    if (markCreationPointerHandler) {
+      document.removeEventListener('pointerdown', markCreationPointerHandler, true);
+      markCreationPointerHandler = null;
+    }
+    if (markCreationCardEl) {
+      markCreationCardEl.remove();
+      markCreationCardEl = null;
+    }
+  }
+  function dismissMarkCreationFeedback(immediate) {
+    clearTimeout(markShowcaseTimer);
+    markShowcaseTimer = null;
+    if (markCreationPointerHandler) {
+      document.removeEventListener('pointerdown', markCreationPointerHandler, true);
+      markCreationPointerHandler = null;
+    }
+    if (markCreationCardEl) {
+      const card = markCreationCardEl;
+      markCreationCardEl = null;
+      if (immediate) card.remove();
+      else {
+        card.classList.add('is-leaving');
+        window.setTimeout(() => card.remove(), 180);
+      }
+    }
+    if (markCreationOverlayEl) {
+      const overlay = markCreationOverlayEl;
+      markCreationOverlayEl = null;
+      if (immediate) overlay.remove();
+      else {
+        overlay.classList.add('fade');
+        window.setTimeout(() => overlay.remove(), 320);
+      }
+    }
+    if (markCreationFlagEl) {
+      const flag = markCreationFlagEl;
+      markCreationFlagEl = null;
+      if (immediate) flag.remove();
+      else {
+        flag.classList.add('is-leaving');
+        window.setTimeout(() => flag.remove(), 180);
+      }
+    }
+    markCreationTime = null;
+    markCreationAnchor = null;
+  }
+  function syncMarkCreationFeedback() {
+    if (!markCreationFlagEl || !markCreationAnchor) return;
+    const video = findVideoElement();
+    if (!video) return;
+    const geometry = markCreationGeometry(video, markCreationTime);
+    if (!geometry) return;
+    markCreationFlagEl.style.left = `${geometry.flagX}px`;
+    markCreationFlagEl.style.top = `${geometry.flagY}px`;
+    if (markCreationOverlayEl) {
+      markCreationOverlayEl.style.left = `${geometry.line.left}px`;
+      markCreationOverlayEl.style.top = `${geometry.line.top}px`;
+      markCreationOverlayEl.style.width = `${geometry.line.width}px`;
+    }
+    markCreationAnchor = { left: geometry.flagX, top: geometry.flagY };
+    if (markCreationCardEl) positionMarkCreationCard(markCreationCardEl, markCreationAnchor);
   }
   async function recordVideoMark(options = {}) {
     const video = findVideoElement();
@@ -1326,13 +1629,17 @@
     const existing = marks.find(m => m.videoKey === vkey && Math.abs(m.time - t) < 1);
     const promptForNote = (mark) => {
       if (withNote) video.pause();
-      // The note input appears at the flag (bottom centre of the video).
       const rect = video.getBoundingClientRect();
+      const anchor = markCreationAnchor || { left: rect.left + rect.width / 2, top: rect.bottom - 10 };
+      hideMarkCreationCard();
+      // The note input appears next to the flag.
       openQuickNoteInput({
-        rect: { left: rect.left + rect.width / 2 - 140, bottom: rect.bottom - 10 },
+        rect: { left: anchor.left - 140, top: anchor.top },
+        above: true,
         onSave: async (note) => {
           if (note) { await ReMarkStorage.updateVideoMark(mark.id, { note }); notifyStorageUpdated(); }
           if (shouldResume) video.play().catch(() => {});
+          dismissMarkCreationFeedback(false);
         }
       });
     };
@@ -1348,12 +1655,44 @@
       duration: isFinite(video.duration) ? Math.floor(video.duration) : 0, title: getVideoTitle()
     });
     notifyStorageUpdated();
-    const timelineHidden = !isTimelineVisible(findVideoProgressBar());
-    if (timelineHidden && isFullscreenVideo(video)) revealFullscreenTimeline(video);
-    renderVideoMarkers();
-    showVideoMarkActions(savedMark, video, timelineHidden);
+    void attachVideoMarkCaption(savedMark, video, t);
+    await renderVideoMarkers();
+    showMarkCreationFeedback(savedMark, video);
     if (withNote) promptForNote(savedMark);
     // The flag on the progress bar (with its action row) is the confirmation.
+  }
+  // Best-effort auxiliary info: the subtitle line spoken at the mark moment
+  // (exact cue match) plus the YouTube chapter the mark falls inside. Anything
+  // not captured is skipped silently — the mark itself is already saved.
+  async function attachVideoMarkCaption(mark, video, time) {
+    try {
+      const platform = detectVideoPlatform();
+      if (!platform) return;
+      const settings = await ReMarkStorage.getSettings();
+      const payload = {
+        platform,
+        time,
+        duration: isFinite(video.duration) ? video.duration : 0,
+        videoKey: mark.videoKey || '',
+        language: settings.language || 'system',
+        bvid: String(mark.videoKey || '').split('?')[0],
+        cid: ''
+      };
+      let result = null;
+      try {
+        result = await chrome.runtime?.sendMessage({ action: 'CAPTURE_VIDEO_CAPTION', payload });
+      } catch (_) {}
+      if (!result) return;
+      const updates = {};
+      if (result.caption?.text) updates.caption = result.caption;
+      if (result.chapter?.text) updates.chapter = result.chapter;
+      if (!Object.keys(updates).length) return;
+      await ReMarkStorage.updateVideoMark(mark.id, updates);
+      notifyStorageUpdated();
+      renderVideoMarkers();
+    } catch (_) {
+      // Caption capture is optional; never fail the mark over it.
+    }
   }
   async function healVideoMarkTitles(vkey) {
     if (!vkey) return false;
@@ -1431,6 +1770,7 @@
     });
 
     videoMarkRenderedIds = newIds;
+    syncMarkCreationFeedback();
   }
 
   async function copyVideoMark(mark) {
@@ -1472,14 +1812,21 @@
     delBtn.addEventListener('pointerdown', stop);
     noteBtn.addEventListener('click', (event) => {
       stop(event);
+      const video = findVideoElement();
+      const wasPlaying = video && !video.paused;
+      if (wasPlaying) video.pause();
       hideMarkTooltip();
+      showMarkEditingBar(mark);
+      const d = dot.getBoundingClientRect();
+      const anchor = markCreationAnchor || { left: d.left + d.width / 2, top: d.top + d.height / 2 };
       openQuickNoteInput({
-        rect: dot.getBoundingClientRect(),
+        rect: { left: anchor.left - 140, top: anchor.top },
+        above: true,
         initialValue: mark.note || '',
         onSave: async (note) => {
-          if (!note) return;
-          await ReMarkStorage.updateVideoMark(mark.id, { note });
-          notifyStorageUpdated();
+          if (wasPlaying) video?.play().catch(() => {});
+          if (note) { await ReMarkStorage.updateVideoMark(mark.id, { note }); notifyStorageUpdated(); }
+          dismissMarkCreationFeedback(false);
         }
       });
     });
@@ -1505,9 +1852,8 @@
     // options.point overrides the anchor (used when the timeline is hidden);
     // options.duration keeps the row visible for a while (creation showcase).
     const anchor = options.point || dot.getBoundingClientRect();
-    tip.style.left = `${anchor.left + (anchor.width || 0) / 2}px`;
-    tip.style.top = `${anchor.top - 8}px`;
-    tip.style.transform = 'translate(-50%, -100%)';
+    const tooltipAnchor = { left: anchor.left + (anchor.width || 0) / 2, top: anchor.top };
+    positionVideoMarkPanel(tip, tooltipAnchor);
 
     tip.addEventListener('mouseenter', () => { if (markTooltipHideTimer) { clearTimeout(markTooltipHideTimer); markTooltipHideTimer = null; } });
     tip.addEventListener('mouseleave', () => scheduleHideMarkTooltip());

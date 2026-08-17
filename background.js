@@ -50,6 +50,238 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 const pendingSourceNavigations = new Map();
+
+// Runs in the MAIN world of the video tab. Reads page-level player state and
+// fetches caption/subtitle data exactly like the page itself would, so the
+// user's logged-in session and cookies apply. Returns { caption, chapter } or
+// null — captions are best-effort and never block the mark itself.
+async function captureVideoCaptionInMainWorld(payload) {
+  const platform = payload?.platform;
+  const time = Number(payload?.time);
+  if (!platform || !Number.isFinite(time)) return null;
+  const cueAt = (cues) => {
+    if (!Array.isArray(cues)) return null;
+    for (const cue of cues) {
+      const from = Number(cue.from);
+      const to = Number(cue.to);
+      if (Number.isFinite(from) && Number.isFinite(to) && time >= from - 0.5 && time < to + 0.5) return cue;
+    }
+    return null;
+  };
+  const timedtextCues = (data) => {
+    const cues = [];
+    for (const ev of data?.events || []) {
+      const start = Number(ev.tStartMs);
+      if (!Number.isFinite(start)) continue;
+      const duration = Number(ev.dDurationMs) || 0;
+      let text = '';
+      if (Array.isArray(ev.segs)) text = ev.segs.map((s) => s.utf8 || '').join('');
+      else if (typeof ev.aAppend === 'string') text = ev.aAppend;
+      text = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!text) continue;
+      cues.push({ from: start / 1000, to: (start + duration) / 1000, text });
+    }
+    return cues;
+  };
+  const fetchJson = async (url, options) => {
+    try {
+      const res = await fetch(url, { credentials: 'include', ...(options || {}) });
+      if (!res.ok) return null;
+      const text = await res.text();
+      if (!text) return null;
+      return JSON.parse(text);
+    } catch (_) {
+      return null;
+    }
+  };
+  const pickTrack = (tracks, prefs, kindOf) => tracks
+    .map((track) => {
+      const lang = String(kindOf(track) || '');
+      const index = prefs.indexOf(lang);
+      return { track, score: index === -1 ? 10 : index * 2 + (track.kind === 'asr' ? 1 : 0) };
+    })
+    .filter((entry) => entry.score < 10)
+    .sort((a, b) => a.score - b.score)
+    .map((entry) => entry.track);
+  const effectiveLanguage = payload.language === 'system'
+    ? String(navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en'
+    : payload.language;
+
+  if (platform === 'youtube') {
+    let player = null;
+    try {
+      if (typeof ytInitialPlayerResponse !== 'undefined') player = ytInitialPlayerResponse;
+      else if (window.ytplayer?.config?.args?.player_response) {
+        player = typeof window.ytplayer.config.args.player_response === 'string'
+          ? JSON.parse(window.ytplayer.config.args.player_response)
+          : window.ytplayer.config.args.player_response;
+      }
+    } catch (_) {}
+
+    let chapter = null;
+    try {
+      if (typeof ytInitialData !== 'undefined') {
+        const found = [];
+        const seen = new Set();
+        const stack = [ytInitialData];
+        while (stack.length) {
+          const node = stack.pop();
+          if (!node || typeof node !== 'object' || seen.has(node)) continue;
+          seen.add(node);
+          if (node.multiMarkersPlayerBarRenderer && Array.isArray(node.multiMarkersPlayerBarRenderer.markersMap)) found.push(node.multiMarkersPlayerBarRenderer);
+          for (const key of Object.keys(node)) {
+            const value = node[key];
+            if (value && typeof value === 'object') stack.push(value);
+          }
+        }
+        const markers = found[0];
+        const entry = markers?.markersMap?.find((m) => m.key === 'DESCRIPTION_CHAPTERS' || m.key === 'chapters' || Array.isArray(m.value?.chapters));
+        const chapters = entry?.value?.chapters || [];
+        if (chapters.length) {
+          const cues = chapters.map((c, i) => ({
+            from: Number(c.chapterRenderer?.timeRangeStartMillis || 0) / 1000,
+            to: i + 1 < chapters.length
+              ? Number(chapters[i + 1].chapterRenderer?.timeRangeStartMillis || 0) / 1000
+              : Number(payload.duration) || Number.MAX_SAFE_INTEGER,
+            text: String(c.chapterRenderer?.title?.simpleText || '').trim()
+          })).filter((c) => c.text);
+          const hit = cueAt(cues);
+          if (hit) chapter = { kind: 'chapter', text: hit.text, from: hit.from, to: hit.to };
+        }
+      }
+    } catch (_) {}
+
+    let caption = null;
+    try {
+      const tracks = player?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+      if (tracks.length) {
+        const prefs = effectiveLanguage === 'zh'
+          ? ['zh-Hans', 'zh-CN', 'zh-TW', 'zh', 'en']
+          : ['en', 'zh-Hans', 'zh-CN', 'zh-TW', 'zh'];
+        const track = pickTrack(tracks, prefs, (t) => t.languageCode)[0];
+        if (track) {
+          const data = await fetchJson(track.baseUrl + '&fmt=json3');
+          const hit = cueAt(timedtextCues(data));
+          if (hit) caption = {
+            kind: 'caption',
+            text: hit.text,
+            from: hit.from,
+            to: hit.to,
+            lang: track.languageCode || '',
+            name: track.name?.simpleText || ''
+          };
+        }
+      }
+    } catch (_) {}
+    return { caption, chapter };
+  }
+
+  if (platform === 'bilibili') {
+    let bvid = payload.bvid || '';
+    let cid = payload.cid || '';
+    try {
+      const state = window.__INITIAL_STATE__;
+      bvid = bvid || state?.bvid || '';
+      cid = cid || String(state?.videoData?.cid || '');
+    } catch (_) {}
+
+    let caption = null;
+    try {
+      let list = [];
+      try { list = window.__INITIAL_STATE__?.videoData?.subtitle?.list || []; } catch (_) {}
+      if (!list.length) {
+        try {
+          const captured = window.__remarkBiliSubtitles__;
+          if (captured && captured.key === `${bvid}:${cid}`) list = captured.subtitles || [];
+        } catch (_) {}
+      }
+      if (!list.length) {
+        try {
+          const data = await fetchJson(`https://api.bilibili.com/x/player/v2?bvid=${encodeURIComponent(bvid)}&cid=${encodeURIComponent(cid)}`);
+          list = data?.data?.subtitle?.subtitles || data?.data?.subtitle?.list || [];
+        } catch (_) {}
+      }
+      if (list.length) {
+        const prefs = effectiveLanguage === 'zh'
+          ? ['ai-zh', 'zh-Hans', 'zh-CN', 'zh', 'zh-TW']
+          : ['en', 'ai-zh', 'zh-Hans', 'zh-CN', 'zh'];
+        const track = pickTrack(list, prefs, (t) => t.lan)[0];
+        if (track?.subtitle_url) {
+          const url = track.subtitle_url.startsWith('//') ? 'https:' + track.subtitle_url : track.subtitle_url;
+          const data = await fetchJson(url);
+          const body = Array.isArray(data?.body) ? data.body : [];
+          const cues = body
+            .filter((item) => item && item.content)
+            .map((item) => ({ from: Number(item.from), to: Number(item.to), text: String(item.content).replace(/\s+/g, ' ').trim() }))
+            .filter((item) => item.text);
+          const hit = cueAt(cues);
+          if (hit) caption = {
+            kind: 'caption',
+            text: hit.text,
+            from: hit.from,
+            to: hit.to,
+            lang: track.lan_doc || track.lan || ''
+          };
+        }
+      }
+    } catch (_) {}
+    return { caption, chapter: null };
+  }
+  return null;
+}
+
+// Installed once per Bilibili video page (MAIN world). Captures the player's
+// own subtitle-list response so the logged-in result can be reused at mark
+// time without re-signing the wbi request ourselves.
+function installBiliSubtitleCaptureInMainWorld() {
+  try {
+    if (window.__remarkBiliSubtitleHookInstalled__) return;
+    window.__remarkBiliSubtitleHookInstalled__ = true;
+    const store = { key: '', subtitles: [], updatedAt: 0 };
+    Object.defineProperty(window, '__remarkBiliSubtitles__', { value: store, writable: false, configurable: true });
+    const capture = (url, bodyText) => {
+      try {
+        if (typeof url !== 'string' || !/\/x\/player\/(wbi\/)?v2(\?|$)/.test(url) || !bodyText) return;
+        const parsed = JSON.parse(bodyText);
+        const subs = parsed?.data?.subtitle?.subtitles || parsed?.data?.subtitle?.list || [];
+        if (!subs.length) return;
+        const parsedUrl = new URL(url, location.href);
+        const bvid = parsedUrl.searchParams.get('bvid') || '';
+        const cid = parsedUrl.searchParams.get('cid') || '';
+        if (!bvid && !cid) return;
+        store.key = `${bvid}:${cid}`;
+        store.subtitles = subs;
+        store.updatedAt = Date.now();
+      } catch (_) {}
+    };
+    const originalFetch = window.fetch;
+    if (typeof originalFetch === 'function') {
+      window.fetch = function (...args) {
+        const url = typeof args[0] === 'string' ? args[0] : args[0]?.url;
+        const promise = originalFetch.apply(this, args);
+        if (typeof url === 'string' && /\/x\/player\/(wbi\/)?v2(\?|$)/.test(url)) {
+          promise.then((res) => {
+            try { res.clone().text().then((text) => capture(url, text)); } catch (_) {}
+          }).catch(() => {});
+        }
+        return promise;
+      };
+    }
+    const originalOpen = XMLHttpRequest.prototype.open;
+    const originalSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+      this.__remarkBiliUrl = url;
+      return originalOpen.call(this, method, url, ...rest);
+    };
+    XMLHttpRequest.prototype.send = function (...args) {
+      this.addEventListener('load', () => {
+        try { capture(this.__remarkBiliUrl, this.responseText); } catch (_) {}
+      });
+      return originalSend.apply(this, args);
+    };
+  } catch (_) {}
+}
+
 chrome.webNavigation.onErrorOccurred.addListener((details) => {
   if (details.frameId !== 0) return;
   const pending = pendingSourceNavigations.get(details.tabId);
@@ -74,6 +306,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
       sendResponse({ success: true });
     }
+  }
+  if (message.action === 'INSTALL_BILI_SUBTITLE_CAPTURE') {
+    if (sender.tab?.id) {
+      chrome.scripting.executeScript({
+        target: { tabId: sender.tab.id },
+        world: 'MAIN',
+        func: installBiliSubtitleCaptureInMainWorld
+      }).catch(() => {});
+    }
+    sendResponse({ ok: true });
+  }
+  if (message.action === 'CAPTURE_VIDEO_CAPTION') {
+    if (!sender.tab?.id) {
+      sendResponse(null);
+      return true;
+    }
+    chrome.scripting.executeScript({
+      target: { tabId: sender.tab.id },
+      world: 'MAIN',
+      func: captureVideoCaptionInMainWorld,
+      args: [message.payload]
+    })
+      .then((results) => sendResponse(results?.[0]?.result || null))
+      .catch(() => sendResponse(null));
+    return true;
   }
   return true;
 });

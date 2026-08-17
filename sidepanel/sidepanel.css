@@ -404,6 +404,18 @@ button {
   box-shadow: inset 2px 0 0 var(--gold-deep);
 }
 
+/* Multi-selection keeps a quiet ledger fill, while the active endpoint retains
+   the stronger gold rule so Shift ranges remain legible. */
+.mark-card.mark-selected {
+  background: color-mix(in srgb, var(--gold-soft) 72%, var(--surface));
+  box-shadow: inset 2px 0 0 var(--gold-line), inset 0 0 0 1px color-mix(in srgb, var(--gold-line) 36%, transparent);
+}
+
+.mark-card.mark-selected.mark-active {
+  background: var(--gold-soft);
+  box-shadow: inset 3px 0 0 var(--gold-deep), inset 0 0 0 1px color-mix(in srgb, var(--gold-deep) 28%, transparent);
+}
+
 .mark-card.mark-active .mark-content-text,
 .mark-card.mark-active .mark-content-text:focus-visible {
   color: var(--ink);
@@ -411,6 +423,10 @@ button {
 }
 
 .mark-card.mark-active .mark-actions {
+  opacity: 1;
+}
+
+.mark-card.mark-selected .mark-actions {
   opacity: 1;
 }
 
@@ -515,6 +531,52 @@ button {
 .mark-card--video:hover .video-duration,
 .mark-card--video:focus-within .video-duration {
   display: inline;
+}
+
+/* ---------- Video captions & chapters ---------- */
+
+.mark-caption {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  margin: 7px 14px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.mark-caption--chapter {
+  margin-top: 6px;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--gold-line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.mark-caption-label {
+  flex: 0 0 auto;
+  color: var(--ink-3);
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+
+.mark-caption-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mark-caption-time {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--ink-4);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* ---------- Notes ---------- */

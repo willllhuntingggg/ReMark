@@ -8,7 +8,13 @@ const background = read('background.js');
 const manifest = JSON.parse(read('manifest.json'));
 const i18n = read('lib/i18n.js');
 
-assert.match(sidepanel, /await notifySourceTabs\(item, \{ action: 'DELETE_CLIP_FROM_PAGE', clipId: item\.id \}\)/);
+assert.match(sidepanel, /async function deleteMarks\(keys = selectedKeys\)/);
+assert.match(sidepanel, /Promise\.all\(highlights\.map\(\(item\) => notifySourceTabs\(item, \{ action: 'DELETE_CLIP_FROM_PAGE', clipId: item\.id \}\)\)\)/);
+assert.match(sidepanel, /function clearNativeTextSelection\(\)[\s\S]*window\.getSelection/);
+assert.match(sidepanel, /list\.addEventListener\('mousedown',[\s\S]*isShiftRangePointer\(event\)[\s\S]*event\.preventDefault\(\)/);
+assert.match(content, /function positionVideoMarkPanel\(panel, anchor\)[\s\S]*window\.innerWidth[\s\S]*window\.innerHeight/);
+assert.match(content, /positionVideoMarkPanel\(tip, tooltipAnchor\)/);
+assert.doesNotMatch(read('content/content.css'), /\.remark-video-mark-card::after/);
 assert.match(sidepanel, /async function notifySourceTabs[\s\S]*Promise\.all/);
 assert.match(sidepanel, /action: 'RESTORE_HIGHLIGHTS'/);
 assert.match(content, /function schedulePageHighlightRestore\(\)[\s\S]*DOMContentLoaded[\s\S]*\[800, 2200, 4000, 7000\]\.forEach/);
@@ -27,7 +33,7 @@ console.log('page-sync.test.js: all assertions passed');
 
 assert.doesNotMatch(content, /selectedHighlight/);
 assert.match(content, /initialValue: item\.note \|\| ''/);
-assert.match(content, /function openQuickNoteInput\(\{ rect, onSave, initialValue = '' \}\)/);
+assert.match(content, /function openQuickNoteInput\(\{ rect, onSave, initialValue = '', above = false \}\)/);
 assert.match(content, /input\.value = initialValue/);
 assert.match(content, /function bindHighlightClick\(element, clip\)[\s\S]*showHighlightActions\(clip\.id[,)]/);
 const clickHandler = content.slice(content.indexOf('function bindHighlightClick'), content.indexOf('function notifyStorageUpdated'));
@@ -59,7 +65,8 @@ assert.match(content, /const normalizedClipText = String\(clip\.text\)\.replace\
 assert.match(content, /originalIndexes\.push\(index\)[\s\S]*normalizedPageText\.indexOf\(normalizedClipText\)/);
 console.log('sidepanel-locate-recovery assertions passed');
 
-assert.match(sidepanel, /if \(action === 'jump'\) \{ setActive\(key\); void jump\(itemFor\(key\)\); return; \}/);
+assert.match(sidepanel, /if \(action === 'jump' && \(event\.shiftKey \|\| event\.metaKey \|\| event\.ctrlKey\)\) \{ selectCard\(key, event\); return; \}/);
+assert.match(sidepanel, /if \(action === 'jump'\) \{ setSelection\(\[key\], key\); setActive\(key\); void jump\(itemFor\(key\)\); return; \}/);
 assert.doesNotMatch(sidepanel.slice(sidepanel.indexOf("list.addEventListener('click'", sidepanel.indexOf('function isGlyphHit')), sidepanel.indexOf("list.addEventListener('click'", sidepanel.indexOf('function isGlyphHit')) + 1200), /isGlyphHit\(event, control\)/);
 assert.match(content, /if \(mark\) \{[\s\S]*performLocateAnimation\(mark\)/);
 assert.match(content, /mark\.scrollIntoView\(\{ behavior: 'smooth', block: 'center', inline: 'nearest' \}\)/);

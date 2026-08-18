@@ -308,6 +308,7 @@
   async function copyTextToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text);
+      return true;
     } catch (_) {
       const area = document.createElement('textarea');
       area.value = text;
@@ -315,17 +316,17 @@
       area.style.opacity = '0';
       document.body.appendChild(area);
       area.select();
-      try { document.execCommand('copy'); } catch (_) {}
-      area.remove();
+      try { return document.execCommand('copy'); } catch (_) { return false; } finally { area.remove(); }
     }
   }
-  async function copyPageClip(clipId) {
+  async function copyPageClip(clipId, button) {
     const clips = await ReMarkStorage.getClips();
     const item = clips.find((clip) => clip.id === clipId);
     if (!item) return;
     const payload = `“${item.text}”${item.note ? `\n\n${item.note}` : ''}`;
-    await copyTextToClipboard(payload);
-    showPageToast(t('copied'));
+    if (await copyTextToClipboard(payload)) {
+      showCopyFeedback(button);
+    }
   }
   async function openPageNoteEditor(clipId, anchor) {
     const item = (await ReMarkStorage.getClips()).find((clip) => clip.id === clipId);
@@ -607,7 +608,24 @@
   const MARKED_PILL_ICON = MARK_PILL_ICON;
   const NOTE_BTN_ICON = '<svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M64 32C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64H288V368c0-26.5 21.5-48 48-48H448V96c0-35.3-28.7-64-64-64H64zM448 352H402.7 336c-8.8 0-16 7.2-16 16v66.7V480l32-32 64-64 32-32z"/></svg>';
   const COPY_BTN_ICON = '<svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M208 0H332.1c12.7 0 24.9 5.1 33.9 14.1l67.9 67.9c9 9 14.1 21.2 14.1 33.9V336c0 26.5-21.5 48-48 48H208c-26.5 0-48-21.5-48-48V48c0-26.5 21.5-48 48-48zM48 128h80v64H64V448H256V416h64v48c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V176c0-26.5 21.5-48 48-48z"/></svg>';
+  const COPIED_BTN_ICON = '<svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M438.6 105.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0l-96-96c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0L224 274.7l169.4-169.3c12.5-12.5 32.8-12.5 45.3 0z"/></svg>';
   const DELETE_BTN_ICON = '<svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96H416c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 296.3 0 284.2 0H163.8c-12.1 0-23.2 6.8-28.6 17.7zM416 128H32L53.2 467c1.6 25.3 22.6 45 47.9 45H346.9c25.3 0 46.3-19.7 47.9-45L416 128z"/></svg>';
+  function showCopyFeedback(button) {
+    if (!button) return;
+    if (!button.__remarkCopyFeedback) {
+      button.__remarkCopyFeedback = { icon: button.innerHTML };
+    }
+    clearTimeout(button.__remarkCopyFeedbackTimer);
+    button.innerHTML = COPIED_BTN_ICON;
+    button.classList.add('remark-copy-success');
+    button.__remarkCopyFeedbackTimer = window.setTimeout(() => {
+      const original = button.__remarkCopyFeedback;
+      if (!original) return;
+      button.innerHTML = original.icon;
+      button.classList.remove('remark-copy-success');
+      button.__remarkCopyFeedback = null;
+    }, 1200);
+  }
   let markPillEl = null;
   let markPillContext = null;  // { text, range } while in the selection state
   let markPillClipId = null;   // clip id once the row morphed to the highlighted state
@@ -666,8 +684,8 @@
       copyBtn.dataset.hint = t('copy');
       copyBtn.setAttribute('aria-label', t('copy'));
       copyBtn.__pillAction = marked
-        ? () => { void copyPageClip(clipId); }
-        : () => { copySelectionFromPill(); };
+        ? () => { void copyPageClip(clipId, copyBtn); }
+        : () => { void copySelectionFromPill(copyBtn); };
     }
   }
   function showMarkPill(context, point) {
@@ -719,11 +737,12 @@
     markPillContext = null;
     markPillClipId = null;
   }
-  function copySelectionFromPill() {
+  async function copySelectionFromPill(button) {
     const ctx = markPillContext;
     if (!ctx || !ctx.text) return;
-    void copyTextToClipboard(ctx.text);
-    showPageToast(t('copied'));
+    if (await copyTextToClipboard(ctx.text)) {
+      showCopyFeedback(button);
+    }
   }
   async function markFromPill(options = {}) {
     const ctx = markPillContext;
@@ -966,7 +985,7 @@
     copy.addEventListener('pointerdown', stop);
     mark.addEventListener('click', async (event) => { stop(event); await deletePageClip(clipId); });
     note.addEventListener('click', async (event) => { stop(event); await openPageNoteEditor(clipId, host); });
-    copy.addEventListener('click', async (event) => { stop(event); await copyPageClip(clipId); });
+    copy.addEventListener('click', async (event) => { stop(event); await copyPageClip(clipId, copy); });
     actions.addEventListener('mouseenter', () => cancelHighlightActionHide(clipId));
     actions.addEventListener('mouseleave', () => scheduleHighlightActionHide(clipId));
     actions.append(mark, note, copy);
@@ -1431,7 +1450,7 @@
         }
       });
     });
-    copyBtn.addEventListener('click', (event) => { stop(event); void copyVideoMark(mark); });
+    copyBtn.addEventListener('click', (event) => { stop(event); void copyVideoMark(mark, copyBtn); });
     delBtn.addEventListener('click', async (event) => {
       stop(event);
       dismissMarkCreationFeedback(true);
@@ -1799,10 +1818,24 @@
     syncMarkCreationFeedback();
   }
 
-  async function copyVideoMark(mark) {
-    const payload = `${mark.title || t('untitled_video')} — ${formatVideoTime(mark.time)}${mark.note ? `\n\n${mark.note}` : ''}`;
-    await copyTextToClipboard(payload);
-    showPageToast(t('copied'));
+  function videoMarkSourceUrl(mark) {
+    const source = String(mark?.url || '').split('#')[0];
+    if (!source) return '';
+    const time = Math.max(0, Math.floor(Number(mark?.time) || 0));
+    try {
+      const url = new URL(source);
+      url.searchParams.set('t', String(time));
+      return url.href;
+    } catch (_) {
+      return `${source}${source.includes('?') ? '&' : '?'}t=${time}`;
+    }
+  }
+  async function copyVideoMark(mark, button) {
+    const payload = videoMarkSourceUrl(mark);
+    if (!payload) return;
+    if (await copyTextToClipboard(payload)) {
+      showCopyFeedback(button);
+    }
   }
   // Hovering a video mark reveals the same style of action row as the
   // highlights: note / copy / delete, with Font Awesome icons.
@@ -1856,7 +1889,7 @@
         }
       });
     });
-    copyBtn.addEventListener('click', (event) => { stop(event); void copyVideoMark(mark); });
+    copyBtn.addEventListener('click', (event) => { stop(event); void copyVideoMark(mark, copyBtn); });
     delBtn.addEventListener('click', async (event) => {
       stop(event);
       await ReMarkStorage.deleteVideoMark(mark.id);

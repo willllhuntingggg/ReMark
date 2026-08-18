@@ -149,6 +149,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   settingsBackButton.addEventListener('click', showTimeline);
   const sameUrl = (a, b) => String(a || '').split('#')[0] === String(b || '').split('#')[0];
   const videoKeyFromUrl = (value) => { try { const url = new URL(value); const host = url.hostname.replace(/^www\./, ''); if (host.endsWith('youtube.com') || host === 'youtu.be') { const v = url.searchParams.get('v'); if (v) return v; const match = url.pathname.match(/\/(?:shorts|embed|e|live)\/([\w-]{6,})/) || url.pathname.match(/^\/([\w-]{6,})/); return match ? match[1] : ''; } if (host.endsWith('bilibili.com')) { const match = url.pathname.match(/\/video\/(BV[a-zA-Z0-9]+)/i); if (!match) return ''; const p = url.searchParams.get('p'); return p ? match[1] + '?p=' + p : match[1]; } } catch (_) {} return ''; };
+  const videoMarkSourceUrl = (item) => {
+    const source = String(item?.url || '').split('#')[0];
+    if (!source) return '';
+    const time = Math.max(0, Math.floor(Number(item?.time) || 0));
+    try {
+      const url = new URL(source);
+      url.searchParams.set('t', String(time));
+      return url.href;
+    } catch (_) {
+      return `${source}${source.includes('?') ? '&' : '?'}t=${time}`;
+    }
+  };
   const sameVideoTab = (item, tabUrl) => Boolean(item.raw?.videoKey) && item.raw.videoKey === videoKeyFromUrl(tabUrl);
   const host = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } };
   const faviconUrl = (value) => {
@@ -180,6 +192,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const createdTime = (value) => new Intl.DateTimeFormat(dateLocale(), { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
   const itemFor = (key) => all().find((item) => item.key === key);
   const cardFor = (key) => list.querySelector(`.mark-card[data-key="${CSS.escape(key)}"]`);
+  // Font Awesome Free 6.7.2 — fa-copy / fa-check (CC BY 4.0, Fonticons Inc.).
+  const COPY_BTN_ICON = '<svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M208 0H332.1c12.7 0 24.9 5.1 33.9 14.1l67.9 67.9c9 9 14.1 21.2 14.1 33.9V336c0 26.5-21.5 48-48 48H208c-26.5 0-48-21.5-48-48V48c0-26.5 21.5-48 48-48zM48 128h80v64H64V448H256V416h64v48c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V176c0-26.5 21.5-48 48-48z"/></svg>';
+  const COPIED_BTN_ICON = '<svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M438.6 105.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0l-96-96c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0L224 274.7l169.4-169.3c12.5-12.5 32.8-12.5 45.3 0z"/></svg>';
 
   function all() {
     return [
@@ -214,6 +229,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (a.position !== null) return -1;
         if (b.position !== null) return 1;
         return a.createdAt - b.createdAt;
+      }
+      return a.createdAt - b.createdAt;
+    });
+  }
+  function sourceRowsFor(url) {
+    return all().filter((item) => sameUrl(item.url, url)).sort((a, b) => {
+      if (a.type === 'video' && b.type === 'video') return a.time - b.time;
+      if (a.type === 'highlight' && b.type === 'highlight') {
+        if (a.position !== null && b.position !== null) {
+          if (a.position !== b.position) return a.position - b.position;
+          return (a.posX ?? 0) - (b.posX ?? 0);
+        }
+        if (a.position !== null) return -1;
+        if (b.position !== null) return 1;
       }
       return a.createdAt - b.createdAt;
     });
@@ -287,7 +316,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     search.placeholder = t('search_placeholder');
     if (inSource) {
       subtitle.textContent = t('source_marks');
-      const sourceRows = all().filter((item) => sameUrl(item.url, sourceUrl));
+      const sourceRows = sourceRowsFor(sourceUrl);
       const sourceTitle = sourceRows[0]?.title || t('source_collection');
       const sourceIcon = sourceIconHtml(sourceUrl, 'source-collection-favicon', 'source-collection-fallback');
       context.hidden = false;
@@ -298,7 +327,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         '<div class="source-collection-source-row">',
         sourceIcon,
         `<span class="source-collection-url" title="${esc(sourceUrl)}">${esc(host(sourceUrl) || sourceUrl)}</span>`,
-        `<span>${esc(count === 1 ? t('one_mark') : t('marks_count', { count }))}</span>`,
+        `<span class="source-collection-meta"><span>${esc(count === 1 ? t('one_mark') : t('marks_count', { count }))}</span><button class="source-collection-copy" data-action="copy-source-markdown" type="button" aria-label="${esc(t('copy_source_markdown'))}" title="${esc(t('copy_source_markdown'))}">${COPY_BTN_ICON}</button></span>`,
         '</div>',
         '</div>'
       ].join('');
@@ -407,26 +436,73 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
   async function deleteMark(key) { await deleteMarks([key]); }
-  async function copyMark(key) {
+  async function copyMark(key, button) {
     const item = itemFor(key);
     if (!item) return;
-    const text = item.type === 'video'
-      ? `${item.title || t('untitled_video')} — ${clock(item.time)}`
-      : `“${item.text}”`;
-    const payload = item.note ? `${text}\n\n${item.note}` : text;
+    const payload = item.type === 'video'
+      ? videoMarkSourceUrl(item)
+      : (item.note ? `“${item.text}”\n\n${item.note}` : `“${item.text}”`);
+    if (!payload) return;
+    if (await copyText(payload)) {
+      showCopyFeedback(button);
+    }
+  }
+  async function copyText(value) {
     try {
-      await navigator.clipboard.writeText(payload);
+      await navigator.clipboard.writeText(value);
+      return true;
     } catch (_) {
       const area = document.createElement('textarea');
-      area.value = payload;
+      area.value = value;
       area.style.position = 'fixed';
       area.style.opacity = '0';
       document.body.appendChild(area);
       area.select();
-      try { document.execCommand('copy'); } catch (_) {}
-      area.remove();
+      try { return document.execCommand('copy'); } catch (_) { return false; } finally { area.remove(); }
     }
-    showToast(t('copied'));
+  }
+  function showCopyFeedback(button) {
+    if (!button) return;
+    if (!button.__remarkCopyFeedback) {
+      button.__remarkCopyFeedback = { html: button.innerHTML };
+    }
+    clearTimeout(button.__remarkCopyFeedbackTimer);
+    button.innerHTML = COPIED_BTN_ICON;
+    button.classList.add('copy-success');
+    button.__remarkCopyFeedbackTimer = setTimeout(() => {
+      const original = button.__remarkCopyFeedback;
+      if (!original) return;
+      button.innerHTML = original.html;
+      button.classList.remove('copy-success');
+      button.__remarkCopyFeedback = null;
+    }, 1200);
+  }
+  function quoteMarkdown(value) {
+    return String(value || '').trim().split('\n').map((line) => `> ${line}`).join('\n');
+  }
+  function sourceMarkdown(rows, url) {
+    if (!rows.length) return '';
+    const title = rows[0].title || t('source_collection');
+    const entries = rows.map((item, index) => {
+      if (item.type === 'video') {
+        const detail = item.caption?.text || item.chapter?.text || item.title || t('untitled_video');
+        const sourceUrl = videoMarkSourceUrl(item);
+        const source = sourceUrl ? `\n\n<${sourceUrl}>` : '';
+        const note = item.note ? `\n\n**${t('add_note')}:** ${item.note}` : '';
+        return `## ${index + 1}. ${clock(item.time)}${source}\n\n${detail}${note}`;
+      }
+      const note = item.note ? `\n\n**${t('add_note')}:** ${item.note}` : '';
+      return `## ${index + 1}\n\n${quoteMarkdown(item.text)}${note}`;
+    });
+    return `# ${title}\n\n<${url}>\n\n${entries.join('\n\n---\n\n')}`;
+  }
+  async function copySourceMarkdown(button) {
+    if (sourceUrl === null) return;
+    const markdown = sourceMarkdown(sourceRowsFor(sourceUrl), sourceUrl);
+    if (!markdown) return;
+    if (await copyText(markdown)) {
+      showCopyFeedback(button);
+    }
   }
 
   // Lightweight toast: reversible actions stay quiet and auto-dismiss.
@@ -579,7 +655,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       showToast(t('source_unavailable'));
       return;
     }
-    if (pageUrl) window.open(item.type === 'video' ? `${item.url}${item.url.includes('?') ? '&' : '?'}t=${Math.floor(item.time)}` : pageUrl, '_blank');
+    if (pageUrl) window.open(item.type === 'video' ? videoMarkSourceUrl(item) : pageUrl, '_blank');
   }
 
   function isGlyphHit(event, element) { const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT); let node; while ((node = walker.nextNode())) { if (!node.nodeValue.trim()) continue; const range = document.createRange(); range.selectNodeContents(node); for (const rect of range.getClientRects()) { if (event.clientX >= rect.left - 1 && event.clientX <= rect.right + 1 && event.clientY >= rect.top - 1 && event.clientY <= rect.bottom + 1) return true; } } return false; }
@@ -613,12 +689,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (action === 'source') { sourceUrl = url || ''; clearSelection(); render(); syncSourcePositions(sourceUrl); return; }
     if (action === 'unmark') void deleteMark(key);
     if (action === 'note') { setSelection([key], key); setActive(key); openNote(key); }
-    if (action === 'copy') void copyMark(key);
+    if (action === 'copy') void copyMark(key, control);
     if (action === 'menu') {
       setSelection([key], key);
       setActive(key);
       openMarkMenu(control.parentElement.querySelector('.mark-menu'));
     }
+  });
+  context.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-action="copy-source-markdown"]');
+    if (button) void copySourceMarkdown(button);
   });
   // Clicking a card establishes an anchor. Shift + click extends a continuous
   // range in the current visible order; Cmd/Ctrl + click toggles individual cards.

@@ -146,6 +146,12 @@ mark.remark-highlight-mark {
 .remark-mark-action--mark.remark-mark-action--marked:focus-visible {
   background: rgb(255, 233, 106);
 }
+
+.remark-mark-action.remark-copy-success {
+  background: rgb(241, 222, 117);
+  color: rgb(82, 64, 18);
+}
+
 .remark-mark-action svg { height: 1em; width: auto; fill: currentColor; pointer-events: none; }
 .remark-mark-action::after {
   content: attr(data-hint);

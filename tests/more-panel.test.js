@@ -41,8 +41,9 @@ assert.match(script, /<footer class="mark-footer"><time class="mark-created"[\s\
 assert.doesNotMatch(html, /class="search-icon"/);
 assert.doesNotMatch(html, /class="search-kbd"/);
 assert.match(script, /search\.placeholder = t\('search_placeholder'\)/);
-assert.match(script, /if \(inSource\) \{\s+subtitle\.textContent = t\('source_marks'\)/);
-assert.match(i18n, /timeline: 'Your Mark Timeline'/);
-assert.match(i18n, /source_marks: 'Source Marks'/);
+assert.match(script, /if \(inSource\) \{[\s\S]*setViewTitle\(t\('source_marks'\), sourceRows\.length\)/);
+assert.doesNotMatch(html, /id="view-count"/);
+assert.match(i18n, /timeline: 'Timeline'/);
+assert.match(i18n, /source_marks: 'Collection'/);
 assert.match(i18n, /search_placeholder: 'Search Marks, notes, sources, or timestamps'/);
 console.log('more-panel.test.js: all assertions passed');

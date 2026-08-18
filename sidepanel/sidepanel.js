@@ -17,6 +17,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const settingsPanel = $('#panel-settings');
   const viewIdentity = $('.view-identity');
   const appContainer = $('.app-container');
+  const selectionTray = $('#selection-tray');
+  const selectionBadge = $('#selection-badge');
+  const selectionHintPoint = $('#selection-hint-point');
+  const selectionHintRange = $('#selection-hint-range');
+  const selectionExportButton = $('#selection-export-markdown');
+  const selectionCopyButton = $('#selection-copy-markdown');
+  const selectionClearButton = $('#selection-clear');
   const feedbackOpenButton = $('#feedback-open');
   const feedbackModal = $('#feedback-modal');
   const feedbackForm = $('#feedback-form');
@@ -41,6 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     settingsOpenButton.hidden = true;
     appContainer.classList.add('is-more-open');
     viewIdentity.hidden = true;
+    updateSelectionTray([]);
   }
 
   function showTimeline() {
@@ -384,6 +392,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     const locale = ReMarkI18n.locale === 'zh' ? 'zh-CN' : 'en-US';
     return new Intl.DateTimeFormat(locale, { month: 'long', day: 'numeric' }).format(date);
   }
+  function setViewTitle(label, count) {
+    subtitle.textContent = `${label} (${t(count === 1 ? 'one_mark' : 'marks_count', { count })})`;
+  }
+  function isMacPlatform() {
+    const platform = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent || '';
+    return /mac|iphone|ipad|ipod/i.test(platform);
+  }
+  function selectedVisibleRows(rows = visible()) {
+    return rows.filter((item) => selectedKeys.has(item.key));
+  }
+  function updateSelectionTray(rows = selectedVisibleRows()) {
+    const count = rows.length;
+    selectionTray.hidden = count === 0;
+    appContainer.classList.toggle('has-selection-tray', count > 0);
+    if (!count) return;
+    selectionBadge.textContent = String(count);
+    selectionTray.setAttribute('aria-label', t('selected_marks_count', { count }));
+    const pointHint = t(isMacPlatform() ? 'selection_hint_point_mac' : 'selection_hint_point_ctrl');
+    const rangeHint = t('selection_hint_range');
+    selectionHintPoint.textContent = pointHint;
+    selectionHintPoint.title = pointHint;
+    selectionHintRange.textContent = rangeHint;
+    selectionHintRange.title = rangeHint;
+  }
+  function selectedMarkdown(rows) {
+    const entries = rows.map((item, index) => {
+      const note = item.note ? `\n\n**${t('add_note')}:** ${item.note}` : '';
+      if (item.type === 'video') {
+        const detail = item.caption?.text || item.chapter?.text || item.title || t('untitled_video');
+        const source = videoMarkSourceUrl(item);
+        return `## ${index + 1}. ${clock(item.time)}\n\n<${source}>\n\n${detail}${note}`;
+      }
+      const source = item.url ? `\n\n<${item.url}>` : '';
+      return `## ${index + 1}. ${item.title || t('untitled_page')}${source}\n\n${quoteMarkdown(item.text)}${note}`;
+    });
+    return `# ReMark\n\n${entries.join('\n\n---\n\n')}`;
+  }
+  function exportSelectedMarkdown() {
+    const rows = selectedVisibleRows();
+    if (!rows.length) return;
+    const now = new Date();
+    const stamp = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+    const blob = new Blob([selectedMarkdown(rows)], { type: 'text/markdown;charset=utf-8' });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = `remark-marks-${stamp}.md`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(href), 0);
+  }
+  async function copySelectedMarkdown() {
+    const rows = selectedVisibleRows();
+    if (!rows.length) return;
+    if (await copyText(selectedMarkdown(rows))) showCopyFeedback(selectionCopyButton);
+  }
 
   function markHtml(item, index = 0) {
     const jumpTitle = item.type === 'video'
@@ -440,30 +505,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     appContainer.classList.toggle('is-source-view', inSource);
     search.placeholder = t('search_placeholder');
     if (inSource) {
-      subtitle.textContent = t('source_marks');
       const sourceRows = sourceRowsFor(sourceUrl);
+      setViewTitle(t('source_marks'), sourceRows.length);
       const sourceTitle = sourceRows[0]?.title || t('source_collection');
       const sourceIcon = sourceIconHtml(sourceUrl, 'source-collection-favicon', 'source-collection-fallback');
       context.hidden = false;
-      const count = sourceRows.length;
       context.innerHTML = [
         '<div class="source-collection-summary">',
         `<strong class="source-collection-page-title" title="${esc(sourceTitle)}">${esc(sourceTitle)}</strong>`,
         '<div class="source-collection-source-row">',
         sourceIcon,
         `<span class="source-collection-url" title="${esc(sourceUrl)}">${esc(host(sourceUrl) || sourceUrl)}</span>`,
-        `<span class="source-collection-meta"><span>${esc(count === 1 ? t('one_mark') : t('marks_count', { count }))}</span><button class="source-collection-copy" data-action="copy-source-markdown" type="button" aria-label="${esc(t('copy_source_markdown'))}" title="${esc(t('copy_source_markdown'))}">${COPY_BTN_ICON}</button></span>`,
         '</div>',
         '</div>'
       ].join('');
     } else if (query) {
       subtitle.hidden = false;
-      subtitle.textContent = t('timeline');
+      setViewTitle(t('timeline'), all().length);
       context.hidden = true;
       context.innerHTML = '';
     } else {
       subtitle.hidden = false;
-      subtitle.textContent = t('timeline');
+      setViewTitle(t('timeline'), all().length);
       context.hidden = true;
       context.innerHTML = '';
     }
@@ -497,6 +560,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       heading.textContent = t('no_marks_title');
       description.textContent = t('no_marks_description');
     }
+    updateSelectionTray();
   }
   async function load(animated) {
     [clips, videos] = await Promise.all([ReMarkStorage.getClips(), ReMarkStorage.getVideoMarks()]);
@@ -535,9 +599,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
   }
+  function adjacentKeyAfterDelete(keys) {
+    if (!selected || !keys.has(selected)) return null;
+    const rows = visible();
+    const activeIndex = rows.findIndex((item) => item.key === selected);
+    if (activeIndex === -1) return null;
+    for (let index = activeIndex + 1; index < rows.length; index += 1) {
+      if (!keys.has(rows[index].key)) return rows[index].key;
+    }
+    for (let index = activeIndex - 1; index >= 0; index -= 1) {
+      if (!keys.has(rows[index].key)) return rows[index].key;
+    }
+    return null;
+  }
   async function deleteMarks(keys = selectedKeys) {
     const items = [...keys].map(itemFor).filter(Boolean);
     if (!items.length) return;
+    const deletedKeys = new Set(items.map((item) => item.key));
+    const adjacentKey = adjacentKeyAfterDelete(deletedKeys);
     const highlights = items.filter((item) => item.type === 'highlight');
     const videoMarks = items.filter((item) => item.type === 'video');
     if (highlights.length) await ReMarkStorage.deleteClips(highlights.map((item) => item.id));
@@ -548,7 +627,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       videoMarks: videoMarks.map((item) => item.raw)
     });
     await Promise.all(highlights.map((item) => notifySourceTabs(item, { action: 'DELETE_CLIP_FROM_PAGE', clipId: item.id })));
-    clearSelection();
+    if (adjacentKey) {
+      selected = adjacentKey;
+      selectedKeys = new Set([adjacentKey]);
+      selectionAnchor = adjacentKey;
+    } else {
+      clearSelection();
+    }
     await load();
     showToast(t('marks_deleted', { count: items.length }), {
       label: t('undo'),
@@ -695,6 +780,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     list.querySelectorAll('.mark-card:not(.mark-selected)').forEach((card) => card.setAttribute('aria-selected', 'false'));
     list.classList.toggle('has-multiple-selection', selectedKeys.size > 1);
+    updateSelectionTray();
   }
   function clearSelection() {
     selectedKeys = new Set();
@@ -703,6 +789,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     list.querySelectorAll('.mark-selected, .mark-active').forEach((node) => node.classList.remove('mark-selected', 'mark-active'));
     list.querySelectorAll('.mark-card').forEach((card) => card.setAttribute('aria-selected', 'false'));
     list.classList.remove('has-multiple-selection');
+    updateSelectionTray([]);
   }
   function clearNativeTextSelection() {
     const nativeSelection = window.getSelection?.();
@@ -821,10 +908,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       openMarkMenu(control.parentElement.querySelector('.mark-menu'));
     }
   });
-  context.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-action="copy-source-markdown"]');
-    if (button) void copySourceMarkdown(button);
-  });
   // Clicking a card establishes an anchor. Shift + click extends a continuous
   // range in the current visible order; Cmd/Ctrl + click toggles individual cards.
   list.addEventListener('click', (event) => {
@@ -844,7 +927,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   list.addEventListener('focusout', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) setTimeout(() => { if (!input.closest('.mark-note-area')?.contains(document.activeElement)) void saveNote(input.dataset.key, input.value); }, 0); });
   list.addEventListener('focusin', (event) => { const card = event.target.closest('.mark-card'); if (keyboardFocus && card) { setSelection([card.dataset.key], card.dataset.key); setActive(card.dataset.key); } });
   list.addEventListener('focusout', (event) => { const card = event.target.closest('.mark-card'); if (!card) return; setTimeout(() => { if (!card.contains(document.activeElement)) clearActive(card.dataset.key); }, 0); });
-  document.addEventListener('pointerdown', (event) => { keyboardFocus = false; if (!event.target.closest('.mark-card')) clearSelection(); });
+  selectionExportButton.addEventListener('click', exportSelectedMarkdown);
+  selectionCopyButton.addEventListener('click', () => { void copySelectedMarkdown(); });
+  selectionClearButton.addEventListener('click', clearSelection);
+  document.addEventListener('pointerdown', (event) => { keyboardFocus = false; if (!event.target.closest('.mark-card, .selection-tray')) clearSelection(); });
   document.addEventListener('click', (event) => { if (!event.target.closest('.mark-actions')) document.querySelectorAll('.mark-menu:not([hidden])').forEach((node) => { node.hidden = true; }); });
   back.addEventListener('click', () => { sourceUrl = null; clearSelection(); render(true); });
   function clearSearch() { search.value = ''; query = ''; clear.hidden = true; render(); }

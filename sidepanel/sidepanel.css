@@ -611,9 +611,9 @@ button {
   background: transparent;
   color: var(--ink);
   font: inherit;
-  font-size: 13.5px;
-  font-weight: 440;
-  line-height: 1.66;
+  font-size: 14px;
+  font-weight: 480;
+  line-height: 1.58;
   text-align: left;
   cursor: default;
 }
@@ -695,8 +695,8 @@ button {
   align-items: baseline;
   gap: 6px;
   color: var(--ink);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .video-timestamp {
@@ -782,27 +782,13 @@ button {
   border: 0;
   background: transparent;
   color: var(--ink-2);
-  font: inherit;
-  font-size: 12px;
-  line-height: 1.6;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.55;
   text-align: left;
   cursor: text;
   transition: color .15s ease;
-}
-
-.mark-note-glyph {
-  flex: 0 0 auto;
-  width: 11px;
-  height: 11px;
-  margin-top: 2px;
-  color: var(--ink-3);
-}
-
-.mark-note-arrow {
-  flex: 0 0 auto;
-  color: var(--ink-4);
-  font-size: 11.5px;
-  line-height: 1.7;
 }
 
 .mark-note-text {
@@ -884,8 +870,9 @@ button {
   border: 0;
   background: transparent;
   color: var(--ink-4);
-  font: inherit;
-  font-size: 10px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 400;
   line-height: 1.35;
   text-align: left;
   text-overflow: ellipsis;
@@ -926,9 +913,10 @@ button {
 
 .mark-created {
   flex: 0 0 auto;
-  width: 4.25rem;
+  margin-left: auto;
   color: var(--ink-4);
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -985,8 +973,9 @@ button {
 
 .mark-more {
   padding: 3px 7px;
-  font-size: 13px;
-  letter-spacing: .06em;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: .02em;
   line-height: 1;
 }
 
@@ -1763,3 +1752,21 @@ button {
 }
 .mark-source { display: inline-flex; align-items: center; gap: 5px; }
 .mark-source-favicon { display: block; flex: 0 0 auto; width: 13px; height: 13px; border-radius: 3px; object-fit: contain; }
+
+.view-subtitle .view-title-count {
+  color: var(--ink-4);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.source-collection-source-row {
+  justify-content: flex-start;
+  width: 100%;
+  text-align: left;
+}
+
+.source-collection-source-row > span.source-collection-url:last-child {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: 0;
+}

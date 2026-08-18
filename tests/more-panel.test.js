@@ -37,7 +37,7 @@ assert.doesNotMatch(sourceView, /subtitle\.textContent = title/);
 assert.match(script, /viewIdentity\.hidden = false/);
 assert.match(script, /settingsOpenButton\.hidden = inSource/);
 assert.match(script, /const sourceControl = sourceUrl === null/);
-assert.match(script, /<footer class="mark-footer"><time class="mark-created"[\s\S]*\$\{sourceControl\}/);
+assert.match(script, /<footer class="mark-footer">\$\{sourceControl \|\| '<span class="mark-source-slot"><\/span>'\}<time class="mark-created"/);
 assert.doesNotMatch(html, /class="search-icon"/);
 assert.doesNotMatch(html, /class="search-kbd"/);
 assert.match(script, /search\.placeholder = t\('search_placeholder'\)/);

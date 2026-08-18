@@ -80,7 +80,7 @@ assert.match(sidepanel, /function render\(animated = false\)[\s\S]*updateSelecti
 assert.match(sidepanel, /function selectedMarkdown\(rows\)[\s\S]*videoMarkSourceUrl\(item\)[\s\S]*quoteMarkdown\(item\.text\)/);
 assert.match(sidepanel, /function exportSelectedMarkdown\(\)[\s\S]*new Blob\([\s\S]*text\/markdown[\s\S]*link\.download = `remark-marks-/);
 assert.match(sidepanel, /selectionExportButton\.addEventListener\('click', exportSelectedMarkdown\)/);
-assert.match(sidepanel, /function setViewTitle\(label, count\)[\s\S]*subtitle\.textContent = `\$\{label\} \(\$\{t\(count === 1 \? 'one_mark' : 'marks_count', \{ count \}\)\}\)`/);
+assert.match(sidepanel, /function setViewTitle\(label, count\)[\s\S]*subtitle\.innerHTML = `\$\{esc\(label\)\} <span class="view-title-count">\(\$\{esc\(countLabel\)\}\)<\/span>`/);
 assert.match(sidepanel, /setViewTitle\(t\('source_marks'\), sourceRows\.length\)/);
 assert.match(sidepanel, /setViewTitle\(t\('timeline'\), all\(\)\.length\)/);
 assert.match(sidepanel, /async function copySelectedMarkdown\(\)[\s\S]*copyText\(selectedMarkdown\(rows\)\)[\s\S]*showCopyFeedback\(selectionCopyButton\)/);
@@ -113,7 +113,14 @@ assert.match(read('sidepanel/sidepanel.css'), /\.feed-day-heading \{[\s\S]*posit
 assert.match(read('sidepanel/sidepanel.css'), /\.controls-bar \{[\s\S]*z-index: 10;[\s\S]*background: var\(--bg\);/);
 assert.match(read('sidepanel/sidepanel.css'), /\.selection-tray \{[\s\S]*position: fixed;/);
 assert.doesNotMatch(read('sidepanel/sidepanel.css'), /\.view-count \{/);
+assert.match(read('sidepanel/sidepanel.css'), /\.view-subtitle \.view-title-count \{[\s\S]*color: var\(--ink-4\);[\s\S]*font-weight: 400;/);
+assert.match(read('sidepanel/sidepanel.css'), /\.source-collection-source-row \{[\s\S]*justify-content: flex-start;[\s\S]*width: 100%;[\s\S]*text-align: left;/);
 assert.match(read('sidepanel/sidepanel.css'), /\.selection-badge \{[\s\S]*position: absolute;/);
 assert.match(read('sidepanel/sidepanel.css'), /\.selection-tray-hint \{[\s\S]*text-overflow: ellipsis;/);
+assert.match(read('sidepanel/sidepanel.css'), /\.mark-content-text \{[\s\S]*font-size: 14px;[\s\S]*font-weight: 480;/);
+assert.match(read('sidepanel/sidepanel.css'), /\.mark-note \{[\s\S]*font-size: 13px;[\s\S]*font-weight: 400;/);
+assert.match(read('sidepanel/sidepanel.css'), /\.mark-source \{[\s\S]*font-size: 11\.5px;[\s\S]*font-weight: 400;/);
+assert.match(read('sidepanel/sidepanel.css'), /\.mark-created \{[\s\S]*margin-left: auto;[\s\S]*font-size: 11px;[\s\S]*font-weight: 400;/);
+assert.match(read('sidepanel/sidepanel.css'), /\.mark-more \{[\s\S]*font-size: 16px;[\s\S]*font-weight: 400;/);
 assert.match(read('content/content.css'), /remark-mark-actions\.is-visible/);
 console.log('page-highlight-actions assertions passed');

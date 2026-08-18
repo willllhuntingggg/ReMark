@@ -124,3 +124,12 @@
 - [ ] 将 Timeline 标题改为 `Timeline (n Marks)` 格式。
 - [ ] 将 Collection 标题改为 `Collection (n Marks)` 格式，并移除独立数字角标。
 - [ ] 覆盖页头括号数量标题及中英文文案回归测试。
+- [ ] 检查 Mark 卡片 Source、时间、正文、笔记与更多按钮的当前 DOM 和样式。
+- [ ] 将卡片底部调整为 Source 标题左、时间右的顺序。
+- [ ] 按指定的字号、字重和视觉强度微调正文、笔记、Source、时间与更多按钮。
+- [ ] 覆盖卡片信息顺序与样式层级的回归测试。
+- [ ] 弱化 Timeline 与 Collection 标题中括号 Mark 计数的视觉强度。
+- [ ] 将 Collection 页面 favicon 与域名整体固定在左侧对齐。
+- [ ] 覆盖页头计数层级和 Collection 来源行对齐的回归测试。
+- [ ] 移除 Mark 卡片 Note 文本前的 `↳` 引导箭头及其遗留样式。
+- [ ] 覆盖 Note 文本无引导符时的渲染回归测试。

@@ -31,7 +31,7 @@ assert.match(script, /const source = item\.title \|\| host\(item\.url\) \|\| ite
 assert.match(script, /mark-source-arrow/);
 assert.match(script, /<div class="mark-card-tools"><div class="mark-actions">/);
 assert.match(script, /<div class="mark-content">[\s\S]*<div class="mark-card-tools">/);
-assert.match(script, /<footer class="mark-footer"><time class="mark-created"[\s\S]*\$\{sourceControl\}<\/footer>/);
+assert.match(script, /<footer class="mark-footer">\$\{sourceControl \|\| '<span class="mark-source-slot"><\/span>'\}<time class="mark-created"/);
 assert.match(css, /\.mark-source:hover \.mark-source-arrow,[\s\S]*opacity: 1;/);
 assert.match(css, /\.mark-card-tools \{[\s\S]*position: absolute;/);
 assert.match(css, /\.mark-card \{[\s\S]*width: calc\(100% \+ 36px\);[\s\S]*margin: 0 -18px;/);

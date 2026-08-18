@@ -393,7 +393,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     return new Intl.DateTimeFormat(locale, { month: 'long', day: 'numeric' }).format(date);
   }
   function setViewTitle(label, count) {
-    subtitle.textContent = `${label} (${t(count === 1 ? 'one_mark' : 'marks_count', { count })})`;
+    const countLabel = t(count === 1 ? 'one_mark' : 'marks_count', { count });
+    subtitle.innerHTML = `${esc(label)} <span class="view-title-count">(${esc(countLabel)})</span>`;
   }
   function isMacPlatform() {
     const platform = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent || '';
@@ -459,7 +460,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         + (item.duration ? `<span class="video-duration"> / ${clock(item.duration)}</span>` : '')
       : esc(item.text);
     const note = item.note
-      ? `<button class="mark-note" data-action="note" data-key="${esc(item.key)}" type="button"><span class="mark-note-arrow" aria-hidden="true">↳</span><span class="mark-note-text">${esc(item.note)}</span></button>`
+      ? `<button class="mark-note" data-action="note" data-key="${esc(item.key)}" type="button"><span class="mark-note-text">${esc(item.note)}</span></button>`
       : '';
     const caption = item.type === 'video' && item.caption?.text
       ? `<div class="mark-caption mark-caption--caption"><span class="mark-caption-label">${esc(t('video_caption'))}</span><span class="mark-caption-text">${esc(item.caption.text)}</span>${Number.isFinite(Number(item.caption.from)) ? `<span class="mark-caption-time">${clock(item.caption.from)}${Number.isFinite(Number(item.caption.to)) ? '–' + clock(item.caption.to) : ''}</span>` : ''}</div>`
@@ -492,7 +493,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       `<div class="mark-menu" hidden>${menu}</div></div></div></div>`,
       caption + chapter,
       `<div class="mark-note-area">${note}${editor}</div>`,
-      `<footer class="mark-footer"><time class="mark-created" datetime="${new Date(item.createdAt).toISOString()}" title="${esc(fullDate(item.createdAt))}">${esc(createdTime(item.createdAt))}</time>${sourceControl}</footer></article>`
+      `<footer class="mark-footer">${sourceControl || '<span class="mark-source-slot"></span>'}<time class="mark-created" datetime="${new Date(item.createdAt).toISOString()}" title="${esc(fullDate(item.createdAt))}">${esc(createdTime(item.createdAt))}</time></footer></article>`
     ].join('');
   }
   function render(animated = false) {

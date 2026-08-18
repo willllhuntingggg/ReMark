@@ -7,6 +7,9 @@ const css = fs.readFileSync(path.resolve(__dirname, '../sidepanel/sidepanel.css'
 
 assert.doesNotMatch(script, /mark-note-empty/);
 assert.doesNotMatch(css, /mark-note-empty/);
+assert.doesNotMatch(script, /mark-note-arrow/);
+assert.doesNotMatch(css, /mark-note-arrow/);
+assert.doesNotMatch(css, /mark-note-glyph/);
 assert.match(script, /t\(item\.note \? 'edit_note' : 'add_note'\)/);
 assert.match(script, /event\.key === 'Enter' && event\.shiftKey/);
 assert.match(script, /event\.metaKey \|\| event\.ctrlKey/);

@@ -33,5 +33,13 @@ assert.match(source, /if \(linkedMark && isLinkedSource\) return;/);
 assert.match(sidepanel, /const isLinkedSource = item\.type === 'highlight' && item\.url && pageUrl && !sameUrl\(item\.url, pageUrl\);/);
 assert.match(sidepanel, /if \(isLinkedSource\) \{/);
 assert.match(sidepanel, /await chrome\.tabs\.create\(\{ url: item\.url, active: true \}\);/);
+assert.match(sidepanel, /Font Awesome Free 6\.7\.2 — fa-link/);
+assert.match(sidepanel, /const isLinkedSource = item\.type === 'highlight' && item\.url && item\.pageUrl && !sameUrl\(item\.url, item\.pageUrl\);/);
+assert.match(sidepanel, /class="mark-link-source"/);
+assert.match(sidepanel, /item\.type === 'highlight'[\s\S]*mark-quote--video/);
+
+const styles = fs.readFileSync(path.resolve(__dirname, '../sidepanel/sidepanel.css'), 'utf8');
+assert.match(styles, /\.mark-link-source \{/);
+assert.match(styles, /\.mark-link-source svg \{/);
 
 console.log('link-source-detection.test.js: all assertions passed');

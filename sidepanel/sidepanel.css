@@ -511,6 +511,27 @@ button {
   user-select: none;
 }
 
+/* Linked-source Marks replace the quote rail marker with a compact link glyph. */
+.mark-link-source {
+  position: absolute;
+  left: -25px;
+  top: 5px;
+  display: grid;
+  width: 13px;
+  height: 13px;
+  place-items: center;
+  color: var(--gold);
+  opacity: .72;
+  pointer-events: none;
+  user-select: none;
+}
+
+.mark-link-source svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 /* Video type marker: a Final-Cut marker — a small flag on a stem
    (keyframes are diamonds; markers are flags), in the mark-gold so the
    rail reads as one family. */

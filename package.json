@@ -8,7 +8,7 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "node tests/storage-backup.test.js && node tests/batch-mark-delete.test.js && node tests/i18n.test.js && node tests/mark-note-gesture.test.js && node tests/onboarding-tutorial.test.js && node tests/more-panel.test.js && node tests/cross-line-highlight.test.js && node tests/ai-block-highlight.test.js && node tests/sidebar-note-entry.test.js && node tests/source-favicon.test.js && node tests/page-sync.test.js && node tests/link-source-detection.test.js && node tests/source-markdown-export.test.js && node tests/video-copy-source-url.test.js",
+    "test": "node tests/storage-backup.test.js && node tests/batch-mark-delete.test.js && node tests/i18n.test.js && node tests/mark-note-gesture.test.js && node tests/onboarding-tutorial.test.js && node tests/more-panel.test.js && node tests/cross-line-highlight.test.js && node tests/ai-block-highlight.test.js && node tests/sidebar-note-entry.test.js && node tests/source-favicon.test.js && node tests/page-sync.test.js && node tests/link-source-detection.test.js && node tests/source-markdown-export.test.js && node tests/video-copy-source-url.test.js && node tests/feedback-mvp.test.js",
     "build:css": "tailwindcss -i sidepanel/tailwind.input.css -o sidepanel/tailwind.css --minify"
   },
   "repository": {

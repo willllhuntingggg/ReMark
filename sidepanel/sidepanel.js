@@ -17,6 +17,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   const settingsPanel = $('#panel-settings');
   const viewIdentity = $('.view-identity');
   const appContainer = $('.app-container');
+  const feedbackOpenButton = $('#feedback-open');
+  const feedbackModal = $('#feedback-modal');
+  const feedbackForm = $('#feedback-form');
+  const feedbackCloseButton = $('#feedback-close');
+  const feedbackType = $('#feedback-type');
+  const feedbackMessage = $('#feedback-message');
+  const feedbackStatus = $('#feedback-status');
+  const feedbackSubmitButton = $('#feedback-submit');
+  const feedbackActions = $('.feedback-actions', feedbackForm);
+  const feedbackFallback = $('#feedback-fallback');
+  const feedbackFallbackBody = $('#feedback-fallback-body');
+  const feedbackCopyEmailButton = $('#feedback-copy-email');
+  const FEEDBACK_RECIPIENT = 'xuzijian2222@gmail.com';
+  const GMAIL_COMPOSE_URL = 'https://mail.google.com/mail/u/0/';
   let showingSettings = false;
 
   function showSettings() {
@@ -130,7 +144,118 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  function setFeedbackStatus(message = '', isError = false) {
+    feedbackStatus.textContent = message;
+    feedbackStatus.hidden = !message;
+    feedbackStatus.classList.toggle('is-error', isError);
+  }
+
+  function openFeedback() {
+    setFeedbackStatus();
+    feedbackFallback.hidden = true;
+    feedbackActions.hidden = false;
+    feedbackModal.hidden = false;
+    window.setTimeout(() => feedbackMessage.focus(), 0);
+  }
+
+  function closeFeedback({ returnFocus = true } = {}) {
+    feedbackModal.hidden = true;
+    setFeedbackStatus();
+    feedbackFallback.hidden = true;
+    feedbackActions.hidden = false;
+    if (returnFocus) feedbackOpenButton.focus();
+  }
+
+  async function feedbackContext() {
+    let tab = null;
+    try {
+      [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    } catch (_) {}
+    const pageUrl = tab?.url || t('feedback_unavailable');
+    let domain = t('feedback_unavailable');
+    try { domain = new URL(pageUrl).hostname || domain; } catch (_) {}
+    return {
+      version: chrome.runtime.getManifest().version,
+      browser: navigator.userAgent,
+      language: navigator.language || t('feedback_unavailable'),
+      title: tab?.title || t('feedback_unavailable'),
+      domain,
+      pageUrl
+    };
+  }
+
+  function feedbackEmailDraft(type, message, context) {
+    const subject = `[ReMark] ${t('feedback_type')}: ${t(`feedback_type_${type}`)}`;
+    const body = [
+      `## ${t('feedback_message')}`,
+      '',
+      message,
+      '',
+      '---',
+      '',
+      `## ${t('feedback_context')}`,
+      '',
+      `- ${t('feedback_context_type')}: ${t(`feedback_type_${type}`)}`,
+      `- ${t('feedback_context_version')}: ${context.version}`,
+      `- ${t('feedback_context_browser')}: ${context.browser}`,
+      `- ${t('feedback_context_language')}: ${context.language}`,
+      `- ${t('feedback_context_title')}: ${context.title}`,
+      `- ${t('feedback_context_domain')}: ${context.domain}`,
+      `- ${t('feedback_context_url')}: ${context.pageUrl}`
+    ].join('\n');
+    return { subject, body };
+  }
+
+  function gmailComposeUrl(draft) {
+    const url = new URL(GMAIL_COMPOSE_URL);
+    url.searchParams.set('to', FEEDBACK_RECIPIENT);
+    url.searchParams.set('su', draft.subject);
+    url.searchParams.set('body', draft.body);
+    url.searchParams.set('tf', 'cm');
+    return url.href;
+  }
+
+  async function copyFeedbackEmail() {
+    const payload = [`To: ${FEEDBACK_RECIPIENT}`, '', feedbackFallbackBody.value].join('\n');
+    if (!await copyText(payload)) return;
+    const original = feedbackCopyEmailButton.textContent;
+    feedbackCopyEmailButton.textContent = t('feedback_copied');
+    window.setTimeout(() => { feedbackCopyEmailButton.textContent = original; }, 1200);
+  }
+
+  async function sendFeedback() {
+    const message = feedbackMessage.value.trim();
+    if (!message) {
+      setFeedbackStatus(t('feedback_required'), true);
+      feedbackMessage.focus();
+      return;
+    }
+    feedbackSubmitButton.disabled = true;
+    setFeedbackStatus(t('feedback_preparing'));
+    try {
+      const type = feedbackType.value;
+      const context = await feedbackContext();
+      const draft = feedbackEmailDraft(type, message, context);
+      feedbackFallbackBody.value = `Subject: ${draft.subject}\n\n${draft.body}`;
+      feedbackFallback.hidden = false;
+      feedbackActions.hidden = true;
+      window.requestAnimationFrame(() => feedbackFallback.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+      await chrome.tabs.create({ url: gmailComposeUrl(draft), active: true });
+      setFeedbackStatus(t('feedback_ready'));
+    } catch (error) {
+      console.warn('[ReMark] Gmail feedback compose could not be opened:', error);
+      setFeedbackStatus(t('feedback_open_failed'), true);
+    } finally {
+      feedbackSubmitButton.disabled = false;
+    }
+  }
+
   $('#replay-tutorial').addEventListener('click', () => { void replayTutorial(); });
+  feedbackOpenButton.addEventListener('click', openFeedback);
+  feedbackCloseButton.addEventListener('click', () => closeFeedback());
+  feedbackModal.addEventListener('click', (event) => { if (event.target === feedbackModal) closeFeedback(); });
+  feedbackForm.addEventListener('submit', (event) => { event.preventDefault(); void sendFeedback(); });
+  feedbackCopyEmailButton.addEventListener('click', () => { void copyFeedbackEmail(); });
   languageSetting.addEventListener('change', () => {
     const preference = languageSetting.value;
     void ReMarkStorage.updateSettings({ language: preference })
@@ -726,7 +851,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   search.addEventListener('input', () => { query = search.value; clear.hidden = !query; render(); });
   search.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.stopPropagation(); clearSearch(); } });
   clear.addEventListener('click', () => { clearSearch(); search.focus(); });
-  document.addEventListener('keydown', async (event) => { if (event.key === 'Tab' || event.key.startsWith('Arrow')) keyboardFocus = true; const editing = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable; if (!editing && event.key === 'ArrowDown') { event.preventDefault(); moveActive(1); return; } if (!editing && event.key === 'ArrowUp') { event.preventDefault(); moveActive(-1); return; } if (!editing && event.key === 'Enter' && event.shiftKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); openNote(selected); return; } if (!editing && (event.metaKey || event.ctrlKey) && event.key === 'Enter' && selected) { event.preventDefault(); openNote(selected); } else if (!editing && !event.isComposing && ['Delete','Backspace'].includes(event.key) && selectedKeys.size) { event.preventDefault(); await deleteMarks(); } else if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (await ReMarkStorage.undoLast()) await load(); } else if (!editing && event.key === 'Escape' && selectedKeys.size) { clearSelection(); } else if (!editing && event.key === '/') { event.preventDefault(); search.focus(); } else if (!editing && event.key === 'Escape' && showingSettings) { showTimeline(); } else if (!editing && event.key === 'Escape' && sourceUrl !== null) { sourceUrl = null; clearSelection(); render(true); } });
+  document.addEventListener('keydown', async (event) => { if (event.key === 'Tab' || event.key.startsWith('Arrow')) keyboardFocus = true; if (event.key === 'Escape' && !feedbackModal.hidden) { event.preventDefault(); closeFeedback(); return; } const editing = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable; if (!editing && event.key === 'ArrowDown') { event.preventDefault(); moveActive(1); return; } if (!editing && event.key === 'ArrowUp') { event.preventDefault(); moveActive(-1); return; } if (!editing && event.key === 'Enter' && event.shiftKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); openNote(selected); return; } if (!editing && (event.metaKey || event.ctrlKey) && event.key === 'Enter' && selected) { event.preventDefault(); openNote(selected); } else if (!editing && !event.isComposing && ['Delete','Backspace'].includes(event.key) && selectedKeys.size) { event.preventDefault(); await deleteMarks(); } else if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (await ReMarkStorage.undoLast()) await load(); } else if (!editing && event.key === 'Escape' && selectedKeys.size) { clearSelection(); } else if (!editing && event.key === '/') { event.preventDefault(); search.focus(); } else if (!editing && event.key === 'Escape' && showingSettings) { showTimeline(); } else if (!editing && event.key === 'Escape' && sourceUrl !== null) { sourceUrl = null; clearSelection(); render(true); } });
   globalThis.chrome?.runtime?.onMessage?.addListener((message) => {
     if (message?.action === 'REMARK_STORAGE_UPDATED') void load();
     if (message?.action === 'FOCUS_CLIP') focusFromSource(message.clipId || message.markId);

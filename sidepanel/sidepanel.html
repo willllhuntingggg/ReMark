@@ -104,9 +104,48 @@
             <span data-i18n="help_how_remark_works">How ReMark works</span>
             <small data-i18n="help_replay_tutorial">Replay the tutorial</small>
           </button>
+          <button id="feedback-open" class="help-action feedback-action" type="button">
+            <span data-i18n="feedback">Feedback</span>
+            <small data-i18n="feedback_description">Share a bug, idea, or other feedback</small>
+          </button>
         </section>
       </section>
     </main>
+  </div>
+  <div id="feedback-modal" class="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-title" hidden>
+    <form id="feedback-form" class="feedback-dialog" novalidate>
+      <div class="feedback-heading">
+        <div>
+          <h2 id="feedback-title" data-i18n="feedback">Feedback</h2>
+          <p data-i18n="feedback_intro">Tell us what could make ReMark better.</p>
+        </div>
+        <button id="feedback-close" class="feedback-close" type="button" data-i18n-aria-label="feedback_close" aria-label="Close feedback">✕</button>
+      </div>
+      <label class="feedback-field" for="feedback-type">
+        <span data-i18n="feedback_type">Feedback type</span>
+        <select id="feedback-type" class="feedback-select" required>
+          <option value="bug" data-i18n="feedback_type_bug">Bug</option>
+          <option value="feature" data-i18n="feedback_type_feature">Feature request</option>
+          <option value="other" data-i18n="feedback_type_other">Other</option>
+        </select>
+      </label>
+      <label class="feedback-field" for="feedback-message">
+        <span data-i18n="feedback_message">Tell us what happened…</span>
+        <textarea id="feedback-message" rows="5" required data-i18n-placeholder="feedback_placeholder" placeholder="Tell us what happened…"></textarea>
+      </label>
+      <p id="feedback-status" class="feedback-status" role="status" aria-live="polite" hidden></p>
+      <section id="feedback-fallback" class="feedback-fallback" hidden>
+        <p data-i18n="feedback_email_fallback">Your feedback email is ready. Open it in an email app or copy the content below to send from any email service.</p>
+        <div class="feedback-recipient"><span data-i18n="feedback_email_recipient">To</span><code id="feedback-recipient">xuzijian2222@gmail.com</code></div>
+        <textarea id="feedback-fallback-body" rows="7" readonly aria-label="Feedback email body"></textarea>
+        <div class="feedback-fallback-actions">
+          <button id="feedback-copy-email" class="feedback-copy-email" type="button" data-i18n="feedback_copy_email">Copy email content</button>
+        </div>
+      </section>
+      <div class="feedback-actions">
+        <button id="feedback-submit" class="feedback-submit" type="submit" data-i18n="feedback_send">Send feedback</button>
+      </div>
+    </form>
   </div>
   <div id="remark-toast-root" class="remark-toast-root" role="status" aria-live="polite"></div>
   <script src="../lib/i18n.js"></script>

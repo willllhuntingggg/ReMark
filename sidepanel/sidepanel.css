@@ -1363,6 +1363,238 @@ button {
   font-size: 11px;
 }
 
+.feedback-action {
+  margin-top: 8px;
+}
+
+/* Lightweight feedback dialog: a compact, in-panel form that opens a reviewable GitHub issue draft. */
+.feedback-modal {
+  position: fixed;
+  z-index: 220;
+  inset: 0;
+  display: grid;
+  place-items: start center;
+  padding: 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: rgba(25, 27, 31, .24);
+}
+
+.feedback-modal[hidden] {
+  display: none;
+}
+
+.feedback-dialog {
+  width: min(100%, 360px);
+  box-sizing: border-box;
+  max-height: calc(100vh - 28px);
+  max-height: calc(100dvh - 28px);
+  padding: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.feedback-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.feedback-heading h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.feedback-heading p {
+  margin: 3px 0 0;
+  color: var(--ink-3);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.feedback-close {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  place-items: center;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.feedback-close:hover,
+.feedback-close:focus-visible {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.feedback-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.feedback-field > span {
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+.feedback-select,
+.feedback-field textarea {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+}
+
+.feedback-select {
+  height: 32px;
+  padding: 0 9px;
+}
+
+.feedback-field textarea {
+  min-height: 96px;
+  padding: 9px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.feedback-select:focus-visible,
+.feedback-field textarea:focus-visible,
+.feedback-close:focus-visible {
+  outline: 2px solid rgba(38, 40, 45, .22);
+  outline-offset: 1px;
+}
+
+.feedback-status {
+  margin: 10px 0 0;
+  color: var(--ink-3);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.feedback-status.is-error {
+  color: var(--danger);
+}
+
+.feedback-fallback {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.feedback-fallback[hidden] {
+  display: none;
+}
+
+.feedback-fallback p,
+.feedback-recipient {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.feedback-recipient {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.feedback-recipient code {
+  color: var(--ink-2);
+  font-size: 11px;
+}
+
+.feedback-fallback textarea {
+  width: 100%;
+  min-height: 126px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font: 11px/1.45 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  resize: vertical;
+}
+
+.feedback-fallback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.feedback-copy-email {
+  min-height: 28px;
+  padding: 5px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.feedback-copy-email:hover,
+.feedback-copy-email:focus-visible {
+  border-color: var(--ink-3);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.feedback-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.feedback-actions[hidden] {
+  display: none;
+}
+
+.feedback-submit {
+  min-height: 32px;
+  padding: 7px 11px;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.feedback-submit:hover {
+  background: #1b1d21;
+  border-color: #1b1d21;
+}
+
+.feedback-submit:disabled {
+  cursor: wait;
+  opacity: .6;
+}
+
 /* ---------- Motion ---------- */
 
 @media (prefers-reduced-motion: reduce) {
@@ -1374,7 +1606,9 @@ button {
   .settings-trigger,
   .settings-back,
   .backup-action,
-  .help-action {
+  .help-action,
+  .feedback-close,
+  .feedback-submit {
     transition: none;
   }
 

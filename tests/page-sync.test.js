@@ -47,6 +47,10 @@ assert.match(content, /showMarkPill\(\{ text, range: range\.cloneRange\(\), sour
 assert.match(content, /remark-mark-pill/);
 assert.match(content, /t\('unmark'\)/);
 assert.match(content, /remark-mark-action--marked/);
+assert.match(content, /function textMarkShortcutHint\(\)[\s\S]*navigator\.userAgentData\?\.platform[\s\S]*text_mark_shortcut_mac[\s\S]*text_mark_shortcut_ctrl/);
+assert.match(content, /markBtn\.dataset\.hint = textMarkShortcutHint\(\)/);
+assert.match(content, /function onVideoMarkKeydown\(e\)[\s\S]*\(e\.key === 'm' \|\| e\.key === 'M'\)/);
+assert.doesNotMatch(content, /remark-video-mark-tip-shortcut|video_mark_shortcut/);
 assert.match(read('content/content.css'), /\.remark-mark-pill \{/);
 assert.match(content, /async function undoPageAction\(\)[\s\S]*ReMarkStorage\.get\(ReMarkStorage\.KEYS\.UNDO\)[\s\S]*ReMarkStorage\.undoLast\(\)/);
 assert.match(content, /action\.type === 'restore_clip'[\s\S]*removeClipHighlightFromDOM\(action\.id, \{ immediate: true \}\)/);
@@ -88,5 +92,6 @@ assert.match(content, /remark-mark-actions-anchor/);
 
 assert.match(content, /async function deletePageClip\(clipId\)[\s\S]*ReMarkStorage\.pushUndo/);
 assert.match(read('content/content.css'), /\.remark-mark-action::after \{[\s\S]*content: attr\(data-hint\)/);
+assert.doesNotMatch(read('content/content.css'), /\.remark-video-mark-tip-shortcut \{/);
 assert.match(read('content/content.css'), /remark-mark-actions\.is-visible/);
 console.log('page-highlight-actions assertions passed');

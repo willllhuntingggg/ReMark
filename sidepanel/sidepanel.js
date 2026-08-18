@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function all() {
     return [
-      ...clips.map((raw) => ({ id: raw.id, key: `h:${raw.id}`, type: 'highlight', raw, url: raw.url || '', title: raw.pageTitle || t('untitled_page'), text: raw.text || '', note: raw.note || '', createdAt: Number(raw.createdAt) || 0, position: Number.isFinite(Number(raw.sourcePosition)) ? Number(raw.sourcePosition) : null, posX: Number.isFinite(Number(raw.sourcePositionX)) ? Number(raw.sourcePositionX) : null })),
+      ...clips.map((raw) => ({ id: raw.id, key: `h:${raw.id}`, type: 'highlight', raw, url: raw.url || '', pageUrl: raw.pageUrl || raw.url || '', title: raw.pageTitle || t('untitled_page'), text: raw.text || '', note: raw.note || '', createdAt: Number(raw.createdAt) || 0, position: Number.isFinite(Number(raw.sourcePosition)) ? Number(raw.sourcePosition) : null, posX: Number.isFinite(Number(raw.sourcePositionX)) ? Number(raw.sourcePositionX) : null })),
       ...videos.map((raw) => ({ id: raw.id, key: `v:${raw.id}`, type: 'video', raw, url: raw.url || '', title: raw.title || t('untitled_video'), text: '', note: raw.note || '', createdAt: Number(raw.createdAt) || 0, time: Number(raw.time) || 0, duration: Number(raw.duration) || 0, caption: raw.caption || null, chapter: raw.chapter || null }))
     ];
   }
@@ -455,10 +455,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   function safeSendMessage(tabId, message) { const tabs = globalThis.chrome?.tabs; if (!tabs?.sendMessage || !Number.isInteger(tabId)) return Promise.resolve(); return tabs.sendMessage(tabId, message).catch((error) => { if (!/Receiving end does not exist/i.test(error?.message || "")) console.debug("[ReMark] Message delivery skipped:", error); }); }
   async function notifySourceTabs(item, message) {
-    if (item?.type !== 'highlight' || !item.url) return;
+    const pageUrl = item?.pageUrl || item?.url;
+    if (item?.type !== 'highlight' || !pageUrl) return;
     try {
       const tabs = await globalThis.chrome?.tabs?.query({});
-      await Promise.all((tabs || []).filter((tab) => sameUrl(tab.url, item.url) && Number.isInteger(tab.id)).map((tab) => safeSendMessage(tab.id, message)));
+      await Promise.all((tabs || []).filter((tab) => sameUrl(tab.url, pageUrl) && Number.isInteger(tab.id)).map((tab) => safeSendMessage(tab.id, message)));
     } catch (_) {}
   }
   // If any highlight in this source still lacks page-position data and the
@@ -468,8 +469,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const rows = all().filter((item) => item.type === 'highlight' && sameUrl(item.url, url) && (item.position === null || item.posX === null));
     if (!rows.length) return;
     globalThis.chrome?.tabs?.query({}).then((tabs) => {
-      const tab = tabs.find((row) => sameUrl(row.url, url));
-      if (tab?.id) safeSendMessage(tab.id, { action: 'COMPUTE_CLIP_POSITIONS', url });
+      const pageUrls = [...new Set(rows.map((item) => item.pageUrl || item.url).filter(Boolean))];
+      pageUrls.forEach((pageUrl) => {
+        const tab = tabs.find((row) => sameUrl(row.url, pageUrl));
+        if (tab?.id) safeSendMessage(tab.id, { action: 'COMPUTE_CLIP_POSITIONS', url: pageUrl });
+      });
     }).catch(() => {});
   }
   function setActive(key) { selected = key; list.querySelectorAll('.mark-active').forEach((node) => node.classList.remove('mark-active')); cardFor(key)?.classList.add('mark-active'); }
@@ -539,9 +543,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   function focusFromSource(id) { const item = all().find((row) => row.id === id); if (!item) return; if (sourceUrl !== null && !sameUrl(sourceUrl, item.url)) sourceUrl = null; selected = item.key; selectedKeys = new Set([item.key]); selectionAnchor = item.key; render(); const card = list.querySelector(`.mark-card[data-id="${CSS.escape(id)}"]`); if (!card) return; card.scrollIntoView({ behavior: 'smooth', block: 'center' }); card.classList.add('remark-panel-focus'); setTimeout(() => card.classList.remove('remark-panel-focus'), 900); }
   async function jump(item) {
     if (!item) return;
+    const pageUrl = item.type === 'highlight' ? (item.pageUrl || item.url) : item.url;
+    const isLinkedSource = item.type === 'highlight' && item.url && pageUrl && !sameUrl(item.url, pageUrl);
     try {
       const tabs = await chrome.tabs.query({});
-      const target = tabs.find((tab) => item.type === 'video' ? (sameVideoTab(item, tab.url) || sameUrl(tab.url, item.url)) : sameUrl(tab.url, item.url));
+      if (isLinkedSource) {
+        const sourceTab = tabs.find((tab) => sameUrl(tab.url, item.url));
+        if (sourceTab?.id) {
+          await chrome.tabs.update(sourceTab.id, { active: true });
+          if (sourceTab.windowId) await chrome.windows.update(sourceTab.windowId, { focused: true });
+        } else {
+          await chrome.tabs.create({ url: item.url, active: true });
+        }
+        return;
+      }
+      const target = tabs.find((tab) => item.type === 'video' ? (sameVideoTab(item, tab.url) || sameUrl(tab.url, item.url)) : sameUrl(tab.url, pageUrl));
       if (target?.id) {
         await chrome.tabs.update(target.id, { active: true });
         if (target.windowId) await chrome.windows.update(target.windowId, { focused: true });
@@ -550,8 +566,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
       if (item.type === 'highlight') {
-        const tab = await chrome.tabs.create({ url: item.url, active: true });
-        try { chrome.runtime.sendMessage({ action: 'TRACK_SOURCE_NAVIGATION', tabId: tab.id, clipId: item.id, url: item.url }); } catch (_) {}
+        const tab = await chrome.tabs.create({ url: pageUrl, active: true });
+        try { chrome.runtime.sendMessage({ action: 'TRACK_SOURCE_NAVIGATION', tabId: tab.id, clipId: item.id, url: pageUrl }); } catch (_) {}
         setTimeout(() => { safeSendMessage(tab.id, { action: 'RESTORE_HIGHLIGHTS' }); safeSendMessage(tab.id, { action: 'LOCATE_CLIP', clipId: item.id }); }, 900);
         return;
       }
@@ -560,7 +576,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       showToast(t('source_unavailable'));
       return;
     }
-    if (item.url) window.open(item.type === 'video' ? `${item.url}${item.url.includes('?') ? '&' : '?'}t=${Math.floor(item.time)}` : item.url, '_blank');
+    if (pageUrl) window.open(item.type === 'video' ? `${item.url}${item.url.includes('?') ? '&' : '?'}t=${Math.floor(item.time)}` : pageUrl, '_blank');
   }
 
   function isGlyphHit(event, element) { const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT); let node; while ((node = walker.nextNode())) { if (!node.nodeValue.trim()) continue; const range = document.createRange(); range.selectNodeContents(node); for (const rect of range.getClientRects()) { if (event.clientX >= rect.left - 1 && event.clientX <= rect.right + 1 && event.clientY >= rect.top - 1 && event.clientY <= rect.bottom + 1) return true; } } return false; }

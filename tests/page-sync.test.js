@@ -43,7 +43,7 @@ assert.doesNotMatch(read('content/content.css'), /remark-selected \{[\s\S]*inset
 console.log('page-mark-interaction assertions passed');
 
 assert.match(content, /if \(event\.button !== 0\) return;/);
-assert.match(content, /showMarkPill\(\{ text, range: range\.cloneRange\(\) \}, \{ x: event\.clientX, y: event\.clientY \}\)/);
+assert.match(content, /showMarkPill\(\{ text, range: range\.cloneRange\(\), sourceUrl: getSelectionSourceUrl\(range\) \}, \{ x: event\.clientX, y: event\.clientY \}\)/);
 assert.match(content, /remark-mark-pill/);
 assert.match(content, /t\('unmark'\)/);
 assert.match(content, /remark-mark-action--marked/);

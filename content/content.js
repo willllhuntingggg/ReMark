@@ -226,7 +226,7 @@
       if (isTutorialTextRange(range)) { hideMarkPill(); return; }
       const rect = range.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
-      showMarkPill({ text, range: range.cloneRange() }, { x: event.clientX, y: event.clientY });
+      showMarkPill({ text, range: range.cloneRange(), sourceUrl: getSelectionSourceUrl(range) }, { x: event.clientX, y: event.clientY });
       return;
     }
     try {
@@ -235,7 +235,7 @@
       event.preventDefault();
       event.stopImmediatePropagation();
       suppressSelectionFollowupClick();
-      currentSelection = { text, range: range.cloneRange() };
+      currentSelection = { text, range: range.cloneRange(), sourceUrl: getSelectionSourceUrl(range) };
       quickHighlightSelection(DEFAULT_HIGHLIGHT_COLOR, {
         withNote: event.shiftKey,
         anchorRect: rect,
@@ -245,6 +245,28 @@
       console.warn('[ReMark] Error handling selection:', error);
     }
   }, true);
+
+  // A text mark inherits a link source only when both selection boundaries
+  // belong to the same anchor. Any cross-link or non-link range stays tied to
+  // the page URL, so a Mark always has one unambiguous source.
+  function getSelectionSourceUrl(range) {
+    if (!range) return window.location.href;
+    const getAnchor = (node) => {
+      const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+      return element?.closest?.('a[href]') || null;
+    };
+    const startAnchor = getAnchor(range.startContainer);
+    const endAnchor = getAnchor(range.endContainer);
+    if (!startAnchor || startAnchor !== endAnchor || !startAnchor.contains(range.commonAncestorContainer)) {
+      return window.location.href;
+    }
+    try {
+      const url = new URL(startAnchor.getAttribute('href'), document.baseURI);
+      return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : window.location.href;
+    } catch (_) {
+      return window.location.href;
+    }
+  }
 
   // Listen for messages from sidepanel / background
   chrome.runtime.onMessage?.addListener((msg, sender, sendResponse) => {
@@ -444,7 +466,7 @@
     const sel = currentSelection;
     if (!sel || !sel.text) return;
 
-    const { text, range } = sel;
+    const { text, range, sourceUrl } = sel;
     currentSelection = null;
 
     if (options.tutorialStep) {
@@ -463,7 +485,8 @@
     }
 
     const clipData = {
-      url: window.location.href,
+      url: sourceUrl || window.location.href,
+      pageUrl: window.location.href,
       pageTitle: document.title,
       text,
       sourcePosition: range ? Math.round(range.getBoundingClientRect().top + window.scrollY) : null,
@@ -707,7 +730,7 @@
     if (!ctx || !ctx.text || !ctx.range) return;
     markPillContext = null;
     try {
-      currentSelection = { text: ctx.text, range: ctx.range.cloneRange() };
+      currentSelection = { text: ctx.text, range: ctx.range.cloneRange(), sourceUrl: ctx.sourceUrl };
       const saved = await quickHighlightSelection(DEFAULT_HIGHLIGHT_COLOR, {
         anchorRect: ctx.range.getBoundingClientRect(),
         withNote: Boolean(options.withNote),
@@ -962,6 +985,9 @@
   function bindHighlightClick(element, clip) {
     element.addEventListener('click', (event) => {
       if (event.target.closest('.remark-note-control, .remark-mark-actions')) return;
+      const linkedMark = event.target.closest('a[href]');
+      const isLinkedSource = clip.url && clip.pageUrl && !samePageUrl(clip.url, clip.pageUrl);
+      if (linkedMark && isLinkedSource) return;
       event.preventDefault();
       event.stopPropagation();
       showHighlightActions(clip.id);
@@ -984,7 +1010,7 @@
     const clips = await ReMarkStorage.getClips();
     const currentUrl = window.location.href;
     for (const clip of clips) {
-      if (!clip.url || !samePageUrl(clip.url, currentUrl)) continue;
+      if (!(clip.pageUrl || clip.url) || !samePageUrl(clip.pageUrl || clip.url, currentUrl)) continue;
       if (Number.isFinite(Number(clip.sourcePosition)) && Number.isFinite(Number(clip.sourcePositionX))) continue;
       const mark = [...document.querySelectorAll(`mark[data-clip-id="${clip.id}"]`)].at(-1);
       if (!mark) continue;
@@ -1017,7 +1043,7 @@
   async function restorePageHighlights() {
     const clips = await ReMarkStorage.getClips();
     const currentUrl = window.location.href;
-    loadedClipsForPage = clips.filter((clip) => clip.url && samePageUrl(clip.url, currentUrl));
+    loadedClipsForPage = clips.filter((clip) => (clip.pageUrl || clip.url) && samePageUrl(clip.pageUrl || clip.url, currentUrl));
     let allDone = true;
     for (const clip of loadedClipsForPage) {
       if (clip.text && !highlightTextInBody(clip)) allDone = false;

@@ -1,16 +1,29 @@
 importScripts('lib/i18n.js');
-
 const SETTINGS_KEY = 'markit_settings';
+let nativeUiRefreshRevision = 0;
+
+function createNativeMenuItem(options) {
+  chrome.contextMenus.create(options, () => {
+    // Read lastError in the callback so a stale browser menu state cannot leak
+    // an unchecked runtime error during extension reloads.
+    void chrome.runtime.lastError;
+  });
+}
 
 function refreshNativeUi() {
+  const revision = ++nativeUiRefreshRevision;
   chrome.action.setTitle({ title: ReMarkI18n.t('open_sidepanel') }).catch(() => {});
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({
+    if (revision !== nativeUiRefreshRevision) return;
+    // Consume an API error, then skip this refresh rather than risking a create
+    // against an uncleared menu collection.
+    if (chrome.runtime.lastError) return;
+    createNativeMenuItem({
       id: 'remark_highlight',
       title: ReMarkI18n.t('highlight_context_menu'),
       contexts: ['selection']
     });
-    chrome.contextMenus.create({
+    createNativeMenuItem({
       id: 'remark_open_sidepanel',
       title: ReMarkI18n.t('open_sidepanel_context_menu'),
       contexts: ['all']
@@ -321,9 +334,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const pending = pendingSourceNavigations.get(message.tabId);
       if (pending && tab.status === 'complete') deliverPendingSourceLocate(message.tabId, pending);
     }).catch(() => {});
+    sendResponse({ ok: true });
+    return false;
   }
   if (message.action === 'SOURCE_CLIP_LOCATED' && sender.tab?.id && message.clipId) {
     acknowledgePendingSourceLocate(sender.tab.id, message.clipId);
+    sendResponse({ ok: true });
+    return false;
   }
   if (message.action === 'OPEN_SIDE_PANEL') {
     if (sender.tab?.windowId) {
@@ -334,7 +351,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         setTimeout(() => chrome.runtime.sendMessage({ action: 'FOCUS_CLIP', ...focus }), 700);
       });
       sendResponse({ success: true });
+    } else {
+      sendResponse({ success: false });
     }
+    return false;
   }
   if (message.action === 'INSTALL_BILI_SUBTITLE_CAPTURE') {
     if (sender.tab?.id) {
@@ -345,6 +365,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }).catch(() => {});
     }
     sendResponse({ ok: true });
+    return false;
   }
   if (message.action === 'CAPTURE_VIDEO_CAPTION') {
     if (!sender.tab?.id) {
@@ -361,7 +382,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch(() => sendResponse(null));
     return true;
   }
-  return true;
+  return false;
 });
 
 void syncNativeLanguage();

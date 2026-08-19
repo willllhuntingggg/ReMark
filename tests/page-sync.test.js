@@ -32,6 +32,20 @@ assert.match(i18n, /source_unavailable: '无法找到原网页或对应内容/);
 assert.match(i18n, /source_unavailable: 'The original page or marked content could not be found/);
 console.log('page-sync.test.js: all assertions passed');
 
+const nativeUiRefresh = background.slice(background.indexOf('let nativeUiRefreshRevision'), background.indexOf('async function syncNativeLanguage'));
+assert.match(nativeUiRefresh, /let nativeUiRefreshRevision = 0;/);
+assert.match(nativeUiRefresh, /function createNativeMenuItem\(options\)[\s\S]*?chrome\.contextMenus\.create\(options, \(\) => \{[\s\S]*?void chrome\.runtime\.lastError/);
+assert.match(nativeUiRefresh, /const revision = \+\+nativeUiRefreshRevision;/);
+assert.match(nativeUiRefresh, /chrome\.contextMenus\.removeAll\(\(\) => \{[\s\S]*?if \(revision !== nativeUiRefreshRevision\) return;[\s\S]*?if \(chrome\.runtime\.lastError\) return;/);
+assert.equal((background.match(/chrome\.contextMenus\.create\(/g) || []).length, 1);
+console.log('idempotent context menu registration assertions passed');
+
+const extensionScripts = [content, sidepanel, background, read('sidepanel/sidepanel.html'), JSON.stringify(manifest)].join('\n');
+assert.doesNotMatch(extensionScripts, /lunanotes\.io|_app\/immutable\/entry\/start\./i);
+assert.doesNotMatch(JSON.stringify(manifest), /declarativeNetRequest|content_security_policy/i);
+assert.match(sidepanel, /function markHtml\(item, index = 0\)[\s\S]*?: esc\(item\.text\);/);
+console.log('website CSP isolation assertions passed');
+
 assert.doesNotMatch(content, /selectedHighlight/);
 assert.match(content, /initialValue: item\.note \|\| ''/);
 assert.match(content, /function openQuickNoteInput\(\{ rect, onSave, initialValue = '', above = false \}\)/);
@@ -153,6 +167,15 @@ assert.match(background, /message\.action === 'SOURCE_CLIP_LOCATED'[\s\S]*acknow
 assert.match(content, /function acknowledgeSourceClipLocation\(mark, attempt = 0\)[\s\S]*SOURCE_CLIP_LOCATED/);
 assert.match(content, /function performLocateAnimation\(mark\)[\s\S]*acknowledgeSourceClipLocation\(mark\)/);
 console.log('source jump service-worker acknowledgement assertions passed');
+
+const backgroundMessageListener = background.slice(background.indexOf('chrome.runtime.onMessage.addListener'), background.lastIndexOf('void syncNativeLanguage'));
+assert.match(backgroundMessageListener, /TRACK_SOURCE_NAVIGATION[\s\S]*?sendResponse\(\{ ok: true \}\);\s*return false;/);
+assert.match(backgroundMessageListener, /SOURCE_CLIP_LOCATED[\s\S]*?sendResponse\(\{ ok: true \}\);\s*return false;/);
+assert.match(backgroundMessageListener, /OPEN_SIDE_PANEL[\s\S]*?sendResponse\(\{ success: true \}\);[\s\S]*?sendResponse\(\{ success: false \}\);[\s\S]*?return false;/);
+assert.match(backgroundMessageListener, /INSTALL_BILI_SUBTITLE_CAPTURE[\s\S]*?sendResponse\(\{ ok: true \}\);\s*return false;/);
+assert.match(backgroundMessageListener, /CAPTURE_VIDEO_CAPTION[\s\S]*?\.then\(\(results\) => sendResponse\(results\?\.\[0\]\?\.result \|\| null\)\)[\s\S]*?return true;/);
+assert.match(backgroundMessageListener, /return false;\s*\}\);/);
+console.log('background message response assertions passed');
 
 assert.match(content, /function getVideoOverlayHost\(video\) \{[\s\S]*document\.fullscreenElement[\s\S]*fullscreen\.contains\(video\)[\s\S]*return document\.body/);
 assert.match(content, /function appendVideoOverlay\(node, video\) \{[\s\S]*getVideoOverlayHost\(video\)\.appendChild\(node\)/);

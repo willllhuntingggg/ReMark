@@ -17,7 +17,9 @@ assert.equal(i18n.locale, 'en');
 assert.equal(i18n.t('settings'), 'Settings');
 assert.equal(i18n.t('backup_imported', { added: 2, updated: 1 }), 'Backup imported successfully. 2 added; 1 updated.');
 assert.equal(i18n.t('onboarding_title'), 'Try ReMark');
-assert.equal(i18n.t('onboarding_try_youtube'), 'Try on YouTube');
+assert.equal(i18n.t('onboarding_text_description'), 'Select text, then click Mark.');
+assert.equal(i18n.t('onboarding_skip'), 'Skip');
+assert.equal(i18n.t('help_tutorial'), 'Tutorial');
 assert.equal(i18n.t('help_replay_tutorial'), 'Replay the tutorial');
 
 i18n = load('zh-CN');
@@ -25,6 +27,9 @@ assert.equal(i18n.locale, 'zh');
 assert.equal(i18n.t('settings'), '设置');
 assert.equal(i18n.t('export_backup'), '导出备份');
 assert.equal(i18n.t('onboarding_title'), '试试 ReMark');
+assert.equal(i18n.t('onboarding_text_description'), '选中文字，然后点击 Mark。');
+assert.equal(i18n.t('onboarding_done'), '完成');
+assert.equal(i18n.t('help_tutorial'), '教程');
 assert.equal(i18n.t('help_replay_tutorial'), '重新播放教学');
 
 

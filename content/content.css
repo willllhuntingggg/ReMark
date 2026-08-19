@@ -614,9 +614,9 @@ html.remark-page-light mark.remark-highlight-mark {
 
 .remark-onboarding-card {
   position: relative;
-  width: min(440px, 100%);
+  width: min(400px, 100%);
   box-sizing: border-box;
-  padding: 26px 24px 22px;
+  padding: 24px 24px 20px;
   border: 1px solid rgba(35, 37, 41, .08);
   border-radius: 18px;
   background: #fff;
@@ -626,23 +626,11 @@ html.remark-page-light mark.remark-highlight-mark {
     Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
 }
 
-.remark-onboarding-card h2 {
-  margin: 0;
-  font-size: 21px;
-  font-weight: 750;
-  letter-spacing: -.02em;
-}
-
-.remark-onboarding-subtitle {
-  margin: 5px 0 20px;
-  color: #6e7480;
-  font-size: 13px;
-}
-
 .remark-onboarding-close {
   position: absolute;
   top: 12px;
   right: 12px;
+  z-index: 20;
   width: 30px;
   height: 30px;
   border: 0;
@@ -660,108 +648,516 @@ html.remark-page-light mark.remark-highlight-mark {
   color: #26282d;
 }
 
-.remark-onboarding-step {
-  position: relative;
-  margin-top: 10px;
-  padding: 14px 15px;
-  border: 1px solid #e9e6df;
-  border-radius: 12px;
-  background: #fcfbf9;
+/* -------- Pages -------- */
+
+.remark-onboarding-page {
+  display: none;
 }
 
-.remark-onboarding-step h3 {
-  margin: 0 0 4px;
-  font-size: 13.5px;
-  font-weight: 650;
+.remark-onboarding-page.is-active {
+  display: block;
 }
 
-.remark-onboarding-step p {
+.remark-onboarding-page h2 {
   margin: 0;
-  color: #6e7480;
-  font-size: 12px;
-  line-height: 1.55;
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -.01em;
 }
 
-.remark-onboarding-sample {
-  margin-top: 11px !important;
-  padding: 10px;
-  border-radius: 8px;
-  background: rgba(250, 222, 74, .38);
-  color: #3a3626 !important;
-  cursor: text;
-  user-select: text;
-}
-
-.remark-onboarding-done {
-  display: inline-block;
-  margin-top: 9px;
-  color: #2f7d4f;
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.remark-onboarding-step.is-complete {
-  border-color: rgba(200, 160, 46, .45);
-  background: rgba(250, 222, 74, .10);
-}
-
-.remark-onboarding-links {
-  display: flex;
-  gap: 8px;
-  margin-top: 11px;
-}
-
-.remark-onboarding-links button,
-.remark-onboarding-finish {
-  border: 0;
-  border-radius: 8px;
-  background: #26282d;
-  color: #fff;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 650;
-  padding: 8px 11px;
-  transition: background-color .15s ease;
-}
-
-.remark-onboarding-links button {
-  background: #f1f0eb;
+.remark-onboarding-description {
+  margin: 3px 0 0;
   color: #4d525a;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
-.remark-onboarding-links button:hover {
-  background: #e9e7e0;
+.remark-onboarding-hint {
+  margin: 10px 0 0;
+  color: #8b909a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* -------- Looping animations (Text Mark) -------- */
+
+.remark-onboarding-anim {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.remark-onboarding-anim--text {
+  height: 172px;
+  background: #fcfbf9;
+  border: 1px solid #e9e6df;
+}
+
+.ob-text-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ob-page {
+  position: absolute;
+  inset: 0;
+  padding: 16px;
+}
+
+.ob-page-bar {
+  display: block;
+  width: 76px;
+  height: 8px;
+  border-radius: 999px;
+  background: #e5e2da;
+}
+
+.ob-page-line {
+  height: 9px;
+  margin: 12px 0 0;
+  border-radius: 4px;
+  background: #ece9e1;
+}
+
+.ob-page-line--short {
+  width: 58%;
+}
+
+.ob-page-line--right {
+  width: 42%;
+  margin-left: auto;
+}
+
+.ob-sentence {
+  margin: 12px 0 0;
+  color: #3d4147;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.ob-context {
+  color: #3d4147;
+}
+
+.ob-target-ink {
+  display: inline;
+  padding: 0 .12em;
+  border-radius: .18em;
+  color: #3d4147;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  animation: ob-text-ink 6.5s linear infinite;
+}
+
+.ob-hand {
+  position: absolute;
+  left: -20px;
+  top: 16px;
+  z-index: 15;
+  color: #000;
+  pointer-events: none;
+  animation: ob-text-hand 6.5s cubic-bezier(.22, .82, .32, 1) infinite;
+}
+
+.ob-hand svg {
+  display: block;
+  width: 22px;
+  height: auto;
+  fill: #fff !important;
+  stroke: #000 !important;
+  stroke-width: 18px !important;
+  stroke-linejoin: round;
+}
+
+.ob-hand svg path {
+  fill: #fff !important;
+  stroke: #000 !important;
+  stroke-width: 18px !important;
+  stroke-linejoin: round;
+}
+
+.ob-click-ring {
+  position: absolute;
+  left: -13px;
+  top: 16px;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid rgb(250, 222, 74);
+  border-radius: 50%;
+  z-index: 14;
+  pointer-events: none;
+  animation: ob-text-click-ring 6.5s linear infinite;
+}
+
+.ob-mark-pill.remark-mark-actions {
+  left: auto;
+  top: calc(100% + .1em);
+  right: -.1em;
+  z-index: 12;
+  font-size: 15px;
+  border: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  animation: ob-mark-pill 6.5s linear infinite;
+}
+
+.ob-mark-pill .ob-mark-btn {
+  position: relative;
+  z-index: 2;
+  color: #000;
+  background: rgb(241, 222, 117);
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.ob-mark-pill .ob-mark-btn svg {
+  display: block;
+  width: 1.36em;
+  height: 1.36em;
+  opacity: 1;
+  visibility: visible;
+  fill: #000 !important;
+  stroke: #000 !important;
+  stroke-width: 12px;
+  paint-order: stroke fill;
+  filter: none;
+}
+
+.ob-mark-pill .ob-mark-btn svg path {
+  fill: #000 !important;
+  stroke: #000 !important;
+}
+
+.ob-success {
+  position: absolute;
+  left: 50%;
+  top: 118px;
+  z-index: 5;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(26, 29, 34, .92);
+  color: #ffe9a8;
+  font-size: 11px;
+  font-weight: 650;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, .22);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.remark-onboarding-anim--text .ob-success {
+  top: 122px;
+  animation: ob-text-success 6.5s linear infinite;
+}
+
+/* -------- Looping animations (Video Mark) -------- */
+
+.remark-onboarding-anim--video {
+  height: 172px;
+  background: linear-gradient(180deg, #23262c 0%, #17191e 100%);
+}
+
+.ob-video-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.ob-video {
+  position: absolute;
+  inset: 0;
+}
+
+.ob-video-play {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 0;
+  height: 0;
+  border-left: 15px solid rgba(255, 255, 255, .78);
+  border-top: 9px solid transparent;
+  border-bottom: 9px solid transparent;
+  transform: translate(-40%, -50%);
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .35));
+  animation: ob-video-play 2.2s ease-in-out infinite;
+}
+
+.ob-video-timeline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 16px 16px;
+}
+
+.ob-video-bar {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .22);
+}
+
+.ob-video-progress {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4%;
+  border-radius: 999px;
+  background: #f5d94a;
+  animation: ob-video-progress 6.5s linear infinite;
+}
+
+.ob-video-thumb {
+  position: absolute;
+  top: 50%;
+  left: 4%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f5d94a;
+  box-shadow: 0 0 0 2px rgba(245, 217, 74, .25);
+  transform: translate(-50%, -50%);
+  animation: ob-video-thumb 6.5s linear infinite;
+}
+
+/* Same compact gold pennant used by real video marks. */
+.ob-video-flag {
+  position: absolute;
+  left: 54%;
+  bottom: 16px;
+  z-index: 2;
+  display: block;
+  width: 2px;
+  height: 16px;
+  border: 0;
+  background: rgb(250, 222, 74);
+  transform: translate(-50%, -100%);
+  transform-origin: bottom center;
+  animation: ob-video-flag 6.5s linear infinite;
+}
+
+.ob-video-flag::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: 0;
+  width: 8px;
+  height: 10px;
+  background: rgb(250, 222, 74);
+  clip-path: polygon(0 0, 100% 0, 100% 68%, 50% 100%, 0 68%);
+}
+
+.ob-keypress {
+  position: absolute;
+  left: 50%;
+  top: 28%;
+  z-index: 3;
+  padding: 9px 15px;
+  border-radius: 9px;
+  background: rgba(18, 20, 24, .9);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 750;
+  letter-spacing: .02em;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .3);
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: ob-video-keypress 6.5s linear infinite;
+}
+
+.remark-onboarding-anim--video .ob-success {
+  top: 76px;
+  animation: ob-video-success 6.5s linear infinite;
+}
+
+/* -------- Keyframes -------- */
+
+@keyframes ob-text-ink {
+  0%, 5% { background: rgba(86, 145, 255, 0); color: #3d4147; box-shadow: none; }
+  13%, 42% { background: rgba(86, 145, 255, .34); color: #3d4147; box-shadow: none; }
+  44%, 84% {
+    background: rgb(250, 222, 74);
+    color: #24220f;
+    box-shadow: 0 .08em 0 rgb(250, 222, 74), 0 -.08em 0 rgb(250, 222, 74);
+  }
+  92%, 100% { background: rgba(86, 145, 255, 0); color: #3d4147; box-shadow: none; }
+}
+
+@keyframes ob-text-hand {
+  0%, 27% { opacity: 0; transform: scale(1); }
+  30%, 40% { opacity: 1; transform: scale(1); }
+  42% { opacity: 1; transform: scale(.78); }
+  48%, 100% { opacity: 0; transform: scale(.78); }
+}
+
+@keyframes ob-text-click-ring {
+  0%, 39% { opacity: 0; transform: translate(-50%, -50%) scale(.45); }
+  42% { opacity: 1; transform: translate(-50%, -50%) scale(.62); }
+  49% { opacity: .48; transform: translate(-50%, -50%) scale(2.25); }
+  55%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(2.55); }
+}
+
+@keyframes ob-mark-pill {
+  0%, 16% { opacity: 0; transform: translateY(2px) scale(.96); }
+  19%, 40% { opacity: 1; transform: translateY(0) scale(1); }
+  42%, 54% { opacity: 1; transform: translateY(0) scale(.9); }
+  60%, 100% { opacity: 0; transform: translateY(2px) scale(.96); }
+}
+
+@keyframes ob-text-success {
+  0%, 50% { opacity: 0; transform: translateX(-50%) translateY(4px) scale(.96); }
+  56%, 82% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  90%, 100% { opacity: 0; transform: translateX(-50%) translateY(4px) scale(.96); }
+}
+
+@keyframes ob-video-play {
+  0%, 100% { opacity: .85; transform: translate(-40%, -50%) scale(1); }
+  50% { opacity: .45; transform: translate(-40%, -50%) scale(.94); }
+}
+
+@keyframes ob-video-progress {
+  0% { width: 4%; }
+  38%, 78% { width: 54%; }
+  100% { width: 4%; }
+}
+
+@keyframes ob-video-thumb {
+  0% { left: 4%; }
+  38%, 78% { left: 54%; }
+  100% { left: 4%; }
+}
+
+@keyframes ob-video-keypress {
+  0%, 26% { opacity: 0; transform: translate(-50%, -50%) translateY(6px) scale(.92); }
+  32%, 42% { opacity: 1; transform: translate(-50%, -50%) translateY(0) scale(1); }
+  50%, 100% { opacity: 0; transform: translate(-50%, -50%) translateY(6px) scale(.92); }
+}
+
+@keyframes ob-video-flag {
+  0%, 42% { opacity: 0; transform: translate(-50%, -100%) translateY(-6px) scale(.84); }
+  50%, 80% { opacity: 1; transform: translate(-50%, -100%) translateY(0) scale(1); }
+  90%, 100% { opacity: 0; transform: translate(-50%, -100%) translateY(-6px) scale(.84); }
+}
+
+@keyframes ob-video-success {
+  0%, 56% { opacity: 0; transform: translateX(-50%) translateY(4px) scale(.96); }
+  62%, 82% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  92%, 100% { opacity: 0; transform: translateX(-50%) translateY(4px) scale(.96); }
+}
+
+/* -------- Dots & actions -------- */
+
+.remark-onboarding-dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 16px;
+}
+
+.remark-onboarding-dots button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  color: #d3d0c8;
+  cursor: pointer;
+  transition: color .15s ease, transform .15s ease;
+}
+
+.remark-onboarding-dots button::before {
+  content: '●';
+}
+
+.remark-onboarding-dots button:not(.is-active)::before {
+  content: '○';
+}
+
+.remark-onboarding-dots button:hover {
+  color: #8b909a;
+}
+
+.remark-onboarding-dots button.is-active {
   color: #26282d;
-}
-
-.remark-onboarding-finish:hover {
-  background: #1b1d21;
+  transform: scale(1.12);
 }
 
 .remark-onboarding-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   gap: 10px;
-  margin-top: 20px;
+  margin-top: 14px;
 }
 
-.remark-onboarding-dismiss {
+.remark-onboarding-skip {
   border: 0;
+  border-radius: 8px;
   background: transparent;
   color: #8b909a;
   cursor: pointer;
   font-size: 12px;
-  transition: color .15s ease;
+  padding: 7px 10px;
+  transition: color .15s ease, background-color .15s ease;
 }
 
-.remark-onboarding-dismiss:hover {
+.remark-onboarding-skip:hover {
+  color: #4d525a;
+  background: #f1f0eb;
+}
+
+.remark-onboarding-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.remark-onboarding-nav button[hidden] {
+  display: none;
+}
+
+.remark-onboarding-prev,
+.remark-onboarding-next,
+.remark-onboarding-done {
+  border: 0;
+  border-radius: 9px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease, opacity .15s ease;
+}
+
+.remark-onboarding-prev {
+  background: #f1f0eb;
   color: #4d525a;
 }
 
-.remark-onboarding-finish:disabled {
-  opacity: .4;
+.remark-onboarding-prev:hover:not(:disabled) {
+  background: #e9e7e0;
+  color: #26282d;
+}
+
+.remark-onboarding-prev:disabled {
+  opacity: .38;
   cursor: default;
+}
+
+.remark-onboarding-next,
+.remark-onboarding-done {
+  background: #26282d;
+  color: #fff;
+}
+
+.remark-onboarding-next:hover,
+.remark-onboarding-done:hover {
+  background: #1b1d21;
 }
 
 .remark-onboarding-card button:focus-visible {
@@ -771,11 +1167,22 @@ html.remark-page-light mark.remark-highlight-mark {
 
 @media (max-width: 430px) {
   .remark-onboarding-card {
-    padding: 20px;
+    padding: 20px 18px 18px;
   }
+}
 
-  .remark-onboarding-links {
-    flex-direction: column;
+@media (prefers-reduced-motion: reduce) {
+  .remark-onboarding-anim .ob-target-ink,
+  .remark-onboarding-anim .ob-hand,
+  .remark-onboarding-anim .ob-click-ring,
+  .remark-onboarding-anim .ob-mark-pill,
+  .remark-onboarding-anim .ob-success,
+  .remark-onboarding-anim .ob-video-play,
+  .remark-onboarding-anim .ob-video-progress,
+  .remark-onboarding-anim .ob-video-thumb,
+  .remark-onboarding-anim .ob-video-flag,
+  .remark-onboarding-anim .ob-keypress {
+    animation-duration: 14s;
   }
 }
 

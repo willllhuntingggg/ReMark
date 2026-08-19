@@ -24,11 +24,14 @@ async function main() {
   assert.deepEqual(Object.keys(exported.data).sort(), [storage.KEYS.CLIPS, storage.KEYS.SETTINGS, storage.KEYS.VIDEO_MARKS].sort());
   assert.equal(exported.data[storage.KEYS.SETTINGS].onboardingSeen, undefined);
   assert.equal(exported.data[storage.KEYS.SETTINGS].onboardingStatus, undefined);
-  assert.equal(await storage.getOnboardingStatus(), 'dismissed');
+  // Legacy `onboardingSeen` installs are treated as skipped.
+  assert.equal(await storage.getOnboardingStatus(), 'skipped');
   await storage.setOnboardingStatus('not_started');
   assert.equal(await storage.getOnboardingStatus(), 'not_started');
   await storage.setOnboardingStatus('completed');
   assert.equal(await storage.getOnboardingStatus(), 'completed');
+  await storage.setOnboardingStatus('skipped');
+  assert.equal(await storage.getOnboardingStatus(), 'skipped');
   await expectReject(() => storage.setOnboardingStatus('other'), 'INVALID_ONBOARDING_STATUS');
 
   const importable = {

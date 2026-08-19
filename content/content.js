@@ -79,15 +79,85 @@
     window.setTimeout(() => observer.disconnect(), 20000);
   }
   let onboardingTutorial = null;
+  const ONBOARDING_MODAL_ID = 'remark-onboarding-tutorial';
+
+  function onboardingModifier() {
+    const platform = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent || '';
+    const mac = /mac|iphone|ipad|ipod/i.test(platform);
+    return mac
+      ? { mod: '⌘', mark: '⌘M', note: '⌘⇧+M' }
+      : { mod: 'Ctrl', mark: 'Ctrl+M', note: 'Ctrl+Shift+M' };
+  }
+
+  // Font Awesome Free solid icons (CC BY 4.0): fa-mouse-pointer and
+  // fa-hand-pointer. Keeping them inline preserves the extension's no-network
+  // onboarding experience while matching a familiar open-source icon language.
+  const ONBOARDING_CURSOR_CLICK_ICON = '<svg class="ob-fa-icon" viewBox="0 0 448 512" aria-hidden="true" fill="#ffffff" stroke="#000000" style="fill:#ffffff!important;stroke:#000000!important"><path fill="#ffffff" stroke="#000000" stroke-width="18" stroke-linejoin="round" style="fill:#ffffff!important;stroke:#000000!important" d="M448 240v96c0 3.084-.356 6.159-1.063 9.162l-32 136C410.686 499.23 394.562 512 376 512H168a40.004 40.004 0 0 1-32.35-16.473l-127.997-176c-12.993-17.866-9.043-42.883 8.822-55.876 17.867-12.994 42.884-9.043 55.877 8.823L104 315.992V40c0-22.091 17.908-40 40-40s40 17.909 40 40v200h8v-40c0-22.091 17.908-40 40-40s40 17.909 40 40v40h8v-24c0-22.091 17.908-40 40-40s40 17.909 40 40v24h8c0-22.091 17.908-40 40-40s40 17.909 40 40zm-256 80h-8v96h8v-96zm88 0h-8v96h8v-96zm88 0h-8v96h8v-96z"/></svg>';
+
+  function onboardingTextPage(mods) {
+    return [
+      '<section class="remark-onboarding-page is-active" data-onboarding-page="text">',
+      `<h2>${t('onboarding_text_title')}</h2>`,
+      `<p class="remark-onboarding-description">${t('onboarding_text_description')}</p>`,
+      '<div class="remark-onboarding-anim remark-onboarding-anim--text" data-onboarding-text aria-hidden="true">',
+      '<div class="ob-text-stage">',
+      '<div class="ob-page">',
+      '<span class="ob-page-bar"></span>',
+      '<p class="ob-page-line ob-page-line--short"></p>',
+      '<p class="ob-sentence">',
+      `<span class="ob-context">${t('onboarding_text_sample_before')}</span>`,
+      `<span class="ob-target-ink">${t('onboarding_text_sample')}</span>`,
+      '<span class="remark-mark-actions-anchor ob-text-action-anchor">',
+      '<span class="ob-mark-pill remark-mark-actions is-visible">',
+      `<button class="remark-mark-action remark-mark-action--mark ob-mark-btn" type="button" tabindex="-1" aria-label="${t('mark_action')}">${ONBOARDING_BLACK_MARK_PILL_ICON}</button>`,
+      '</span>',
+      `<span class="ob-hand ob-hand--click" role="img" aria-label="Cursor clicking Mark">${ONBOARDING_CURSOR_CLICK_ICON}</span>`,
+      '<i class="ob-click-ring" aria-hidden="true"></i>',
+      '</span>',
+      `<span class="ob-context">${t('onboarding_text_sample_after')}</span>`,
+      '</p>',
+      '<p class="ob-page-line ob-page-line--short ob-page-line--right"></p>',
+      '</div>',
+      `<span class="ob-success">✓ ${t('onboarding_marked')}</span>`,
+      '</div></div>',
+      `<p class="remark-onboarding-hint">${t('onboarding_text_hint', { mod: mods.mod })}</p>`,
+      '</section>'
+    ].join('');
+  }
+
+  function onboardingVideoPage(mods) {
+    return [
+      '<section class="remark-onboarding-page" data-onboarding-page="video">',
+      `<h2>${t('onboarding_video_title')}</h2>`,
+      `<p class="remark-onboarding-description">${t('onboarding_video_description', { mark: mods.mark })}</p>`,
+      '<div class="remark-onboarding-anim remark-onboarding-anim--video" aria-hidden="true">',
+      '<div class="ob-video-stage">',
+      '<div class="ob-video">',
+      '<span class="ob-video-play" aria-hidden="true"></span>',
+      '<div class="ob-video-timeline">',
+      '<div class="ob-video-bar">',
+      '<span class="ob-video-progress"></span>',
+      '<span class="ob-video-thumb"></span>',
+      '</div>',
+      '<span class="ob-video-flag" aria-hidden="true"></span>',
+      '</div>',
+      '</div>',
+      `<span class="ob-keypress" aria-hidden="true">${escHtml(mods.mark)}</span>`,
+      `<span class="ob-success">✓ ${t('onboarding_marked')}</span>`,
+      '</div></div>',
+      `<p class="remark-onboarding-hint">${t('onboarding_video_hint', { note: mods.note })}</p>`,
+      '</section>'
+    ].join('');
+  }
 
   async function showFirstUseGuide(options = {}) {
-    if (document.getElementById('remark-onboarding-tutorial')) return;
+    if (document.getElementById(ONBOARDING_MODAL_ID)) return;
     const manual = Boolean(options.manual);
     try {
       if (!manual && await ReMarkStorage.getOnboardingStatus() !== 'not_started') return;
-      const videoSupported = isVideoPage();
+      const mods = onboardingModifier();
       const modal = document.createElement('div');
-      modal.id = 'remark-onboarding-tutorial';
+      modal.id = ONBOARDING_MODAL_ID;
       modal.className = 'remark-onboarding';
       modal.setAttribute('role', 'dialog');
       modal.setAttribute('aria-modal', 'true');
@@ -95,25 +165,25 @@
       modal.innerHTML = [
         '<div class="remark-onboarding-card">',
         `<button class="remark-onboarding-close" type="button" aria-label="${t('onboarding_close')}">×</button>`,
-        `<h2>${t('onboarding_title')}</h2>`,
-        `<p class="remark-onboarding-subtitle">${t('onboarding_subtitle')}</p>`,
-        '<section class="remark-onboarding-step" data-step="text">',
-        `<div><h3>${t('onboarding_text_title')}</h3><p>${t('onboarding_text_instruction')}</p></div>`,
-        `<p class="remark-onboarding-sample" data-onboarding-text>${t('onboarding_text_sample')}</p>`,
-        `<span class="remark-onboarding-done" hidden>✓ ${t('onboarding_marked')}</span>`,
-        '</section>',
-        '<section class="remark-onboarding-step" data-step="video">',
-        `<div><h3>${t('onboarding_video_title')}</h3><p>${t(videoSupported ? 'onboarding_video_supported' : 'onboarding_video_unsupported')}</p></div>`,
-        videoSupported ? '' : `<div class="remark-onboarding-links"><button type="button" data-tutorial-platform="youtube">${t('onboarding_try_youtube')}</button><button type="button" data-tutorial-platform="bilibili">${t('onboarding_try_bilibili')}</button></div>`,
-        `<span class="remark-onboarding-done" hidden>✓ ${t('onboarding_marked')}</span>`,
-        '</section>',
+        '<div class="remark-onboarding-pages">',
+        onboardingTextPage(mods),
+        onboardingVideoPage(mods),
+        '</div>',
+        '<div class="remark-onboarding-dots">',
+        `<button type="button" class="is-active" aria-label="${t('onboarding_page_dot', { page: 1 })}" aria-current="true"></button>`,
+        `<button type="button" aria-label="${t('onboarding_page_dot', { page: 2 })}" aria-current="false"></button>`,
+        '</div>',
         '<div class="remark-onboarding-actions">',
-        `<button class="remark-onboarding-dismiss" type="button">${t('onboarding_dismiss')}</button>`,
-        `<button class="remark-onboarding-finish" type="button" disabled>${t('onboarding_finish')}</button>`,
+        `<button class="remark-onboarding-skip" type="button">${t('onboarding_skip')}</button>`,
+        '<div class="remark-onboarding-nav">',
+        `<button class="remark-onboarding-prev" type="button" disabled>${t('onboarding_previous')}</button>`,
+        `<button class="remark-onboarding-next" type="button">${t('onboarding_next')}</button>`,
+        `<button class="remark-onboarding-done" type="button" hidden>${t('onboarding_done')}</button>`,
+        '</div>',
         '</div></div>'
       ].join('');
       document.documentElement.appendChild(modal);
-      onboardingTutorial = { modal, manual, textDone: false, videoDone: false };
+      onboardingTutorial = { modal, manual, page: 0 };
       bindOnboardingTutorial(onboardingTutorial);
     } catch (error) {
       console.warn('[ReMark] Onboarding unavailable:', error);
@@ -122,51 +192,55 @@
   function bindOnboardingTutorial(tutorial) {
     const { modal } = tutorial;
     const close = (status) => { void closeOnboardingTutorial(status); };
-    modal.querySelector('.remark-onboarding-close')?.addEventListener('click', () => close('dismissed'));
-    modal.querySelector('.remark-onboarding-dismiss')?.addEventListener('click', () => close('dismissed'));
-    modal.querySelector('.remark-onboarding-finish')?.addEventListener('click', () => close('completed'));
-    modal.querySelectorAll('[data-tutorial-platform]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const platform = button.dataset.tutorialPlatform;
-        const url = platform === 'bilibili' ? 'https://www.bilibili.com' : 'https://www.youtube.com';
-        window.open(url, '_blank', 'noopener');
+    const pages = [...modal.querySelectorAll('.remark-onboarding-page')];
+    const dots = [...modal.querySelectorAll('.remark-onboarding-dots button')];
+    const prev = modal.querySelector('.remark-onboarding-prev');
+    const next = modal.querySelector('.remark-onboarding-next');
+    const done = modal.querySelector('.remark-onboarding-done');
+    const skip = modal.querySelector('.remark-onboarding-skip');
+    const showPage = (index) => {
+      tutorial.page = Math.max(0, Math.min(pages.length - 1, index));
+      pages.forEach((page, i) => page.classList.toggle('is-active', i === tutorial.page));
+      dots.forEach((dot, i) => {
+        const active = i === tutorial.page;
+        dot.classList.toggle('is-active', active);
+        dot.setAttribute('aria-current', String(active));
       });
-    });
+      prev.disabled = tutorial.page === 0;
+      next.hidden = tutorial.page === pages.length - 1;
+      done.hidden = tutorial.page !== pages.length - 1;
+    };
+    dots.forEach((dot, i) => dot.addEventListener('click', () => showPage(i)));
+    modal.querySelector('.remark-onboarding-close')?.addEventListener('click', () => close('skipped'));
+    skip.addEventListener('click', () => close('skipped'));
+    prev.addEventListener('click', () => showPage(tutorial.page - 1));
+    next.addEventListener('click', () => showPage(tutorial.page + 1));
+    done.addEventListener('click', () => close('completed'));
     modal.addEventListener('click', (event) => {
-      if (event.target === modal) close('dismissed');
+      if (event.target === modal) close('skipped');
     });
     const onEscape = (event) => {
       if (event.key !== 'Escape' || !document.documentElement.contains(modal)) return;
-      document.removeEventListener('keydown', onEscape);
-      close('dismissed');
+      close('skipped');
     };
     document.addEventListener('keydown', onEscape);
+    tutorial.onEscape = onEscape;
   }
 
   async function closeOnboardingTutorial(status) {
     const tutorial = onboardingTutorial;
     if (!tutorial) return;
     onboardingTutorial = null;
+    if (tutorial.onEscape) document.removeEventListener('keydown', tutorial.onEscape);
     tutorial.modal.remove();
     if (!tutorial.manual) await ReMarkStorage.setOnboardingStatus(status);
   }
 
-  function markOnboardingStep(step) {
-    const tutorial = onboardingTutorial;
-    if (!tutorial) return;
-    const key = step === 'video' ? 'videoDone' : 'textDone';
-    tutorial[key] = true;
-    const section = tutorial.modal.querySelector(`[data-step="${step}"]`);
-    section?.classList.add('is-complete');
-    const done = section?.querySelector('.remark-onboarding-done');
-    if (done) done.hidden = false;
-    const finish = tutorial.modal.querySelector('.remark-onboarding-finish');
-    if (finish) finish.disabled = !(tutorial.textDone || tutorial.videoDone);
-  }
-
-  function isTutorialTextRange(range) {
-    const sample = onboardingTutorial?.modal.querySelector('[data-onboarding-text]');
-    return Boolean(sample && range && sample.contains(range.startContainer) && sample.contains(range.endContainer));
+  function isInsideOnboardingModal(selection) {
+    const node = selection?.anchorNode;
+    if (!node) return false;
+    const parent = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    return Boolean(parent?.closest?.(`#${ONBOARDING_MODAL_ID}`));
   }
 
   // ⌘/Ctrl + mouseup → silent highlight. Capture phase blocks page popup handlers.
@@ -230,9 +304,9 @@
     const text = selection?.toString().trim();
     const range = (() => { try { return selection && selection.rangeCount ? selection.getRangeAt(0) : null; } catch (_) { return null; } })();
     if (!text || text.length < 2 || !range || isEditableSelection(selection)) { hideMarkPill(); return; }
+    if (isInsideOnboardingModal(selection)) { hideMarkPill(); return; }
     if (!(event.metaKey || event.ctrlKey)) {
       // Plain selection: offer a one-click Mark pill next to the selection.
-      if (isTutorialTextRange(range)) { hideMarkPill(); return; }
       const rect = range.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
       showMarkPill({ text, range: range.cloneRange(), sourceUrl: getSelectionSourceUrl(range) }, { x: event.clientX, y: event.clientY });
@@ -247,8 +321,7 @@
       currentSelection = { text, range: range.cloneRange(), sourceUrl: getSelectionSourceUrl(range) };
       quickHighlightSelection(DEFAULT_HIGHLIGHT_COLOR, {
         withNote: event.shiftKey,
-        anchorRect: rect,
-        tutorialStep: isTutorialTextRange(range) ? 'text' : null
+        anchorRect: rect
       });
     } catch (error) {
       console.warn('[ReMark] Error handling selection:', error);
@@ -506,21 +579,6 @@
     const { text, range, sourceUrl } = sel;
     currentSelection = null;
 
-    if (options.tutorialStep) {
-      const tutorialClip = {
-        id: `tutorial_text_${Date.now()}`,
-        color: colorCode,
-        note: ''
-      };
-      if (range) {
-        highlightDOMRange(range, tutorialClip);
-        window.getSelection()?.removeAllRanges();
-      }
-      markOnboardingStep(options.tutorialStep);
-      window.setTimeout(() => removeClipHighlightFromDOM(tutorialClip.id), 1200);
-      return;
-    }
-
     const clipData = {
       url: sourceUrl || window.location.href,
       pageUrl: window.location.href,
@@ -642,6 +700,10 @@
   // fa-highlighter / fa-note-sticky / fa-copy. The marked state reuses the
   // highlighter — the gold button background carries the state signal.
   const MARK_PILL_ICON = '<svg viewBox="0 0 576 512" aria-hidden="true"><path fill="currentColor" d="M315 315l158.4-215L444.1 70.6 229 229 315 315zm-187 5l0 0V248.3c0-15.3 7.2-29.6 19.5-38.6L420.6 8.4C428 2.9 437 0 446.2 0c11.4 0 22.4 4.5 30.5 12.6l54.8 54.8c8.1 8.1 12.6 19 12.6 30.5c0 9.2-2.9 18.2-8.4 25.6L334.4 396.5c-9 12.3-23.4 19.5-38.6 19.5H224l-25.4 25.4c-12.5 12.5-32.8 12.5-45.3 0l-50.7-50.7c-12.5-12.5-12.5-32.8 0-45.3L128 320zM7 466.3l63-63 70.6 70.6-31 31c-4.5 4.5-10.6 7-17 7H24c-13.3 0-24-10.7-24-24v-4.7c0-6.4 2.5-12.5 7-17z"/></svg>';
+  const ONBOARDING_BLACK_MARK_PILL_ICON = MARK_PILL_ICON.replace(
+    'fill="currentColor"',
+    'fill="#000000" stroke="#000000" stroke-width="8" style="fill:#000000!important;stroke:#000000!important"'
+  );
   const MARKED_PILL_ICON = MARK_PILL_ICON;
   const NOTE_BTN_ICON = '<svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M64 32C28.7 32 0 60.7 0 96V416c0 35.3 28.7 64 64 64H288V368c0-26.5 21.5-48 48-48H448V96c0-35.3-28.7-64-64-64H64zM448 352H402.7 336c-8.8 0-16 7.2-16 16v66.7V480l32-32 64-64 32-32z"/></svg>';
   const COPY_BTN_ICON = '<svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M208 0H332.1c12.7 0 24.9 5.1 33.9 14.1l67.9 67.9c9 9 14.1 21.2 14.1 33.9V336c0 26.5-21.5 48-48 48H208c-26.5 0-48-21.5-48-48V48c0-26.5 21.5-48 48-48zM48 128h80v64H64V448H256V416h64v48c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V176c0-26.5 21.5-48 48-48z"/></svg>';
@@ -1414,6 +1476,7 @@
     const tag = (document.activeElement?.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable) return;
     if (!isVideoPage()) return;
+    if (document.getElementById(ONBOARDING_MODAL_ID)) return;
     e.preventDefault();
     recordVideoMark({ withNote: e.shiftKey });
   }
@@ -1722,28 +1785,6 @@
     if (!isFinite(t) || t < 0) return;
     const vkey = getVideoKey();
     if (!vkey) return;
-    if (onboardingTutorial && isVideoPage()) {
-      const bar = findVideoProgressBar();
-      if (isTimelineVisible(bar)) {
-        const host = getVideoMarkerHost(bar);
-        const dot = document.createElement('div');
-        dot.className = 'remark-video-mark remark-video-mark--tutorial';
-        host.appendChild(dot);
-        const duration = Number(video.duration) || 0;
-        const percent = duration > 0 ? Math.min(100, Math.max(0, (t / duration) * 100)) : 50;
-        positionMarkerInHost(dot, host, bar, percent);
-        addMarkerInkParticles(dot);
-        void dot.offsetWidth;
-        dot.classList.add('pop');
-        window.setTimeout(() => dot.remove(), 1200);
-      } else if (isFullscreenVideo(video)) {
-        showFullscreenTimelineFeedback(video);
-      } else {
-        showInVideoMarkerFeedback(video);
-      }
-      markOnboardingStep('video');
-      return;
-    }
 
     const marks = await ReMarkStorage.getVideoMarks();
     const existing = marks.find(m => m.videoKey === vkey && Math.abs(m.time - t) < 1);

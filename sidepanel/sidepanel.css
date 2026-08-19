@@ -693,7 +693,7 @@ button {
 .mark-card--video .mark-content-text {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 4px;
   color: var(--ink);
   font-size: 14px;
   font-weight: 500;
@@ -705,14 +705,11 @@ button {
   color: var(--ink);
 }
 
-.video-duration {
-  display: none;
-  font-variant-numeric: tabular-nums;
-}
-
-.mark-card--video:hover .video-duration,
-.mark-card--video:focus-within .video-duration {
-  display: inline;
+.video-primary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---------- Video captions & chapters ---------- */

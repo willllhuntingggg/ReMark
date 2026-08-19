@@ -455,17 +455,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const jumpTitle = item.type === 'video'
       ? t('jump_to_time', { time: clock(item.time) })
       : item.text;
+    const videoMarkedText = item.type === 'video' ? String(item.text || '').trim() : '';
+    const videoPrimary = item.type === 'video'
+      ? videoMarkedText || item.chapter?.text?.trim() || item.caption?.text?.trim() || item.note?.trim() || item.title?.trim() || t('untitled_video')
+      : '';
+    const videoUsesChapter = item.type === 'video' && !videoMarkedText && videoPrimary === item.chapter?.text?.trim();
+    const videoUsesCaption = item.type === 'video' && !videoMarkedText && !videoUsesChapter && videoPrimary === item.caption?.text?.trim();
+    const videoUsesNote = item.type === 'video' && !videoMarkedText && !videoUsesChapter && !videoUsesCaption && videoPrimary === item.note?.trim();
     const content = item.type === 'video'
       ? `<span class="video-timestamp">${clock(item.time)}</span>`
-        + (item.duration ? `<span class="video-duration"> / ${clock(item.duration)}</span>` : '')
+        + `<span class="video-primary">${esc(videoPrimary)}</span>`
       : esc(item.text);
-    const note = item.note
+    const note = item.note && !videoUsesNote
       ? `<button class="mark-note" data-action="note" data-key="${esc(item.key)}" type="button"><span class="mark-note-text">${esc(item.note)}</span></button>`
       : '';
-    const caption = item.type === 'video' && item.caption?.text
+    const caption = item.type === 'video' && item.caption?.text && !videoUsesCaption
       ? `<div class="mark-caption mark-caption--caption"><span class="mark-caption-label">${esc(t('video_caption'))}</span><span class="mark-caption-text">${esc(item.caption.text)}</span>${Number.isFinite(Number(item.caption.from)) ? `<span class="mark-caption-time">${clock(item.caption.from)}${Number.isFinite(Number(item.caption.to)) ? '–' + clock(item.caption.to) : ''}</span>` : ''}</div>`
       : '';
-    const chapter = item.type === 'video' && item.chapter?.text
+    const chapter = item.type === 'video' && item.chapter?.text && !videoUsesChapter
       ? `<div class="mark-caption mark-caption--chapter"><span class="mark-caption-label">${esc(t('video_chapter'))}</span><span class="mark-caption-text">${esc(item.chapter.text)}</span>${Number.isFinite(Number(item.chapter.from)) ? `<span class="mark-caption-time">${clock(item.chapter.from)}</span>` : ''}</div>`
       : '';
     // Inline editor: the visible note text itself becomes the field.
@@ -475,6 +482,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const sourceIcon = sourceIconHtml(item.url, 'mark-source-favicon', 'mark-source-fallback');
     const sourceControl = sourceUrl === null
       ? `<span class="mark-source-slot"><button class="mark-source" data-action="source" data-url="${esc(item.url)}" type="button" title="${esc(item.url)}">${sourceIcon}<span class="mark-source-label">${esc(source)}</span><span class="mark-source-arrow" aria-hidden="true">›</span></button></span>`
+      : '';
+    const footer = sourceUrl === null
+      ? `<footer class="mark-footer">${sourceControl}<time class="mark-created" datetime="${new Date(item.createdAt).toISOString()}" title="${esc(fullDate(item.createdAt))}">${esc(createdTime(item.createdAt))}</time></footer>`
       : '';
     const menu = [
       `<button data-action="unmark" data-key="${esc(item.key)}" type="button">${esc(t('unmark'))}</button>`,
@@ -493,7 +503,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       `<div class="mark-menu" hidden>${menu}</div></div></div></div>`,
       caption + chapter,
       `<div class="mark-note-area">${note}${editor}</div>`,
-      `<footer class="mark-footer">${sourceControl || '<span class="mark-source-slot"></span>'}<time class="mark-created" datetime="${new Date(item.createdAt).toISOString()}" title="${esc(fullDate(item.createdAt))}">${esc(createdTime(item.createdAt))}</time></footer></article>`
+      `${footer}</article>`
     ].join('');
   }
   function render(animated = false) {

@@ -284,7 +284,7 @@
     } else if (msg.action === 'DELETE_PAGE_CLIPS_FROM_PAGE') {
       removeAllPageHighlightsFromDOM();
     } else if (msg.action === 'COMPUTE_CLIP_POSITIONS') {
-      void computeClipPositionsForPage();
+      void computeClipPositionsForPage({ force: Boolean(msg.forcePositions) });
     } else if (msg.action === 'REFRESH_VIDEO_MARKS' || msg.action === 'VIDEO_MARK_DELETED') {
       renderVideoMarkers();
     } else if (msg.action === 'SEEK_VIDEO_MARK') {
@@ -1029,12 +1029,13 @@
 
   // Backfill page positions for every clip of this page that is currently
   // rendered, so older marks without position data can be ordered too.
-  async function computeClipPositionsForPage() {
+  async function computeClipPositionsForPage(options = {}) {
+    const force = Boolean(options.force);
     const clips = await ReMarkStorage.getClips();
     const currentUrl = window.location.href;
     for (const clip of clips) {
       if (!(clip.pageUrl || clip.url) || !samePageUrl(clip.pageUrl || clip.url, currentUrl)) continue;
-      if (Number.isFinite(Number(clip.sourcePosition)) && Number.isFinite(Number(clip.sourcePositionX))) continue;
+      if (!force && Number.isFinite(Number(clip.sourcePosition)) && Number.isFinite(Number(clip.sourcePositionX))) continue;
       const mark = [...document.querySelectorAll(`mark[data-clip-id="${clip.id}"]`)].at(-1);
       if (!mark) continue;
       const rect = mark.getBoundingClientRect();

@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const settingsPanel = $('#panel-settings');
   const viewIdentity = $('.view-identity');
   const appContainer = $('.app-container');
+  const contentArea = document.querySelector('.content-area');
   const selectionTray = $('#selection-tray');
   const selectionBadge = $('#selection-badge');
   const selectionHintPoint = $('#selection-hint-point');
@@ -335,6 +336,40 @@ document.addEventListener('DOMContentLoaded', async () => {
       ...videos.map((raw) => ({ id: raw.id, key: `v:${raw.id}`, type: 'video', raw, url: raw.url || '', title: raw.title || t('untitled_video'), text: '', note: raw.note || '', createdAt: Number(raw.createdAt) || 0, time: Number(raw.time) || 0, duration: Number(raw.duration) || 0, caption: raw.caption || null, chapter: raw.chapter || null }))
     ];
   }
+  const READING_ORDER_ROW_TOLERANCE = 8;
+  function sortSourceRows(rows) {
+    const positioned = rows
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => item.type === 'highlight' && item.position !== null && item.posX !== null)
+      .sort((a, b) => (a.item.position - b.item.position) || (a.item.posX - b.item.posX) || (a.item.createdAt - b.item.createdAt) || (a.index - b.index));
+    const spatialRank = new Map();
+    let rowTop = null;
+    let row = -1;
+    positioned.forEach((entry) => {
+      if (rowTop === null || entry.item.position - rowTop > READING_ORDER_ROW_TOLERANCE) {
+        row += 1;
+        rowTop = entry.item.position;
+      }
+      entry.row = row;
+    });
+    positioned
+      .sort((a, b) => (a.row - b.row) || (a.item.posX - b.item.posX) || (a.item.position - b.item.position) || (a.item.createdAt - b.item.createdAt) || (a.index - b.index))
+      .forEach((entry, index) => spatialRank.set(entry.item.key, index));
+    return rows
+      .map((item, index) => ({ item, index }))
+      .sort((a, b) => {
+        if (a.item.type === 'video' && b.item.type === 'video') return a.item.time - b.item.time;
+        if (a.item.type === 'highlight' && b.item.type === 'highlight') {
+          const aRank = spatialRank.get(a.item.key);
+          const bRank = spatialRank.get(b.item.key);
+          if (aRank !== undefined && bRank !== undefined) return aRank - bRank;
+          if (aRank !== undefined) return -1;
+          if (bRank !== undefined) return 1;
+        }
+        return (a.item.createdAt - b.item.createdAt) || (a.index - b.index);
+      })
+      .map(({ item }) => item);
+  }
   function visible() {
     const q = query.trim().toLowerCase();
     let rows = all();
@@ -351,34 +386,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       ].some((value) => String(value).toLowerCase().includes(q)));
     }
     if (sourceUrl === null) return rows.sort((a, b) => b.createdAt - a.createdAt);
-    return rows.sort((a, b) => {
-      if (a.type === 'video' && b.type === 'video') return a.time - b.time;
-      if (a.type === 'highlight' && b.type === 'highlight') {
-        // Reading order: top → bottom, then left → right on the same line.
-        if (a.position !== null && b.position !== null) {
-          if (a.position !== b.position) return a.position - b.position;
-          return (a.posX ?? 0) - (b.posX ?? 0);
-        }
-        if (a.position !== null) return -1;
-        if (b.position !== null) return 1;
-        return a.createdAt - b.createdAt;
-      }
-      return a.createdAt - b.createdAt;
-    });
+    return sortSourceRows(rows);
   }
   function sourceRowsFor(url) {
-    return all().filter((item) => sameUrl(item.url, url)).sort((a, b) => {
-      if (a.type === 'video' && b.type === 'video') return a.time - b.time;
-      if (a.type === 'highlight' && b.type === 'highlight') {
-        if (a.position !== null && b.position !== null) {
-          if (a.position !== b.position) return a.position - b.position;
-          return (a.posX ?? 0) - (b.posX ?? 0);
-        }
-        if (a.position !== null) return -1;
-        if (b.position !== null) return 1;
-      }
-      return a.createdAt - b.createdAt;
-    });
+    return sortSourceRows(all().filter((item) => sameUrl(item.url, url)));
   }
   function day(value) {
     const now = new Date();
@@ -766,13 +777,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // source page is open in a tab, ask its content script to backfill it so
   // the collection can be ordered top-to-bottom / left-to-right.
   function syncSourcePositions(url) {
-    const rows = all().filter((item) => item.type === 'highlight' && sameUrl(item.url, url) && (item.position === null || item.posX === null));
+    const rows = all().filter((item) => item.type === 'highlight' && sameUrl(item.url, url));
     if (!rows.length) return;
     globalThis.chrome?.tabs?.query({}).then((tabs) => {
       const pageUrls = [...new Set(rows.map((item) => item.pageUrl || item.url).filter(Boolean))];
       pageUrls.forEach((pageUrl) => {
         const tab = tabs.find((row) => sameUrl(row.url, pageUrl));
-        if (tab?.id) safeSendMessage(tab.id, { action: 'COMPUTE_CLIP_POSITIONS', url: pageUrl });
+        if (tab?.id) safeSendMessage(tab.id, { action: 'COMPUTE_CLIP_POSITIONS', url: pageUrl, forcePositions: true });
       });
     }).catch(() => {});
   }
@@ -909,7 +920,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (isGlyphHit(event, control)) void jump(itemFor(key));
       return;
     }
-    if (action === 'source') { sourceUrl = url || ''; clearSelection(); render(); syncSourcePositions(sourceUrl); return; }
+    if (action === 'source') { sourceUrl = url || ''; contentArea.scrollTop = 0; clearSelection(); render(); syncSourcePositions(sourceUrl); return; }
     if (action === 'unmark') void deleteMark(key);
     if (action === 'note') { setSelection([key], key); setActive(key); openNote(key); }
     if (action === 'copy') void copyMark(key, control);

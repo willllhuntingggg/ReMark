@@ -1128,7 +1128,10 @@
   let videoMarkRenderedIds = new Set();
   let markTooltipEl = null;
   let markTooltipHideTimer = null;
-  let markShowcaseTimer = null;
+  // Creation feedback and the hover action row have independent lifecycles.
+  // Sharing a timer here can suppress the hover menu's mouseleave cleanup.
+  let markTooltipShowcaseTimer = null;
+  let markCreationDismissTimer = null;
   let markCreationCardEl = null;
   let markCreationOverlayEl = null;
   let markCreationFlagEl = null;
@@ -1155,9 +1158,10 @@
         return p ? `${m[1]}?p=${p}` : m[1];
       },
       getVideoTitle() {
-        const og = document.querySelector('meta[property="og:title"]');
-        const metaTitle = document.querySelector('meta[name="title"]');
-        return og ? og.content : (metaTitle ? metaTitle.content : (document.title.replace(/_哔哩哔哩_bilibili/i, '').trim() || document.title));
+        const fromText = (sel) => { const el = document.querySelector(sel); return el && el.textContent && el.textContent.trim() ? el.textContent.trim() : ''; };
+        const fromMeta = (sel) => { const meta = document.querySelector(sel); return meta && meta.content && meta.content.trim() ? meta.content.trim() : ''; };
+        const title = fromText('h1.video-title') || fromText('.video-info-title') || fromMeta('meta[property="og:title"]') || fromMeta('meta[name="title"]');
+        return title || document.title.replace(/_哔哩哔哩_bilibili/i, '').trim() || document.title;
       },
       findVideoElement() {
         const candidates = ['video.bpx-player-video', 'video.bilibili-player-video', '.bpx-player-container video', '.bilibili-player-video video'];
@@ -1200,9 +1204,9 @@
         const fromMeta = (sel) => { const m = document.querySelector(sel); return m && m.content && m.content.trim() ? m.content.trim() : ''; };
         const fromText = (sel) => { const el = document.querySelector(sel); return el && el.textContent && el.textContent.trim() ? el.textContent.trim() : ''; };
         const candidates = [
-          fromMeta('meta[property="og:title"]'), fromMeta('meta[name="title"]'), fromMeta('meta[itemprop="name"]'),
           fromText('h1.ytd-watch-metadata yt-formatted-string'), fromText('h1.title.ytd-watch-metadata'),
-          fromText('#info-contents h1'), fromText('ytd-reel-video-renderer h2')
+          fromText('#info-contents h1'), fromText('ytd-reel-video-renderer[is-active] h2'), fromText('ytd-reel-video-renderer h2'),
+          fromMeta('meta[property="og:title"]'), fromMeta('meta[name="title"]'), fromMeta('meta[itemprop="name"]')
         ];
         for (const t of candidates) {
           if (t && !/^(youtube|bilibili|哔哩哔哩)$/i.test(t)) return t;
@@ -1235,6 +1239,20 @@
   function isVideoPage() { const p = detectVideoPlatform(); return !!p && VIDEO_PLATFORMS[p].isVideoPage(); }
   function getVideoKey() { const p = detectVideoPlatform(); return p ? VIDEO_PLATFORMS[p].getVideoKey() : null; }
   function getVideoTitle() { const p = detectVideoPlatform(); return p ? VIDEO_PLATFORMS[p].getVideoTitle() : document.title; }
+  function isUsableVideoTitle(title) { return Boolean(title && !/^(youtube|bilibili|哔哩哔哩|youtube 视频)$/i.test(title)); }
+  async function refreshVideoMarkTitle(markId, videoKey, initialTitle) {
+    for (const delay of [180, 700, 1500]) {
+      await new Promise((resolve) => window.setTimeout(resolve, delay));
+      if (getVideoKey() !== videoKey) return;
+      const title = getVideoTitle();
+      if (!isUsableVideoTitle(title) || title === initialTitle) continue;
+      const mark = (await ReMarkStorage.getVideoMarks()).find((item) => item.id === markId && item.videoKey === videoKey);
+      if (!mark || mark.title === title) return;
+      await ReMarkStorage.updateVideoMark(markId, { title });
+      notifyStorageUpdated();
+      return;
+    }
+  }
   function findVideoElement() { const p = detectVideoPlatform(); return p ? VIDEO_PLATFORMS[p].findVideoElement() : document.querySelector('video'); }
   function findVideoProgressBar() { const p = detectVideoPlatform(); return p ? VIDEO_PLATFORMS[p].findProgressBar() : null; }
 
@@ -1370,6 +1388,7 @@
   // user two things: the mark was saved, and they can add a note there.
   function showMarkCreationFeedback(mark, video) {
     dismissMarkCreationFeedback(true);
+    hideMarkTooltip();
     const rect = video.getBoundingClientRect();
     if (rect.width < 40 || rect.height < 40) return;
     markCreationTime = Number(mark.time) || 0;
@@ -1476,7 +1495,7 @@
     markCreationCardEl = card;
 
     card.addEventListener('mouseenter', () => {
-      if (markShowcaseTimer) { clearTimeout(markShowcaseTimer); markShowcaseTimer = null; }
+      if (markCreationDismissTimer) { clearTimeout(markCreationDismissTimer); markCreationDismissTimer = null; }
     });
     card.addEventListener('mouseleave', () => scheduleMarkCreationDismiss(1500));
     markCreationPointerHandler = (event) => {
@@ -1568,9 +1587,9 @@
     positionVideoMarkPanel(card, anchor);
   }
   function scheduleMarkCreationDismiss(delay = 4200) {
-    clearTimeout(markShowcaseTimer);
-    markShowcaseTimer = window.setTimeout(() => {
-      markShowcaseTimer = null;
+    clearTimeout(markCreationDismissTimer);
+    markCreationDismissTimer = window.setTimeout(() => {
+      markCreationDismissTimer = null;
       if (markCreationCardEl?.matches(':hover')) { scheduleMarkCreationDismiss(1500); return; }
       dismissMarkCreationFeedback(false);
     }, delay);
@@ -1578,8 +1597,8 @@
   // Keep the flag (and the fullscreen overlay) visible while the note editor
   // is open; only the action card steps aside so it never overlaps the input.
   function hideMarkCreationCard() {
-    clearTimeout(markShowcaseTimer);
-    markShowcaseTimer = null;
+    clearTimeout(markCreationDismissTimer);
+    markCreationDismissTimer = null;
     if (markCreationPointerHandler) {
       document.removeEventListener('pointerdown', markCreationPointerHandler, true);
       markCreationPointerHandler = null;
@@ -1590,8 +1609,8 @@
     }
   }
   function dismissMarkCreationFeedback(immediate) {
-    clearTimeout(markShowcaseTimer);
-    markShowcaseTimer = null;
+    clearTimeout(markCreationDismissTimer);
+    markCreationDismissTimer = null;
     if (markCreationPointerHandler) {
       document.removeEventListener('pointerdown', markCreationPointerHandler, true);
       markCreationPointerHandler = null;
@@ -1699,11 +1718,13 @@
       return;
     }
     if (withNote) video.pause();
+    const currentTitle = getVideoTitle();
     const savedMark = await ReMarkStorage.addVideoMark({
       url: window.location.href.split('#')[0], videoKey: vkey, time: Math.round(t * 10) / 10,
-      duration: isFinite(video.duration) ? Math.floor(video.duration) : 0, title: getVideoTitle()
+      duration: isFinite(video.duration) ? Math.floor(video.duration) : 0, title: currentTitle
     });
     notifyStorageUpdated();
+    void refreshVideoMarkTitle(savedMark.id, vkey, currentTitle);
     void attachVideoMarkCaption(savedMark, video, t);
     await renderVideoMarkers();
     showMarkCreationFeedback(savedMark, video);
@@ -1789,7 +1810,7 @@
 
     const host = getVideoMarkerHost(bar);
     host.querySelectorAll('.remark-video-mark').forEach(el => el.remove());
-    if (!markShowcaseTimer && !(markTooltipEl && markTooltipEl.matches(':hover'))) hideMarkTooltip();
+    if (!(markTooltipEl && markTooltipEl.matches(':hover'))) hideMarkTooltip();
 
     const marks = await ReMarkStorage.getVideoMarks();
     const forVideo = marks.filter(m => m.videoKey === vkey);
@@ -1845,6 +1866,7 @@
   // highlights: note / copy / delete, with Font Awesome icons.
   function showMarkTooltip(dot, mark, options = {}) {
     if (markTooltipHideTimer) { clearTimeout(markTooltipHideTimer); markTooltipHideTimer = null; }
+    if (markTooltipShowcaseTimer) { clearTimeout(markTooltipShowcaseTimer); markTooltipShowcaseTimer = null; }
     hideMarkTooltip();
     const tip = document.createElement('div');
     tip.className = 'remark-video-mark-tip';
@@ -1921,9 +1943,9 @@
     tip.addEventListener('mouseenter', () => { if (markTooltipHideTimer) { clearTimeout(markTooltipHideTimer); markTooltipHideTimer = null; } });
     tip.addEventListener('mouseleave', () => scheduleHideMarkTooltip());
     if (options.duration) {
-      clearTimeout(markShowcaseTimer);
-      markShowcaseTimer = window.setTimeout(() => {
-        markShowcaseTimer = null;
+      clearTimeout(markTooltipShowcaseTimer);
+      markTooltipShowcaseTimer = window.setTimeout(() => {
+        markTooltipShowcaseTimer = null;
         if (markTooltipEl && markTooltipEl.matches(':hover')) return;  // hovering keeps it
         hideMarkTooltip();
       }, options.duration);
@@ -1931,14 +1953,16 @@
   }
 
   function scheduleHideMarkTooltip(delay = 320) {
-    if (markShowcaseTimer) return;  // keep during the creation showcase
+    if (markTooltipShowcaseTimer) return;  // keep only during this tooltip's own showcase
     if (markTooltipHideTimer) clearTimeout(markTooltipHideTimer);
     markTooltipHideTimer = setTimeout(() => { markTooltipHideTimer = null; hideMarkTooltip(); }, delay);
   }
 
   function hideMarkTooltip() {
-    clearTimeout(markShowcaseTimer);
-    markShowcaseTimer = null;
+    clearTimeout(markTooltipHideTimer);
+    markTooltipHideTimer = null;
+    clearTimeout(markTooltipShowcaseTimer);
+    markTooltipShowcaseTimer = null;
     if (markTooltipEl) { markTooltipEl.remove(); markTooltipEl = null; }
   }
 

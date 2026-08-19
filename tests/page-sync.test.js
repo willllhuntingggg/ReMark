@@ -153,3 +153,11 @@ assert.match(background, /message\.action === 'SOURCE_CLIP_LOCATED'[\s\S]*acknow
 assert.match(content, /function acknowledgeSourceClipLocation\(mark, attempt = 0\)[\s\S]*SOURCE_CLIP_LOCATED/);
 assert.match(content, /function performLocateAnimation\(mark\)[\s\S]*acknowledgeSourceClipLocation\(mark\)/);
 console.log('source jump service-worker acknowledgement assertions passed');
+
+assert.match(content, /function getVideoOverlayHost\(video\) \{[\s\S]*document\.fullscreenElement[\s\S]*fullscreen\.contains\(video\)[\s\S]*return document\.body/);
+assert.match(content, /function appendVideoOverlay\(node, video\) \{[\s\S]*getVideoOverlayHost\(video\)\.appendChild\(node\)/);
+const creationFeedback = content.slice(content.indexOf('function showMarkCreationFeedback'), content.indexOf('function markCreationGeometry'));
+assert.match(creationFeedback, /appendVideoOverlay\(flag, video\);[\s\S]*appendVideoOverlay\(overlay, video\);[\s\S]*appendVideoOverlay\(card, video\);/);
+const hoverTooltip = content.slice(content.indexOf('function showMarkTooltip'), content.indexOf('function scheduleHideMarkTooltip'));
+assert.match(hoverTooltip, /appendVideoOverlay\(tip, findVideoElement\(\)\);/);
+console.log('video fullscreen overlay host assertions passed');

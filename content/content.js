@@ -1427,6 +1427,17 @@
   // disappears when the player controls auto-hide. The fake bar is always
   // shown so the insert position is obvious in any mode. The card tells the
   // user two things: the mark was saved, and they can add a note there.
+  // Fullscreen puts the active player in the top layer; body-level overlays
+  // render underneath it. Mount video feedback inside that player subtree.
+  function getVideoOverlayHost(video) {
+    const fullscreen = document.fullscreenElement;
+    if (fullscreen && video && fullscreen !== video && fullscreen.contains(video)) return fullscreen;
+    return document.body;
+  }
+  function appendVideoOverlay(node, video) {
+    getVideoOverlayHost(video).appendChild(node);
+  }
+
   function showMarkCreationFeedback(mark, video) {
     dismissMarkCreationFeedback(true);
     hideMarkTooltip();
@@ -1441,7 +1452,7 @@
     flag.style.left = `${geometry.flagX}px`;
     flag.style.top = `${geometry.flagY}px`;
     addMarkerInkParticles(flag);
-    document.body.appendChild(flag);
+    appendVideoOverlay(flag, video);
     void flag.offsetWidth;
     flag.classList.add('pop');
     markCreationFlagEl = flag;
@@ -1451,7 +1462,7 @@
     overlay.style.left = `${geometry.line.left}px`;
     overlay.style.top = `${geometry.line.top}px`;
     overlay.style.width = `${geometry.line.width}px`;
-    document.body.appendChild(overlay);
+    appendVideoOverlay(overlay, video);
     void overlay.offsetWidth;
     overlay.classList.add('show');
     markCreationOverlayEl = overlay;
@@ -1531,7 +1542,7 @@
     });
     actions.append(noteBtn, copyBtn, delBtn);
     card.append(head, hint, actions);
-    document.body.appendChild(card);
+    appendVideoOverlay(card, video);
     positionMarkCreationCard(card, anchor);
     markCreationCardEl = card;
 
@@ -1590,7 +1601,7 @@
     flag.style.left = `${geometry.flagX}px`;
     flag.style.top = `${geometry.flagY}px`;
     addMarkerInkParticles(flag);
-    document.body.appendChild(flag);
+    appendVideoOverlay(flag, video);
     void flag.offsetWidth;
     flag.classList.add('pop');
     markCreationFlagEl = flag;
@@ -1599,7 +1610,7 @@
     overlay.style.left = `${geometry.line.left}px`;
     overlay.style.top = `${geometry.line.top}px`;
     overlay.style.width = `${geometry.line.width}px`;
-    document.body.appendChild(overlay);
+    appendVideoOverlay(overlay, video);
     void overlay.offsetWidth;
     overlay.classList.add('show');
     markCreationOverlayEl = overlay;
@@ -1972,7 +1983,7 @@
       });
     });
     tip.append(time, noteBtn, copyBtn, delBtn);
-    document.body.appendChild(tip);
+    appendVideoOverlay(tip, findVideoElement());
     markTooltipEl = tip;
 
     // options.point overrides the anchor (used when the timeline is hidden);

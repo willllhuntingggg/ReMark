@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const selectionCopyButton = $('#selection-copy-markdown');
   const selectionClearButton = $('#selection-clear');
   const feedbackOpenButton = $('#feedback-open');
+  const shortcutModifierKeys = [...document.querySelectorAll('[data-shortcut-modifier]')];
   const feedbackModal = $('#feedback-modal');
   const feedbackForm = $('#feedback-form');
   const feedbackCloseButton = $('#feedback-close');
@@ -67,6 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const normalized = ['system', 'en', 'zh'].includes(preference) ? preference : 'system';
     ReMarkI18n.setLocale(normalized);
     ReMarkI18n.apply();
+    applyShortcutModifierLabels();
     languageSetting.value = normalized;
     if (!showingSettings) render();
   }
@@ -410,6 +412,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   function isMacPlatform() {
     const platform = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent || '';
     return /mac|iphone|ipad|ipod/i.test(platform);
+  }
+  function applyShortcutModifierLabels() {
+    const label = isMacPlatform() ? '⌘' : 'Ctrl';
+    shortcutModifierKeys.forEach((key) => { key.textContent = label; });
   }
   function selectedVisibleRows(rows = visible()) {
     return rows.filter((item) => selectedKeys.has(item.key));

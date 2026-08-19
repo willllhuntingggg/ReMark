@@ -47,3 +47,37 @@ assert.match(i18n, /timeline: 'Timeline'/);
 assert.match(i18n, /source_marks: 'Collection'/);
 assert.match(i18n, /search_placeholder: 'Search Marks, notes, sources, or timestamps'/);
 console.log('more-panel.test.js: all assertions passed');
+
+assert.match(html, /<section class="shortcuts-section" aria-labelledby="shortcuts-heading">/);
+assert.match(html, /data-i18n="core_shortcuts"/);
+assert.match(html, /data-i18n="shortcut_mark_text"/);
+assert.match(html, /data-i18n="shortcut_mark_video"/);
+assert.match(html, /data-i18n="shortcut_delete"/);
+assert.match(i18n, /core_shortcuts: '核心快捷键'/);
+assert.match(i18n, /core_shortcuts: 'Core shortcuts'/);
+assert.match(i18n, /shortcut_mark_video: 'Mark video moment'/);
+assert.match(css, /\.shortcuts-section \{[\s\S]*border-bottom: 1px solid var\(--line\);/);
+assert.match(css, /\.shortcut-row \{[\s\S]*justify-content: space-between;/);
+assert.match(css, /\.shortcut-row kbd \{[\s\S]*font-family: ui-monospace/);
+console.log('core-shortcuts-panel assertions passed');
+
+assert.match(html, /data-i18n="shortcut_mark_text_note"/);
+assert.match(html, /data-i18n="shortcut_edit_note"/);
+assert.match(html, /data-i18n="shortcut_toggle_selection"/);
+assert.match(html, /data-i18n="shortcut_range_selection"/);
+assert.match(html, /data-shortcut-modifier/);
+assert.doesNotMatch(html.slice(html.indexOf('shortcuts-section'), html.indexOf('help-section')), /data-i18n="shortcut_search"|data-i18n="shortcut_undo"/);
+assert.match(i18n, /shortcut_mark_text_note: '划线并添加笔记'/);
+assert.match(i18n, /shortcut_mark_text_note: 'Mark text and add a note'/);
+assert.match(i18n, /shortcut_toggle_selection: 'Add or remove Marks from selection'/);
+assert.match(script, /function applyShortcutModifierLabels\(\) \{[\s\S]*isMacPlatform\(\) \? '⌘' : 'Ctrl'/);
+assert.match(script, /ReMarkI18n\.apply\(\);[\s\S]*applyShortcutModifierLabels\(\);/);
+console.log('core-shortcuts-platform assertions passed');
+
+const content = fs.readFileSync(path.resolve(__dirname, '../content/content.js'), 'utf8');
+assert.match(html, /data-i18n="shortcut_mark_video_note"/);
+assert.match(i18n, /shortcut_mark_video_note: '标记当前视频时刻并添加笔记'/);
+assert.match(i18n, /shortcut_mark_video_note: 'Mark video moment and add a note'/);
+const videoShortcut = content.slice(content.indexOf('function onVideoMarkKeydown'), content.indexOf('function getVideoTimelineBar'));
+assert.match(videoShortcut, /recordVideoMark\(\{ withNote: e\.shiftKey \}\)/);
+console.log('video-note-shortcut assertions passed');

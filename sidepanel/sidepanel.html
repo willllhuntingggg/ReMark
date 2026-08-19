@@ -98,6 +98,27 @@
           <input id="import-backup-file" type="file" accept="application/json,.json" hidden>
           <p id="backup-status" class="backup-status" role="status" aria-live="polite" hidden></p>
         </section>
+        <section class="shortcuts-section" aria-labelledby="shortcuts-heading">
+          <div class="shortcuts-copy">
+            <h2 id="shortcuts-heading" data-i18n="core_shortcuts">Core shortcuts</h2>
+            <p data-i18n="core_shortcuts_description">Quick actions for marking and managing what you save.</p>
+          </div>
+          <p class="shortcuts-scope" data-i18n="shortcut_scope_page">On a web page</p>
+          <dl class="shortcuts-list">
+            <div class="shortcut-row"><dt data-i18n="shortcut_mark_text">Mark text</dt><dd><kbd data-shortcut-modifier>⌘</kbd><span>+</span><kbd data-i18n="shortcut_key_drag">Drag</kbd></dd></div>
+            <div class="shortcut-row"><dt data-i18n="shortcut_mark_text_note">Mark text and add a note</dt><dd><kbd data-shortcut-modifier>⌘</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd data-i18n="shortcut_key_drag">Drag</kbd></dd></div>
+            <div class="shortcut-row"><dt data-i18n="shortcut_mark_video">Mark video moment</dt><dd><kbd data-shortcut-modifier>⌘</kbd><span>+</span><kbd>M</kbd></dd></div>
+            <div class="shortcut-row"><dt data-i18n="shortcut_mark_video_note">Mark video moment and add a note</dt><dd><kbd data-shortcut-modifier>⌘</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>M</kbd></dd></div>
+          </dl>
+          <p class="shortcuts-scope" data-i18n="shortcut_scope_panel">In ReMark</p>
+          <dl class="shortcuts-list">
+            <div class="shortcut-row"><dt data-i18n="shortcut_edit_note">Quickly edit selected Mark's note</dt><dd><kbd>Shift</kbd><span>+</span><kbd>Enter</kbd></dd></div>
+            <div class="shortcut-row"><dt data-i18n="shortcut_toggle_selection">Add or remove Marks from selection</dt><dd><kbd data-shortcut-modifier>⌘</kbd><span>+</span><kbd data-i18n="shortcut_key_click">Click</kbd></dd></div>
+            <div class="shortcut-row"><dt data-i18n="shortcut_range_selection">Select a range of Marks</dt><dd><kbd>Shift</kbd><span>+</span><kbd data-i18n="shortcut_key_click">Click</kbd></dd></div>
+            <div class="shortcut-row"><dt data-i18n="shortcut_delete">Delete selected Marks</dt><dd><kbd>Delete</kbd></dd></div>
+            <div class="shortcut-row"><dt data-i18n="shortcut_escape">Clear selection or go back</dt><dd><kbd>Esc</kbd></dd></div>
+          </dl>
+        </section>
         <section class="help-section" aria-labelledby="help-heading">
           <h2 id="help-heading" data-i18n="help">Help</h2>
           <button id="replay-tutorial" class="help-action" type="button">

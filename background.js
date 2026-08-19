@@ -51,6 +51,28 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
 const pendingSourceNavigations = new Map();
 
+const PENDING_SOURCE_LOCATE_DELAYS = [0, 600, 1800, 4200, 7000, 10000];
+
+function deliverPendingSourceLocate(tabId, pending) {
+  PENDING_SOURCE_LOCATE_DELAYS.forEach((delay) => setTimeout(async () => {
+    if (pendingSourceNavigations.get(tabId) !== pending) return;
+    try { await chrome.tabs.sendMessage(tabId, { action: 'RESTORE_HIGHLIGHTS' }); } catch (_) {}
+    try { await chrome.tabs.sendMessage(tabId, { action: 'LOCATE_CLIP', clipId: pending.clipId }); } catch (_) {}
+  }, delay));
+}
+function acknowledgePendingSourceLocate(tabId, clipId) {
+  const pending = pendingSourceNavigations.get(tabId);
+  if (pending?.clipId === clipId) pendingSourceNavigations.delete(tabId);
+}
+
+
+chrome.webNavigation.onCompleted.addListener((details) => {
+  if (details.frameId !== 0) return;
+  const pending = pendingSourceNavigations.get(details.tabId);
+  if (!pending) return;
+  deliverPendingSourceLocate(details.tabId, pending);
+});
+
 // Runs in the MAIN world of the video tab. Reads page-level player state and
 // fetches caption/subtitle data exactly like the page itself would, so the
 // user's logged-in session and cookies apply. Returns { caption, chapter } or
@@ -295,6 +317,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'TRACK_SOURCE_NAVIGATION' && Number.isInteger(message.tabId) && message.clipId) {
     pendingSourceNavigations.set(message.tabId, { clipId: message.clipId, url: message.url || '' });
     setTimeout(() => pendingSourceNavigations.delete(message.tabId), 15000);
+    chrome.tabs.get(message.tabId).then((tab) => {
+      const pending = pendingSourceNavigations.get(message.tabId);
+      if (pending && tab.status === 'complete') deliverPendingSourceLocate(message.tabId, pending);
+    }).catch(() => {});
+  }
+  if (message.action === 'SOURCE_CLIP_LOCATED' && sender.tab?.id && message.clipId) {
+    acknowledgePendingSourceLocate(sender.tab.id, message.clipId);
   }
   if (message.action === 'OPEN_SIDE_PANEL') {
     if (sender.tab?.windowId) {

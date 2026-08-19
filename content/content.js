@@ -45,8 +45,17 @@
         ReMarkI18n.setLocale(settings.language);
         ReMarkI18n.apply();
       }
+      if (changes?.[ReMarkStorage.KEYS.CLIPS]) scheduleCurrentPageHighlightRecovery();
       renderVideoMarkers();
     });
+  }
+
+  let currentPageHighlightRecoveryTimers = [];
+  function scheduleCurrentPageHighlightRecovery() {
+    currentPageHighlightRecoveryTimers.forEach((timer) => window.clearTimeout(timer));
+    currentPageHighlightRecoveryTimers = [0, 250, 900, 2200].map((delay) => window.setTimeout(() => {
+      void restorePageHighlights();
+    }, delay));
   }
 
   function schedulePageHighlightRestore() {
@@ -381,28 +390,55 @@
     window.addEventListener('remark:urlchange', () => restorePageHighlights());
   }
 
+  const LOCATE_CLIP_RETRY_DELAYS = [250, 500, 900, 1500, 2400, 3600, 5000, 6500];
+  const pendingClipLocations = new Set();
+
+  function resolvePendingClipLocation(clipId) {
+    if (!pendingClipLocations.delete(clipId)) return;
+    window.requestAnimationFrame(() => {
+      const mark = document.querySelector(`mark[data-clip-id="${clipId}"]`);
+      if (mark) performLocateAnimation(mark);
+      else locateAndAnimateClip(clipId, 1);
+    });
+  }
+
   // Locate clip by ID, scroll into view and play animation.
   function locateAndAnimateClip(clipId, attempt = 0) {
     const mark = document.querySelector(`mark[data-clip-id="${clipId}"]`);
     if (mark) {
-      performLocateAnimation(mark);
+      if (pendingClipLocations.has(clipId)) resolvePendingClipLocation(clipId);
+      else performLocateAnimation(mark);
       return;
     }
-    if (attempt >= 5) { reportSourceUnavailable(clipId); return; }
+    if (attempt === 0) pendingClipLocations.add(clipId);
+    if (attempt >= LOCATE_CLIP_RETRY_DELAYS.length) { pendingClipLocations.delete(clipId); reportSourceUnavailable(clipId); return; }
     Promise.resolve(restorePageHighlights()).finally(() => {
-      setTimeout(() => locateAndAnimateClip(clipId, attempt + 1), 250 + attempt * 300);
+      setTimeout(() => locateAndAnimateClip(clipId, attempt + 1), LOCATE_CLIP_RETRY_DELAYS[attempt]);
     });
   }
   function reportSourceUnavailable(clipId) {
     showPageToast(t('source_unavailable'));
     try { chrome.runtime?.sendMessage({ action: 'SOURCE_MARK_UNAVAILABLE', clipId, url: window.location.href }); } catch (_) {}
   }
+  function acknowledgeSourceClipLocation(mark, attempt = 0) {
+    const clipId = mark?.getAttribute('data-clip-id');
+    if (!clipId) return;
+    const rect = mark.getBoundingClientRect();
+    const visible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+    if (!visible && attempt < 4) {
+      window.setTimeout(() => acknowledgeSourceClipLocation(mark, attempt + 1), 180);
+      return;
+    }
+    try { chrome.runtime?.sendMessage({ action: 'SOURCE_CLIP_LOCATED', clipId }); } catch (_) {}
+  }
+
   function performLocateAnimation(mark) {
     const focus = () => {
       mark.classList.remove('remark-locate-pulse');
       void mark.offsetWidth;
       mark.classList.add('remark-locate-pulse');
       setTimeout(() => mark.classList.remove('remark-locate-pulse'), 1300);
+      acknowledgeSourceClipLocation(mark);
     };
     const rect = mark.getBoundingClientRect();
     const visible = rect.top >= 0 && rect.bottom <= window.innerHeight;
@@ -500,6 +536,7 @@
     await ReMarkStorage.pushUndo({ type: 'restore_clip', id: savedClip.id });
     if (range) {
       highlightDOMRange(range, savedClip, true);
+      scheduleCurrentPageHighlightRecovery();
       if (!options.suppressActions) showHighlightActions(savedClip.id, 2800);
       window.getSelection()?.removeAllRanges();
     }
@@ -858,12 +895,14 @@
           bindHighlightClick(mark, clip);
           if (showNote) attachNoteControl(mark, clip);
         });
+        resolvePendingClipLocation(clip.id);
         return;
       }
       const mark = createMark(Boolean(clip.note));
       range.surroundContents(mark);
       bindHighlightClick(mark, clip);
       if (clip.note) attachNoteControl(mark, clip);
+      resolvePendingClipLocation(clip.id);
     } catch (error) {
       console.warn('[ReMark] Highlight DOM range fallback:', error);
       try {
@@ -873,6 +912,7 @@
         range.insertNode(mark);
         bindHighlightClick(mark, clip);
         if (clip.note) attachNoteControl(mark, clip);
+        resolvePendingClipLocation(clip.id);
       } catch (fallbackError) {
         console.error('[ReMark] Fallback highlight failed:', fallbackError);
       }

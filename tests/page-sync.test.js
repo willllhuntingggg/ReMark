@@ -124,3 +124,32 @@ assert.match(read('sidepanel/sidepanel.css'), /\.mark-created \{[\s\S]*margin-le
 assert.match(read('sidepanel/sidepanel.css'), /\.mark-more \{[\s\S]*font-size: 16px;[\s\S]*font-weight: 400;/);
 assert.match(read('content/content.css'), /remark-mark-actions\.is-visible/);
 console.log('page-highlight-actions assertions passed');
+
+assert.match(content, /function scheduleCurrentPageHighlightRecovery\(\) \{[\s\S]*\[0, 250, 900, 2200\]\.map[\s\S]*restorePageHighlights\(\)/);
+assert.match(content, /changes\?\.\[ReMarkStorage\.KEYS\.CLIPS\]\) scheduleCurrentPageHighlightRecovery\(\);/);
+assert.match(content, /highlightDOMRange\(range, savedClip, true\);[\s\S]*scheduleCurrentPageHighlightRecovery\(\);/);
+console.log('dynamic page immediate highlight recovery assertions passed');
+
+assert.match(background, /const PENDING_SOURCE_LOCATE_DELAYS = \[0, 600, 1800, 4200, 7000, 10000\];/);
+assert.match(background, /chrome\.webNavigation\.onCompleted\.addListener\(\(details\) => \{[\s\S]*deliverPendingSourceLocate\(details\.tabId, pending\)/);
+assert.match(background, /function deliverPendingSourceLocate\(tabId, pending\)[\s\S]*RESTORE_HIGHLIGHTS[\s\S]*LOCATE_CLIP/);
+assert.match(content, /const LOCATE_CLIP_RETRY_DELAYS = \[250, 500, 900, 1500, 2400, 3600, 5000, 6500\];/);
+assert.match(content, /attempt >= LOCATE_CLIP_RETRY_DELAYS\.length[\s\S]*LOCATE_CLIP_RETRY_DELAYS\[attempt\]/);
+assert.match(sidepanel, /await chrome\.runtime\.sendMessage\(\{ action: 'TRACK_SOURCE_NAVIGATION'[\s\S]*\[900, 2200, 4500\][\s\S]*LOCATE_CLIP/);
+console.log('source jump initial-locate recovery assertions passed');
+
+assert.match(content, /const pendingClipLocations = new Set\(\);/);
+assert.match(content, /function resolvePendingClipLocation\(clipId\) \{[\s\S]*requestAnimationFrame[\s\S]*performLocateAnimation\(mark\)/);
+assert.match(content, /if \(attempt === 0\) pendingClipLocations\.add\(clipId\);/);
+assert.match(content, /textSegments\.slice\(\)\.reverse\(\)\.forEach[\s\S]*resolvePendingClipLocation\(clip\.id\);[\s\S]*return;/);
+assert.match(content, /range\.surroundContents\(mark\);[\s\S]*resolvePendingClipLocation\(clip\.id\);/);
+assert.match(content, /range\.insertNode\(mark\);[\s\S]*resolvePendingClipLocation\(clip\.id\);/);
+console.log('source jump target-mounted locate assertions passed');
+
+assert.doesNotMatch(background, /window\.setTimeout/);
+assert.match(background, /chrome\.tabs\.get\(message\.tabId\)[\s\S]*tab\.status === 'complete'[\s\S]*deliverPendingSourceLocate/);
+assert.match(background, /function acknowledgePendingSourceLocate\(tabId, clipId\)[\s\S]*pendingSourceNavigations\.delete\(tabId\)/);
+assert.match(background, /message\.action === 'SOURCE_CLIP_LOCATED'[\s\S]*acknowledgePendingSourceLocate\(sender\.tab\.id, message\.clipId\)/);
+assert.match(content, /function acknowledgeSourceClipLocation\(mark, attempt = 0\)[\s\S]*SOURCE_CLIP_LOCATED/);
+assert.match(content, /function performLocateAnimation\(mark\)[\s\S]*acknowledgeSourceClipLocation\(mark\)/);
+console.log('source jump service-worker acknowledgement assertions passed');

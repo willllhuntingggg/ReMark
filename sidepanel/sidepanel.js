@@ -880,8 +880,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       if (item.type === 'highlight') {
         const tab = await chrome.tabs.create({ url: pageUrl, active: true });
-        try { chrome.runtime.sendMessage({ action: 'TRACK_SOURCE_NAVIGATION', tabId: tab.id, clipId: item.id, url: pageUrl }); } catch (_) {}
-        setTimeout(() => { safeSendMessage(tab.id, { action: 'RESTORE_HIGHLIGHTS' }); safeSendMessage(tab.id, { action: 'LOCATE_CLIP', clipId: item.id }); }, 900);
+        try { await chrome.runtime.sendMessage({ action: 'TRACK_SOURCE_NAVIGATION', tabId: tab.id, clipId: item.id, url: pageUrl }); } catch (_) {}
+        [900, 2200, 4500].forEach((delay) => setTimeout(() => { safeSendMessage(tab.id, { action: 'RESTORE_HIGHLIGHTS' }); safeSendMessage(tab.id, { action: 'LOCATE_CLIP', clipId: item.id }); }, delay));
         return;
       }
     } catch (error) {

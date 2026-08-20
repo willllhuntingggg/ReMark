@@ -8,10 +8,15 @@ const storage = fs.readFileSync(path.resolve(__dirname, '../lib/storage.js'), 'u
 const i18n = fs.readFileSync(path.resolve(__dirname, '../lib/i18n.js'), 'utf8');
 const css = fs.readFileSync(path.resolve(__dirname, '../content/content.css'), 'utf8');
 
-// Two onboarding pages with carousel navigation and a replay entry point.
+// Three onboarding pages with carousel navigation and a replay entry point.
 assert.match(content, /data-onboarding-page="text"/);
 assert.match(content, /data-onboarding-page="video"/);
+assert.match(content, /data-onboarding-page="find"/);
 assert.match(content, /data-onboarding-text/);
+assert.match(content, /onboardingFindPage\(\)/);
+assert.match(content, /ob-find-panel/);
+assert.match(content, /ob-find-mark-card/);
+assert.match(content, /onboarding_page_dot', \{ page: 3 \}/);
 assert.match(content, /showFirstUseGuide\(\{ manual: true \}\)/);
 assert.match(content, /remark-onboarding-prev/);
 assert.match(content, /remark-onboarding-next/);
@@ -67,6 +72,9 @@ assert.doesNotMatch(enOnboardingCopy, /Drag/);
 assert.match(i18n, /onboarding_text_sample_before: 'ReMark is '/);
 assert.match(i18n, /onboarding_text_sample: 'a lightweight capture tool for people who encounter something worth remembering'/);
 assert.match(i18n, /onboarding_text_sample_after: ' while reading webpages or watching videos\.'/);
+const enFindCopy = i18n.slice(i18n.indexOf("onboarding_find_title: 'Find your Marks'"), i18n.indexOf("onboarding_marked: 'Marked'"));
+assert.match(enFindCopy, /Open ReMark from the extension icon to see all your Marks\./);
+assert.match(enFindCopy, /Click a Mark to jump back to where you found it\./);
 
 // Title and description sit above the animation; only the hint stays below.
 const textPageMarkup = content.slice(content.indexOf('function onboardingTextPage'), content.indexOf('function onboardingVideoPage'));
@@ -77,6 +85,12 @@ assert.ok(textPageMarkup.indexOf('ob-text-action-anchor') < textPageMarkup.index
 const videoPageMarkup = content.slice(content.indexOf('function onboardingVideoPage'), content.indexOf('async function showFirstUseGuide'));
 assert.ok(videoPageMarkup.indexOf('<h2>') < videoPageMarkup.indexOf('remark-onboarding-anim'));
 assert.ok(videoPageMarkup.indexOf('remark-onboarding-anim') < videoPageMarkup.indexOf('remark-onboarding-hint'));
+const findPageMarkup = content.slice(content.indexOf('function onboardingFindPage'), content.indexOf('async function showFirstUseGuide'));
+assert.ok(findPageMarkup.indexOf('<h2>') < findPageMarkup.indexOf('remark-onboarding-anim'));
+assert.ok(findPageMarkup.indexOf('remark-onboarding-anim') < findPageMarkup.indexOf('remark-onboarding-hint'));
+assert.match(findPageMarkup, /ONBOARDING_BLACK_MARK_PILL_ICON/);
+assert.match(findPageMarkup, /ob-find-extension/);
+assert.match(findPageMarkup, /ob-find-panel-header/);
 
 // Both looping animations exist and reuse real ReMark visual language.
 assert.doesNotMatch(css, /ob-text-cursor/);
@@ -87,6 +101,12 @@ assert.match(css, /@keyframes ob-mark-pill/);
 assert.match(css, /@keyframes ob-text-click-ring/);
 assert.match(css, /@keyframes ob-video-keypress/);
 assert.match(css, /@keyframes ob-video-flag/);
+assert.match(css, /\.remark-onboarding-anim--find\s*\{/);
+assert.match(css, /\.ob-find-extension\s*\{[\s\S]*?animation: ob-find-extension 7\.5s linear infinite/);
+assert.match(css, /\.ob-find-panel\s*\{[\s\S]*?animation: ob-find-panel 7\.5s/);
+assert.match(css, /\.ob-find-mark-card\s*\{[\s\S]*?animation: ob-find-mark-card 7\.5s/);
+assert.match(css, /@keyframes ob-find-document-scroll/);
+assert.match(css, /@keyframes ob-find-source-highlight/);
 assert.match(css, /\.ob-mark-pill\.remark-mark-actions\s*\{[\s\S]*?animation: ob-mark-pill/);
 assert.match(css, /\.ob-mark-pill \.ob-mark-btn\s*\{[\s\S]*?pointer-events: none/);
 assert.match(css, /\.ob-click-ring\s*\{[\s\S]*?animation: ob-text-click-ring/);

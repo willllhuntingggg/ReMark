@@ -150,6 +150,54 @@
     ].join('');
   }
 
+  // Page 3 keeps the product loop deliberately narrow: the real highlighter
+  // icon opens a compact ReMark Side Panel, then its Mark card returns focus
+  // to the matching yellow source highlight. It is a visual demo only.
+  function onboardingFindPage() {
+    return [
+      '<section class="remark-onboarding-page" data-onboarding-page="find">',
+      `<h2>${t('onboarding_find_title')}</h2>`,
+      `<p class="remark-onboarding-description">${t('onboarding_find_description')}</p>`,
+      '<div class="remark-onboarding-anim remark-onboarding-anim--find" aria-hidden="true">',
+      '<div class="ob-find-stage">',
+      '<div class="ob-find-browser">',
+      '<div class="ob-find-toolbar">',
+      '<span class="ob-find-browser-dots"><i></i><i></i><i></i></span>',
+      '<span class="ob-find-address"></span>',
+      `<span class="ob-find-extension">${ONBOARDING_BLACK_MARK_PILL_ICON}</span>`,
+      '<span class="ob-find-extension-ring"></span>',
+      '</div>',
+      '<div class="ob-find-page-viewport"><div class="ob-find-document">',
+      '<span class="ob-find-page-heading"></span>',
+      '<span class="ob-find-page-line ob-find-page-line--wide"></span>',
+      '<span class="ob-find-page-line"></span>',
+      '<span class="ob-find-page-line ob-find-page-line--short"></span>',
+      '<span class="ob-find-page-line ob-find-page-line--wide ob-find-page-line--lower"></span>',
+      '<span class="ob-find-source-highlight"></span>',
+      '<span class="ob-find-page-line ob-find-page-line--short ob-find-page-line--after"></span>',
+      '</div></div>',
+      '<aside class="ob-find-panel">',
+      '<div class="ob-find-panel-header">',
+      `<span>${t('timeline')}</span>`,
+      '<i>•••</i>',
+      '</div>',
+      '<div class="ob-find-search"></div>',
+      '<button class="ob-find-mark-card" type="button" tabindex="-1">',
+      '<span class="ob-find-mark-source"></span>',
+      '<span class="ob-find-mark-copy ob-find-mark-copy--first"></span>',
+      '<span class="ob-find-mark-copy ob-find-mark-copy--highlight"></span>',
+      '<span class="ob-find-mark-copy ob-find-mark-copy--last"></span>',
+      '</button>',
+      '</aside>',
+      `<span class="ob-find-hand ob-find-hand--extension">${ONBOARDING_CURSOR_CLICK_ICON}</span>`,
+      `<span class="ob-find-hand ob-find-hand--mark">${ONBOARDING_CURSOR_CLICK_ICON}</span>`,
+      '<span class="ob-find-mark-ring"></span>',
+      '</div></div>',
+      `<p class="remark-onboarding-hint">${t('onboarding_find_hint')}</p>`,
+      '</section>'
+    ].join('');
+  }
+
   async function showFirstUseGuide(options = {}) {
     if (document.getElementById(ONBOARDING_MODAL_ID)) return;
     const manual = Boolean(options.manual);
@@ -168,10 +216,12 @@
         '<div class="remark-onboarding-pages">',
         onboardingTextPage(mods),
         onboardingVideoPage(mods),
+        onboardingFindPage(),
         '</div>',
         '<div class="remark-onboarding-dots">',
         `<button type="button" class="is-active" aria-label="${t('onboarding_page_dot', { page: 1 })}" aria-current="true"></button>`,
         `<button type="button" aria-label="${t('onboarding_page_dot', { page: 2 })}" aria-current="false"></button>`,
+        `<button type="button" aria-label="${t('onboarding_page_dot', { page: 3 })}" aria-current="false"></button>`,
         '</div>',
         '<div class="remark-onboarding-actions">',
         `<button class="remark-onboarding-skip" type="button">${t('onboarding_skip')}</button>`,

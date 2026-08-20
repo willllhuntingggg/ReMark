@@ -998,6 +998,286 @@ html.remark-page-light mark.remark-highlight-mark {
   animation: ob-video-success 6.5s linear infinite;
 }
 
+/* -------- Looping animation (Find your Marks) --------
+ * Design note: a faithful miniature of the essential ReMark loop only—browser
+ * toolbar icon, Side Panel Mark card, then the matching source highlight. */
+
+.remark-onboarding-anim--find {
+  height: 172px;
+  background: #f4f2ed;
+  border: 1px solid #e5e1d9;
+}
+
+.ob-find-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ob-find-browser {
+  position: absolute;
+  inset: 10px;
+  overflow: hidden;
+  border: 1px solid #dad6ce;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 13px rgba(35, 37, 41, .09);
+}
+
+.ob-find-toolbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 25px;
+  padding: 0 8px;
+  border-bottom: 1px solid #e5e1d9;
+  background: #f7f6f2;
+}
+
+.ob-find-browser-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.ob-find-browser-dots i {
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #c9c5bd;
+}
+
+.ob-find-address {
+  display: block;
+  width: 49%;
+  height: 7px;
+  margin-left: 10px;
+  border-radius: 999px;
+  background: #e7e4dd;
+}
+
+.ob-find-extension {
+  position: absolute;
+  right: 8px;
+  top: 4px;
+  z-index: 6;
+  display: grid;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  border-radius: 5px;
+  background: rgb(250, 222, 74);
+  color: #000;
+  box-shadow: 0 1px 3px rgba(35, 37, 41, .16);
+  animation: ob-find-extension 7.5s linear infinite;
+}
+
+.ob-find-extension svg {
+  width: 10px;
+  height: 10px;
+  fill: #000 !important;
+  stroke: #000 !important;
+}
+
+.ob-find-extension svg path {
+  fill: #000 !important;
+  stroke: #000 !important;
+}
+
+.ob-find-extension-ring,
+.ob-find-mark-ring {
+  position: absolute;
+  z-index: 8;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid rgb(250, 222, 74);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.ob-find-extension-ring {
+  right: 11px;
+  top: 7px;
+  animation: ob-find-extension-ring 7.5s linear infinite;
+}
+
+.ob-find-page-viewport {
+  position: absolute;
+  top: 26px;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  overflow: hidden;
+  background: #fff;
+}
+
+.ob-find-document {
+  position: absolute;
+  inset: 0;
+  padding: 13px 13px 0;
+  box-sizing: border-box;
+  animation: ob-find-document-scroll 7.5s cubic-bezier(.22, .82, .32, 1) infinite;
+}
+
+.ob-find-page-heading,
+.ob-find-page-line,
+.ob-find-source-highlight {
+  position: absolute;
+  left: 13px;
+  display: block;
+}
+
+.ob-find-page-heading {
+  top: 13px;
+  width: 72px;
+  height: 7px;
+  border-radius: 4px;
+  background: #ccc8be;
+}
+
+.ob-find-page-line {
+  top: 34px;
+  width: 62%;
+  height: 6px;
+  border-radius: 3px;
+  background: #e7e4dd;
+}
+
+.ob-find-page-line--wide { width: 76%; }
+.ob-find-page-line--short { width: 48%; }
+.ob-find-page-line:nth-of-type(3) { top: 48px; }
+.ob-find-page-line:nth-of-type(4) { top: 62px; }
+.ob-find-page-line--lower { top: 102px !important; }
+.ob-find-page-line--after { top: 160px !important; }
+
+.ob-find-source-highlight {
+  top: 134px;
+  width: 78%;
+  height: 16px;
+  border-radius: 3px;
+  background: rgb(250, 222, 74);
+  box-shadow: 0 2px 0 rgb(250, 222, 74), 0 -2px 0 rgb(250, 222, 74);
+  opacity: 0;
+  animation: ob-find-source-highlight 7.5s linear infinite;
+}
+
+.ob-find-panel {
+  position: absolute;
+  top: 26px;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  width: 47%;
+  box-sizing: border-box;
+  padding: 10px 8px;
+  border-left: 1px solid #dedad2;
+  background: rgba(255, 255, 255, .98);
+  box-shadow: -5px 0 14px rgba(35, 37, 41, .09);
+  transform: translateX(108%);
+  animation: ob-find-panel 7.5s cubic-bezier(.22, .82, .32, 1) infinite;
+}
+
+.ob-find-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #34383e;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.ob-find-panel-header i {
+  color: #8b909a;
+  font-size: 8px;
+  font-style: normal;
+  letter-spacing: 1px;
+}
+
+.ob-find-search {
+  height: 13px;
+  margin-top: 8px;
+  border-radius: 4px;
+  background: #f0eee9;
+}
+
+.ob-find-mark-card {
+  display: block;
+  width: 100%;
+  margin-top: 9px;
+  padding: 7px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  cursor: default;
+  text-align: left;
+  animation: ob-find-mark-card 7.5s linear infinite;
+}
+
+.ob-find-mark-source,
+.ob-find-mark-copy {
+  display: block;
+  border-radius: 2px;
+}
+
+.ob-find-mark-source {
+  width: 34px;
+  height: 4px;
+  background: #a5a9af;
+}
+
+.ob-find-mark-copy {
+  height: 4px;
+  margin-top: 5px;
+  background: #d6d4ce;
+}
+
+.ob-find-mark-copy--first { width: 91%; }
+.ob-find-mark-copy--highlight { width: 75%; background: rgb(250, 222, 74); }
+.ob-find-mark-copy--last { width: 53%; }
+
+.ob-find-hand {
+  position: absolute;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.ob-find-hand svg {
+  display: block;
+  width: 17px;
+  height: auto;
+  fill: #fff !important;
+  stroke: #000 !important;
+  stroke-width: 18px !important;
+  stroke-linejoin: round;
+}
+
+.ob-find-hand svg path {
+  fill: #fff !important;
+  stroke: #000 !important;
+  stroke-width: 18px !important;
+}
+
+.ob-find-hand--extension {
+  right: 7px;
+  top: 11px;
+  animation: ob-find-extension-hand 7.5s linear infinite;
+}
+
+.ob-find-hand--mark {
+  right: 24%;
+  top: 80px;
+  animation: ob-find-mark-hand 7.5s linear infinite;
+}
+
+.ob-find-mark-ring {
+  right: 27%;
+  top: 86px;
+  animation: ob-find-mark-ring 7.5s linear infinite;
+}
+
 /* -------- Keyframes -------- */
 
 @keyframes ob-text-ink {
@@ -1071,6 +1351,66 @@ html.remark-page-light mark.remark-highlight-mark {
   0%, 56% { opacity: 0; transform: translateX(-50%) translateY(4px) scale(.96); }
   62%, 82% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
   92%, 100% { opacity: 0; transform: translateX(-50%) translateY(4px) scale(.96); }
+}
+
+@keyframes ob-find-extension {
+  0%, 8% { transform: scale(1); }
+  15% { transform: scale(.82); }
+  20%, 100% { transform: scale(1); }
+}
+
+@keyframes ob-find-extension-ring {
+  0%, 13% { opacity: 0; transform: scale(.5); }
+  16% { opacity: 1; transform: scale(.65); }
+  23% { opacity: 0; transform: scale(2.2); }
+  100% { opacity: 0; transform: scale(2.2); }
+}
+
+@keyframes ob-find-extension-hand {
+  0%, 9% { opacity: 0; transform: scale(1); }
+  12%, 18% { opacity: 1; transform: scale(1); }
+  20% { opacity: 1; transform: scale(.78); }
+  24%, 100% { opacity: 0; transform: scale(.78); }
+}
+
+@keyframes ob-find-panel {
+  0%, 18% { opacity: 0; transform: translateX(108%); }
+  26%, 84% { opacity: 1; transform: translateX(0); }
+  94%, 100% { opacity: 0; transform: translateX(108%); }
+}
+
+@keyframes ob-find-mark-card {
+  0%, 51% { background: transparent; box-shadow: none; transform: translateX(0); }
+  55% { background: #f1f0eb; box-shadow: 0 0 0 1px rgba(250, 222, 74, .65); transform: translateX(-1px) scale(.98); }
+  62%, 83% { background: #f7f6f2; box-shadow: 0 0 0 1px rgba(250, 222, 74, .38); transform: translateX(0) scale(1); }
+  92%, 100% { background: transparent; box-shadow: none; transform: translateX(0); }
+}
+
+@keyframes ob-find-mark-hand {
+  0%, 49% { opacity: 0; transform: scale(1); }
+  52%, 56% { opacity: 1; transform: scale(1); }
+  58% { opacity: 1; transform: scale(.78); }
+  63%, 100% { opacity: 0; transform: scale(.78); }
+}
+
+@keyframes ob-find-mark-ring {
+  0%, 55% { opacity: 0; transform: scale(.45); }
+  58% { opacity: 1; transform: scale(.65); }
+  65% { opacity: 0; transform: scale(2.2); }
+  100% { opacity: 0; transform: scale(2.2); }
+}
+
+@keyframes ob-find-document-scroll {
+  0%, 54% { transform: translateY(0); }
+  61%, 84% { transform: translateY(-94px); }
+  94%, 100% { transform: translateY(0); }
+}
+
+@keyframes ob-find-source-highlight {
+  0%, 56% { opacity: 0; transform: scaleX(.92); }
+  63%, 80% { opacity: 1; transform: scaleX(1); }
+  85% { opacity: 1; transform: scaleX(1.03); }
+  93%, 100% { opacity: 0; transform: scaleX(.92); }
 }
 
 /* -------- Dots & actions -------- */

@@ -9,9 +9,13 @@ const sidepanel = read('sidepanel/sidepanel.js');
 assert.match(content, /function videoMarkSourceUrl\(mark\)[\s\S]*url\.searchParams\.set\('t', String\(time\)\)/);
 assert.match(content, /async function copyVideoMark\(mark, button\)[\s\S]*const payload = videoMarkSourceUrl\(mark\)/);
 assert.doesNotMatch(content.slice(content.indexOf('async function copyVideoMark'), content.indexOf('// Hovering a video mark')), /mark\.title|formatVideoTime\(mark\.time\)/);
+assert.match(content, /const VIDEO_MARK_REPLAY_PREROLL_SECONDS = 5;/);
+assert.match(content, /function seekVideoToMark\(time\)[\s\S]*video\.currentTime = Math\.max\(0, Number\(time\) - VIDEO_MARK_REPLAY_PREROLL_SECONDS\)/);
+assert.match(content, /dot\.addEventListener\('click', \(e\) => \{[\s\S]*seekVideoToMark\(m\.time\);/);
 
 assert.match(sidepanel, /const videoMarkSourceUrl = \(item\) => \{[\s\S]*url\.searchParams\.set\('t', String\(time\)\)/);
+assert.match(sidepanel, /const videoReplaySourceUrl = \(item\) => \{[\s\S]*Math\.floor\(\(Number\(item\?\.time\) \|\| 0\) - 5\)[\s\S]*url\.searchParams\.set\('t', String\(time\)\)/);
 assert.match(sidepanel, /async function copyMark\(key, button\)[\s\S]*videoMarkSourceUrl\(item\)/);
-assert.match(sidepanel, /window\.open\(item\.type === 'video' \? videoMarkSourceUrl\(item\) : pageUrl/);
+assert.match(sidepanel, /window\.open\(item\.type === 'video' \? videoReplaySourceUrl\(item\) : pageUrl/);
 
 console.log('video-copy-source-url.test.js: all assertions passed');

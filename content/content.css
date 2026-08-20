@@ -180,6 +180,14 @@ mark.remark-highlight-mark {
   transform: translateY(0);
   transition-delay: .65s;
 }
+/* After a Mark click, the pointer is still on the now-Unmark button. Require a
+   deliberate leave-and-reenter before showing that newly changed tooltip. */
+.remark-mark-action.remark-tooltip-await-reentry::after,
+.remark-mark-action.remark-tooltip-await-reentry:hover::after {
+  opacity: 0;
+  transform: translateY(3px);
+  transition-delay: 0s;
+}
 /* Source-page interaction may retain keyboard focus internally but has no selected visual state. */
 mark.remark-highlight-mark.remark-selected { outline: none; }
 /* Locate pulse when jumping to a mark from the panel. */
@@ -273,6 +281,20 @@ html.remark-page-light mark.remark-highlight-mark {
   position: absolute;
   top: 50%;
   z-index: 90;
+  pointer-events: auto;
+}
+
+/* Shorts swaps and fades its native progress DOM. This layer lives in the
+   active player so persistent Mark flags remain above that transient control. */
+.remark-video-marker-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 71;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.remark-video-marker-layer .remark-video-mark {
   pointer-events: auto;
 }
 

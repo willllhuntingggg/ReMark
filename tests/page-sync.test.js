@@ -62,6 +62,9 @@ assert.match(content, /showMarkPill\(\{ text, range: range\.cloneRange\(\), sour
 assert.match(content, /remark-mark-pill/);
 assert.match(content, /t\('unmark'\)/);
 assert.match(content, /remark-mark-action--marked/);
+assert.match(content, /function suppressPillTooltipUntilPointerReentry\(button\)[\s\S]*?button\?\.matches\(':hover'\)[\s\S]*?remark-tooltip-await-reentry[\s\S]*?addEventListener\('pointerleave'[\s\S]*?remove\('remark-tooltip-await-reentry'\)[\s\S]*?once: true/);
+assert.match(content, /updatePillMarkState\(true, saved\.id\);[\s\S]*?suppressPillTooltipUntilPointerReentry\(markPillEl\.querySelector\('\.remark-mark-action--mark'\)\)/);
+assert.match(read('content/content.css'), /\.remark-mark-action\.remark-tooltip-await-reentry:hover::after \{[\s\S]*?opacity: 0;/);
 assert.match(content, /function textMarkShortcutHint\(\)[\s\S]*navigator\.userAgentData\?\.platform[\s\S]*text_mark_shortcut_mac[\s\S]*text_mark_shortcut_ctrl/);
 assert.match(content, /markBtn\.dataset\.hint = textMarkShortcutHint\(\)/);
 assert.match(content, /function onVideoMarkKeydown\(e\)[\s\S]*\(e\.key === 'm' \|\| e\.key === 'M'\)/);

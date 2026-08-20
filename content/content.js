@@ -791,6 +791,15 @@
         : () => { void copySelectionFromPill(copyBtn); };
     }
   }
+  // Clicking Mark leaves the pointer on the same button. Keep its new Unmark
+  // tooltip quiet until the user deliberately leaves and re-enters that button.
+  function suppressPillTooltipUntilPointerReentry(button) {
+    if (!button?.matches(':hover')) return;
+    button.classList.add('remark-tooltip-await-reentry');
+    button.addEventListener('pointerleave', () => {
+      button.classList.remove('remark-tooltip-await-reentry');
+    }, { once: true });
+  }
   function showMarkPill(context, point) {
     clearTimeout(markPillHideTimer);
     markPillContext = context;
@@ -862,6 +871,7 @@
       markPillClipId = saved.id;
       // Only the buttons' state flips — the row stays fixed, no flash.
       updatePillMarkState(true, saved.id);
+      suppressPillTooltipUntilPointerReentry(markPillEl.querySelector('.remark-mark-action--mark'));
       scheduleMarkPillHide(4000);
     } catch (error) {
       console.warn('[ReMark] Mark from pill failed:', error);
@@ -1241,7 +1251,10 @@
   let markCreationTime = null;
   let markCreationAnchor = null;
   let markCreationPointerHandler = null;
+  const VIDEO_MARK_REPLAY_PREROLL_SECONDS = 5;
   const healedVideoKeys = new Set();
+  const videoMarkerNodeIds = new WeakMap();
+  let nextVideoMarkerNodeId = 1;
 
   function detectVideoPlatform() {
     const host = window.location.hostname;
@@ -1318,13 +1331,40 @@
         return (stripped && !/^youtube$/i.test(stripped)) ? stripped : (document.title || 'YouTube 视频');
       },
       findVideoElement() {
-        const main = document.querySelector('video.html5-main-video');
-        if (main) return main;
-        const fallback = document.querySelector('video');
-        if (fallback && fallback.duration > 0) return fallback;
-        return fallback;
+        // Shorts keeps adjacent reel videos mounted. Prefer the active reel so
+        // a Mark never targets an off-screen or preloaded video element.
+        const activeShort = document.querySelector('ytd-reel-video-renderer[is-active] video.html5-main-video');
+        if (activeShort) return activeShort;
+        const candidates = [...document.querySelectorAll('video.html5-main-video, video')]
+          .filter((video) => {
+            const rect = video.getBoundingClientRect();
+            return rect.width >= 40 && rect.height >= 40 && getComputedStyle(video).visibility !== 'hidden';
+          })
+          .sort((a, b) => {
+            const aRect = a.getBoundingClientRect();
+            const bRect = b.getBoundingClientRect();
+            return (bRect.width * bRect.height) - (aRect.width * aRect.height);
+          });
+        if (candidates[0]) return candidates[0];
+        return document.querySelector('video.html5-main-video, video');
       },
       findProgressBar() {
+        // The current Shorts player exposes its visual seek rail as a native
+        // slider, not as YouTube's desktop `.ytp-progress-bar` element.
+        const shortsRails = [
+          '#shorts-player [role="slider"].ytPlayerProgressBarDragContainer',
+          'ytd-shorts [role="slider"].ytPlayerProgressBarDragContainer',
+          '[role="slider"].ytPlayerProgressBarDragContainer'
+        ];
+        for (const selector of shortsRails) {
+          const rail = document.querySelector(selector);
+          if (rail && rail.getBoundingClientRect().width > 0) return rail;
+        }
+        const activeShort = document.querySelector('ytd-reel-video-renderer[is-active]');
+        if (activeShort) {
+          const activeBar = activeShort.querySelector('.ytp-progress-bar, .ytp-progress-container');
+          if (activeBar && activeBar.getBoundingClientRect().width > 0) return activeBar;
+        }
         const candidates = ['.ytp-progress-bar', '.ytp-progress-container'];
         for (const sel of candidates) {
           const el = document.querySelector(sel);
@@ -1359,7 +1399,31 @@
   function findVideoElement() { const p = detectVideoPlatform(); return p ? VIDEO_PLATFORMS[p].findVideoElement() : document.querySelector('video'); }
   function findVideoProgressBar() { const p = detectVideoPlatform(); return p ? VIDEO_PLATFORMS[p].findProgressBar() : null; }
 
-  function getVideoMarkerHost(bar) {
+  function isYouTubeShortsPage() {
+    return detectVideoPlatform() === 'youtube' && /\/shorts\//.test(window.location.pathname);
+  }
+  function markerNodeId(node) {
+    if (!node) return 'none';
+    if (!videoMarkerNodeIds.has(node)) videoMarkerNodeIds.set(node, nextVideoMarkerNodeId++);
+    return videoMarkerNodeIds.get(node);
+  }
+  function getVideoMarkerHost(bar, video) {
+    // Shorts frequently replaces or auto-hides the native progress subtree.
+    // A dedicated layer in the active player remains above its controls and
+    // keeps Mark flags attached to the visible reel rather than a stale bar.
+    if (isYouTubeShortsPage()) {
+      const player = video?.closest('.html5-video-player') || video?.parentElement;
+      if (player) {
+        if (window.getComputedStyle(player).position === 'static') player.style.position = 'relative';
+        let layer = [...player.children].find((node) => node.classList?.contains('remark-video-marker-layer'));
+        if (!layer) {
+          layer = document.createElement('div');
+          layer.className = 'remark-video-marker-layer';
+          player.appendChild(layer);
+        }
+        return layer;
+      }
+    }
     const platform = detectVideoPlatform();
     const host = platform ? VIDEO_PLATFORMS[platform].findMarkerHost(bar) : bar;
     if (window.getComputedStyle(host).position === 'static') host.style.position = 'relative';
@@ -1454,7 +1518,9 @@
   }
   function initVideoMarkFeature() {
     if (!detectVideoPlatform()) return;
-    document.addEventListener('keydown', onVideoMarkKeydown);
+    // Capture prevents YouTube Shorts' native M handler from receiving the
+    // Command/Ctrl+M shortcut after ReMark has consumed it.
+    document.addEventListener('keydown', onVideoMarkKeydown, true);
     document.getElementById('remark-video-mark-btn')?.remove();
     renderVideoMarkers();
     if (detectVideoPlatform() === 'bilibili') {
@@ -1478,6 +1544,7 @@
     if (!isVideoPage()) return;
     if (document.getElementById(ONBOARDING_MODAL_ID)) return;
     e.preventDefault();
+    e.stopImmediatePropagation();
     recordVideoMark({ withNote: e.shiftKey });
   }
   function pulseVideoMarker(mark, video) {
@@ -1881,7 +1948,7 @@
     const video = findVideoElement();
     const bar = findVideoProgressBar();
     const dur = video ? video.duration : 0;
-    const sig = bar ? `${bar.getBoundingClientRect().width}:${isFinite(dur) ? Math.round(dur) : 0}:${!!video}` : 'nobar';
+    const sig = bar ? `${markerNodeId(video)}:${markerNodeId(bar)}:${bar.getBoundingClientRect().width}:${isFinite(dur) ? Math.round(dur) : 0}` : `nobar:${markerNodeId(video)}`;
     if (videoMarkRenderSig === sig) return;
     videoMarkRenderSig = sig;
     renderVideoMarkers();
@@ -1901,7 +1968,7 @@
       healVideoMarkTitles(vkey).then((did) => { if (did) renderVideoMarkers(); });
     }
 
-    const host = getVideoMarkerHost(bar);
+    const host = getVideoMarkerHost(bar, video);
     host.querySelectorAll('.remark-video-mark').forEach(el => el.remove());
     if (!(markTooltipEl && markTooltipEl.matches(':hover'))) hideMarkTooltip();
 
@@ -1917,8 +1984,7 @@
       dot.setAttribute('aria-label', t('video_marker'));
       dot.addEventListener('click', (e) => {
         e.stopPropagation();
-        video.currentTime = m.time;
-        if (video.paused) video.play().catch(() => {});
+        seekVideoToMark(m.time);
       });
       dot.addEventListener('mouseenter', () => { showMarkTooltip(dot, m); });
       dot.addEventListener('mouseleave', () => scheduleHideMarkTooltip());
@@ -2062,7 +2128,9 @@
   function seekVideoToMark(time) {
     const video = findVideoElement();
     if (!video || !isFinite(time)) return;
-    video.currentTime = time;
+    // Preserve the exact mark for storage and the flag, but start replaying a
+    // little earlier so returning to a Mark restores the spoken context.
+    video.currentTime = Math.max(0, Number(time) - VIDEO_MARK_REPLAY_PREROLL_SECONDS);
     if (video.paused) video.play().catch(() => {});
   }
 

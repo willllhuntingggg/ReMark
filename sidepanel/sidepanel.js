@@ -297,6 +297,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       return `${source}${source.includes('?') ? '&' : '?'}t=${time}`;
     }
   };
+  // Source links and exports retain the exact Mark time. Only opening a Video
+  // Mark for replay starts five seconds earlier to restore audible context.
+  const videoReplaySourceUrl = (item) => {
+    const source = String(item?.url || '').split('#')[0];
+    if (!source) return '';
+    const time = Math.max(0, Math.floor((Number(item?.time) || 0) - 5));
+    try {
+      const url = new URL(source);
+      url.searchParams.set('t', String(time));
+      return url.href;
+    } catch (_) {
+      return `${source}${source.includes('?') ? '&' : '?'}t=${time}`;
+    }
+  };
   const sameVideoTab = (item, tabUrl) => Boolean(item.raw?.videoKey) && item.raw.videoKey === videoKeyFromUrl(tabUrl);
   const host = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } };
   const faviconUrl = (value) => {
@@ -895,7 +909,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       showToast(t('source_unavailable'));
       return;
     }
-    if (pageUrl) window.open(item.type === 'video' ? videoMarkSourceUrl(item) : pageUrl, '_blank');
+    if (pageUrl) window.open(item.type === 'video' ? videoReplaySourceUrl(item) : pageUrl, '_blank');
   }
 
   function isGlyphHit(event, element) { const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT); let node; while ((node = walker.nextNode())) { if (!node.nodeValue.trim()) continue; const range = document.createRange(); range.selectNodeContents(node); for (const rect of range.getClientRects()) { if (event.clientX >= rect.left - 1 && event.clientX <= rect.right + 1 && event.clientY >= rect.top - 1 && event.clientY <= rect.bottom + 1) return true; } } return false; }

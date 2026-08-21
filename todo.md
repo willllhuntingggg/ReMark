@@ -329,6 +329,6 @@
 - [x] 审查 Pine Green 在预设、颜色选择器、双语文案和测试中的全部引用。
 - [x] 以 Harbor Mist（雾霭港湾，#468282）替换 Pine Green。
 - [x] 验证新预设可持久化并通过全量回归测试。
-- [ ] 审查待提交文件、当前 main 分支与远程跟踪状态。
-- [ ] 创建包含全局 Mark Color 和 Harbor Mist 更新的 Git 提交。
-- [ ] 推送 main 分支并确认 GitHub 远程同步完成。
+- [x] 审查待提交文件、当前 main 分支与远程跟踪状态。
+- [x] 创建包含全局 Mark Color 和 Harbor Mist 更新的 Git 提交。
+- [x] 推送 main 分支并确认 GitHub 远程同步完成。

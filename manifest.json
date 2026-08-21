@@ -28,7 +28,8 @@
       "48": "assets/icons/icon48.png",
       "64": "assets/icons/icon64.png",
       "96": "assets/icons/icon96.png",
-      "128": "assets/icons/icon128.png"
+      "128": "assets/icons/icon128.png",
+      "512": "assets/icons/icon512.png"
     }
   },
   "side_panel": {
@@ -48,6 +49,7 @@
     "48": "assets/icons/icon48.png",
     "64": "assets/icons/icon64.png",
     "96": "assets/icons/icon96.png",
-    "128": "assets/icons/icon128.png"
+    "128": "assets/icons/icon128.png",
+    "512": "assets/icons/icon512.png"
   }
 }

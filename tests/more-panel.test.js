@@ -5,6 +5,7 @@ const path = require('path');
 const html = fs.readFileSync(path.resolve(__dirname, '../sidepanel/sidepanel.html'), 'utf8');
 const script = fs.readFileSync(path.resolve(__dirname, '../sidepanel/sidepanel.js'), 'utf8');
 const i18n = fs.readFileSync(path.resolve(__dirname, '../lib/i18n.js'), 'utf8');
+const storage = fs.readFileSync(path.resolve(__dirname, '../lib/storage.js'), 'utf8');
 
 assert.match(html, /data-i18n-aria-label="open_more"/);
 assert.match(html, /id="theme-setting"/);
@@ -39,7 +40,12 @@ assert.match(css, /:root\[data-theme='dark'\]\s*\{/);
 assert.match(css, /:root\[data-theme='dark'\][\s\S]*?color-scheme: dark/);
 assert.match(css, /\.appearance-section,[\s\S]*?\.language-section\s*\{/);
 assert.match(css, /:root\[data-theme='dark'\][\s\S]*?--selection-tray-bg: rgba\(37, 40, 46, \.98\)/);
-assert.match(css, /:root\[data-theme='dark'\][\s\S]*?--primary-action: #f0cf57/);
+assert.match(css, /--gold: #ff5500;[\s\S]*?--gold-soft: rgba\(255, 85, 0, \.10\)/);
+assert.match(css, /:root\[data-theme='dark'\][\s\S]*?--primary-action: #ff5500/);
+assert.match(css, /:root\[data-theme='dark'\][\s\S]*?--focus-ring: rgba\(255, 85, 0, \.72\)/);
+assert.match(storage, /BRAND_COLOR: '#FF5500'/);
+assert.match(storage, /LEGACY_DEFAULT_AMBER: '#FFE066'/);
+assert.match(storage, /defaultColor: '#FF5500'/);
 assert.match(css, /\.selection-tray\s*\{[\s\S]*?background: var\(--selection-tray-bg\)/);
 assert.match(css, /\.selection-export:hover,[\s\S]*?background: var\(--control-hover-bg\)/);
 assert.match(css, /\.backup-action\s*\{[\s\S]*?background: var\(--primary-action\)[\s\S]*?color: var\(--primary-action-ink\)/);
@@ -96,6 +102,16 @@ assert.match(script, /ReMarkI18n\.apply\(\);[\s\S]*applyShortcutModifierLabels\(
 console.log('core-shortcuts-platform assertions passed');
 
 const content = fs.readFileSync(path.resolve(__dirname, '../content/content.js'), 'utf8');
+const contentCss = fs.readFileSync(path.resolve(__dirname, '../content/content.css'), 'utf8');
+assert.match(content, /DEFAULT_HIGHLIGHT_COLOR = '#FF5500'/);
+assert.match(contentCss, /--remark-brand: rgb\(255, 85, 0\)/);
+assert.match(contentCss, /mark\.remark-highlight-mark \{[\s\S]*?--remark-highlight-bg: var\(--remark-brand\)[\s\S]*?background-image: linear-gradient\([\s\S]*?color: #fff[\s\S]*?box-shadow: none/);
+assert.doesNotMatch(contentCss, /::selection \{/);
+assert.doesNotMatch(contentCss, /::-moz-selection \{/);
+assert.match(contentCss, /--remark-menu-surface: rgba\(255, 255, 255, \.98\)/);
+assert.match(contentCss, /@media \(prefers-color-scheme: dark\)[\s\S]*?--remark-menu-surface: rgba\(35, 38, 45, \.98\)/);
+assert.match(contentCss, /\.remark-mark-actions,[\s\S]*?\.remark-video-mark-tip \{[\s\S]*?background: var\(--remark-menu-surface\)/);
+assert.match(contentCss, /\.remark-mark-action:not\(\.remark-mark-action--delete\):hover,[\s\S]*?background: var\(--remark-menu-hover\)/);
 assert.match(html, /data-i18n="shortcut_mark_video_note"/);
 assert.match(i18n, /shortcut_mark_video_note: '标记当前视频时刻并添加笔记'/);
 assert.match(i18n, /shortcut_mark_video_note: 'Mark video moment and add a note'/);

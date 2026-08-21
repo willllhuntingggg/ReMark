@@ -9,16 +9,28 @@
 
 /* ---------- Text highlights ---------- */
 
+:root {
+  --remark-brand: rgb(255, 85, 0);
+  --remark-brand-soft: rgba(255, 85, 0, .18);
+}
+
 mark.remark-highlight-mark {
-  --remark-highlight-bg: rgb(250, 222, 74);
+  --remark-highlight-bg: var(--remark-brand);
   position: relative;
   display: inline;
   overflow: visible;
-  background: var(--remark-highlight-bg);
-  color: #24220f;
+  background-color: transparent;
+  background-image: linear-gradient(
+    to bottom,
+    transparent .04em,
+    var(--remark-highlight-bg) .04em,
+    var(--remark-highlight-bg) calc(100% - .06em),
+    transparent calc(100% - .06em)
+  );
+  color: #fff;
   border: 0;
   border-radius: .2em;
-  box-shadow: 0 .08em 0 var(--remark-highlight-bg), 0 -.08em 0 var(--remark-highlight-bg);
+  box-shadow: none;
   padding: 0;
   line-height: inherit;
   vertical-align: baseline;
@@ -27,12 +39,14 @@ mark.remark-highlight-mark {
   word-spacing: inherit;
   font-weight: inherit;
   text-decoration: none;
+  text-shadow: 0 1px 1px rgba(68, 20, 0, .34);
   cursor: pointer;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
-  background-clip: border-box;
-  transition: background-color .16s ease, box-shadow .16s ease;
+  background-clip: padding-box;
+  transition: background-color .16s ease;
 }
+
 /* Persistent marker for a saved Note; it does not affect text layout. */
 .remark-note-control {
   position: absolute;
@@ -45,16 +59,16 @@ mark.remark-highlight-mark {
   place-items: center;
   margin: 0;
   padding: 0;
-  border: 1px solid rgb(108, 82, 14);
+  border: 1px solid rgb(197, 63, 0);
   border-radius: .24em .24em .24em 0;
-  background: rgb(80, 61, 12);
-  color: rgb(255, 247, 202);
+  background: rgb(122, 40, 0);
+  color: rgb(255, 240, 232);
   box-shadow: 0 1px 2px rgba(0, 0, 0, .22);
   cursor: pointer;
   transform: rotate(-2deg);
 }
 .remark-note-control:hover,
-.remark-note-control:focus-visible { background: rgb(111, 85, 13); outline: 2px solid rgb(255, 246, 173); outline-offset: 1px; }
+.remark-note-control:focus-visible { background: rgb(168, 55, 0); outline: 2px solid rgb(255, 216, 194); outline-offset: 1px; }
 .remark-note-control svg { width: .68em; height: .68em; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linejoin: round; pointer-events: none; }
 .remark-note-hint {
   position: absolute;
@@ -63,10 +77,10 @@ mark.remark-highlight-mark {
   left: -.38em;
   width: min(240px, 56vw);
   padding: .5em .65em;
-  border: 1px solid rgba(71, 56, 15, .2);
+  border: 1px solid rgba(197, 63, 0, .2);
   border-radius: .48em;
-  background: rgb(45, 39, 23);
-  color: rgb(255, 249, 219);
+  background: rgb(53, 26, 16);
+  color: rgb(255, 240, 232);
   box-shadow: 0 6px 18px rgba(0, 0, 0, .22);
   font: 12px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: normal;
@@ -131,25 +145,25 @@ mark.remark-highlight-mark {
   border: 0;
   border-radius: .34em;
   background: transparent;
-  color: rgb(82, 64, 18);
+  color: rgb(138, 45, 0);
   cursor: pointer;
 }
 .remark-mark-action:hover,
-.remark-mark-action:focus-visible { background: rgb(241, 222, 117); outline: none; }
+.remark-mark-action:focus-visible { background: rgb(255, 177, 138); outline: none; }
 .remark-mark-action--delete:hover,
 .remark-mark-action--delete:focus-visible { background: rgb(253, 218, 208); color: rgb(155, 50, 39); }
 .remark-mark-action--mark.remark-mark-action--marked {
-  background: rgb(241, 222, 117);
+  background: rgb(255, 177, 138);
 }
 
 .remark-mark-action--mark.remark-mark-action--marked:hover,
 .remark-mark-action--mark.remark-mark-action--marked:focus-visible {
-  background: rgb(255, 233, 106);
+  background: rgb(255, 138, 82);
 }
 
 .remark-mark-action.remark-copy-success {
-  background: rgb(241, 222, 117);
-  color: rgb(82, 64, 18);
+  background: rgb(255, 177, 138);
+  color: rgb(138, 45, 0);
 }
 
 .remark-mark-action svg { height: 1em; width: auto; fill: currentColor; pointer-events: none; }
@@ -196,9 +210,9 @@ mark.remark-highlight-mark.remark-locate-pulse {
 }
 
 @keyframes remark-gentle-focus {
-  0% { background: rgb(250, 222, 74); box-shadow: 0 .08em 0 rgb(250, 222, 74), 0 -.08em 0 rgb(250, 222, 74); }
-  18%, 62% { background: rgb(229, 107, 78); box-shadow: 0 .08em 0 rgb(229, 107, 78), 0 -.08em 0 rgb(229, 107, 78); }
-  100% { background: rgb(250, 222, 74); box-shadow: 0 .08em 0 rgb(250, 222, 74), 0 -.08em 0 rgb(250, 222, 74); }
+  0% { background: var(--remark-brand); box-shadow: none; }
+  18%, 62% { background: rgb(255, 138, 82); box-shadow: none; }
+  100% { background: var(--remark-brand); box-shadow: none; }
 }
 
 /* A just-saved highlight lands with a soft ink sweep. */
@@ -226,8 +240,8 @@ mark.remark-highlight-mark.remark-remove-fade {
 /* The page-brightness class is toggled by the script; the mark
    stays identical on light and dark pages thanks to its fixed ink. */
 html.remark-page-light mark.remark-highlight-mark {
-  background: rgb(250, 222, 74);
-  color: #24220f;
+  background: var(--remark-highlight-bg);
+  color: #fff;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -808,7 +822,7 @@ html.remark-page-light mark.remark-highlight-mark {
   top: 16px;
   width: 10px;
   height: 10px;
-  border: 1.5px solid rgb(250, 222, 74);
+  border: 1.5px solid var(--remark-brand);
   border-radius: 50%;
   z-index: 14;
   pointer-events: none;
@@ -1275,9 +1289,9 @@ html.remark-page-light mark.remark-highlight-mark {
   0%, 5% { background: rgba(86, 145, 255, 0); color: #3d4147; box-shadow: none; }
   13%, 42% { background: rgba(86, 145, 255, .34); color: #3d4147; box-shadow: none; }
   44%, 84% {
-    background: rgb(250, 222, 74);
-    color: #24220f;
-    box-shadow: 0 .08em 0 rgb(250, 222, 74), 0 -.08em 0 rgb(250, 222, 74);
+    background: var(--remark-brand);
+    color: #fff;
+    box-shadow: none;
   }
   92%, 100% { background: rgba(86, 145, 255, 0); color: #3d4147; box-shadow: none; }
 }
@@ -1588,4 +1602,221 @@ html.remark-page-light mark.remark-highlight-mark {
   margin-top: 6px;
   color: #8b909a;
   font-size: 10px;
+}
+
+/* ---------- Icon-dot orange brand override ---------- */
+
+.remark-video-mark,
+.remark-video-timeline-feedback i,
+.remark-video-mark-flag,
+.remark-video-mark::before,
+.remark-video-timeline-feedback i::before,
+.remark-video-mark-flag::before,
+.remark-video-marker-feedback,
+.ob-video-progress,
+.ob-video-flag,
+.ob-video-flag::before,
+.ob-find-source-highlight,
+.ob-find-mark-copy--highlight {
+  background: var(--remark-brand);
+}
+
+.remark-mark-actions {
+  border-color: rgba(197, 63, 0, .18);
+  background: rgb(255, 240, 232);
+  box-shadow: 0 3px 10px rgba(79, 25, 0, .20);
+}
+
+.remark-mark-action::after {
+  background: rgb(53, 26, 16);
+  color: rgb(255, 240, 232);
+}
+
+.remark-video-mark-card,
+.remark-video-mark-tip {
+  border-color: rgba(197, 63, 0, .20);
+  background: rgb(255, 240, 232);
+  box-shadow: 0 6px 18px rgba(79, 25, 0, .20);
+}
+
+.remark-video-mark-card-time,
+.remark-video-mark-tip-time,
+.remark-mark-action,
+.remark-mark-action.remark-copy-success {
+  color: rgb(138, 45, 0);
+}
+
+.remark-video-mark-card-note {
+  background: var(--remark-brand-soft);
+}
+
+.remark-note-saved-chip,
+.remark-toast-action,
+.ob-success {
+  color: #ffd8c2;
+}
+
+.ob-click-ring,
+.ob-find-extension-ring,
+.ob-find-mark-ring {
+  border-color: var(--remark-brand);
+}
+
+.ob-mark-pill .ob-mark-btn {
+  background: rgb(255, 177, 138);
+}
+
+.ob-video-thumb {
+  background: var(--remark-brand);
+  box-shadow: 0 0 0 2px rgba(255, 85, 0, .25);
+}
+
+.ob-find-source-highlight {
+  box-shadow: 0 2px 0 var(--remark-brand), 0 -2px 0 var(--remark-brand);
+}
+
+/* Stronger brand treatment for Mark action surfaces. */
+.remark-mark-actions,
+.remark-video-mark-card,
+.remark-video-mark-tip {
+  border-color: rgb(197, 63, 0);
+  background: var(--remark-brand);
+  color: #241a12;
+  box-shadow: 0 6px 18px rgba(120, 38, 0, .30);
+}
+
+.remark-mark-action,
+.remark-mark-action.remark-copy-success,
+.remark-video-mark-card-time,
+.remark-video-mark-tip-time,
+.remark-video-mark-card-hint {
+  color: #241a12;
+}
+
+.remark-video-mark-card-note {
+  background: rgb(255, 138, 82);
+  color: #241a12;
+}
+
+.remark-mark-action:hover,
+.remark-mark-action:focus-visible,
+.remark-mark-action--mark.remark-mark-action--marked,
+.remark-mark-action--mark.remark-mark-action--marked:hover,
+.remark-mark-action--mark.remark-mark-action--marked:focus-visible,
+.remark-mark-action.remark-copy-success {
+  background: rgb(255, 138, 82);
+  color: #241a12;
+  box-shadow: inset 0 0 0 1px rgba(95, 30, 0, .24);
+}
+
+.remark-mark-action::after {
+  background: var(--remark-brand);
+  color: #241a12;
+  box-shadow: 0 4px 12px rgba(120, 38, 0, .28);
+}
+
+.remark-mark-action--delete:hover,
+.remark-mark-action--delete:focus-visible {
+  background: rgb(253, 218, 208);
+  color: rgb(155, 50, 39);
+  box-shadow: none;
+}
+
+/* Keep Mark menus quiet so the orange markers remain the visual focus. */
+:root {
+  --remark-menu-surface: rgba(255, 255, 255, .98);
+  --remark-menu-border: rgba(29, 32, 38, .14);
+  --remark-menu-ink: rgb(30, 33, 39);
+  --remark-menu-muted: rgb(93, 99, 109);
+  --remark-menu-hover: rgb(237, 239, 243);
+  --remark-menu-tooltip: rgb(30, 33, 39);
+  --remark-menu-tooltip-ink: rgb(255, 255, 255);
+  --remark-menu-shadow: rgba(18, 22, 30, .20);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --remark-menu-surface: rgba(35, 38, 45, .98);
+    --remark-menu-border: rgba(255, 255, 255, .14);
+    --remark-menu-ink: rgb(244, 246, 249);
+    --remark-menu-muted: rgb(198, 203, 212);
+    --remark-menu-hover: rgb(61, 66, 77);
+    --remark-menu-tooltip: rgb(61, 66, 77);
+    --remark-menu-tooltip-ink: rgb(255, 255, 255);
+    --remark-menu-shadow: rgba(0, 0, 0, .42);
+  }
+}
+
+.remark-mark-actions,
+.remark-video-mark-card,
+.remark-video-mark-tip {
+  border-color: var(--remark-menu-border);
+  background: var(--remark-menu-surface);
+  color: var(--remark-menu-ink);
+  box-shadow: 0 6px 18px var(--remark-menu-shadow);
+}
+
+.remark-mark-action,
+.remark-mark-action.remark-copy-success,
+.remark-video-mark-card-time,
+.remark-video-mark-tip-time {
+  color: var(--remark-menu-ink);
+}
+
+.remark-video-mark-card-hint {
+  color: var(--remark-menu-muted);
+}
+
+.remark-video-mark-card-note,
+.remark-mark-action.remark-copy-success,
+.remark-mark-action--mark.remark-mark-action--marked {
+  background: var(--remark-menu-hover);
+  color: var(--remark-menu-ink);
+}
+
+.remark-mark-action:not(.remark-mark-action--delete):hover,
+.remark-mark-action:not(.remark-mark-action--delete):focus-visible,
+.remark-mark-action--mark.remark-mark-action--marked:hover,
+.remark-mark-action--mark.remark-mark-action--marked:focus-visible {
+  background: var(--remark-menu-hover);
+  color: var(--remark-menu-ink);
+  box-shadow: none;
+}
+
+.remark-mark-action::after {
+  background: var(--remark-menu-tooltip);
+  color: var(--remark-menu-tooltip-ink);
+  box-shadow: 0 4px 12px var(--remark-menu-shadow);
+}
+
+.remark-mark-action--delete:hover,
+.remark-mark-action--delete:focus-visible {
+  background: rgb(253, 218, 208);
+  color: rgb(155, 50, 39);
+}
+
+@keyframes remark-gentle-focus {
+  0% { background: var(--remark-brand); box-shadow: none; }
+  18%, 62% { background: rgb(255, 138, 82); box-shadow: none; }
+  100% { background: var(--remark-brand); box-shadow: none; }
+}
+
+@keyframes remark-ink-in {
+  0% { background: rgba(255, 85, 0, .35); }
+  55% { background: rgb(255, 177, 138); }
+  100% { background: var(--remark-brand); }
+}
+
+@keyframes ob-text-ink {
+  0%, 5% { background: rgba(86, 145, 255, 0); color: #3d4147; box-shadow: none; }
+  13%, 42% { background: rgba(86, 145, 255, .34); color: #3d4147; box-shadow: none; }
+  44%, 84% { background: var(--remark-brand); color: #fff; box-shadow: none; }
+  92%, 100% { background: rgba(86, 145, 255, 0); color: #3d4147; box-shadow: none; }
+}
+
+@keyframes ob-find-mark-card {
+  0%, 51% { background: transparent; box-shadow: none; transform: translateX(0); }
+  55% { background: #fff0e8; box-shadow: 0 0 0 1px rgba(255, 85, 0, .65); transform: translateX(-1px) scale(.98); }
+  62%, 83% { background: #fff7f2; box-shadow: 0 0 0 1px rgba(255, 85, 0, .38); transform: translateX(0) scale(1); }
+  92%, 100% { background: transparent; box-shadow: none; transform: translateX(0); }
 }

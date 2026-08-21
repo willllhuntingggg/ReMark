@@ -2,7 +2,7 @@
    ReMark — Side Panel Stylesheet
    Design language: ink & paper. ReMark is a quiet companion for
    active reading: a calm paper surface, ink typography, and one
-   warm accent — the mark gold — reserved for things you saved.
+   one brand accent — the icon-dot orange — reserved for things you saved.
    ============================================================ */
 
 :root {
@@ -25,10 +25,10 @@
   --line-strong: #d9d6cd;   /* visible border */
 
   /* Accents */
-  --gold: #c8a02e;          /* text mark accent */
-  --gold-deep: #a67f1e;     /* active / emphasis */
-  --gold-soft: rgba(200, 160, 46, .10);
-  --gold-line: rgba(200, 160, 46, .38);
+  --gold: #ff5500;          /* text mark accent */
+  --gold-deep: #c53f00;     /* active / emphasis */
+  --gold-soft: rgba(255, 85, 0, .10);
+  --gold-line: rgba(255, 85, 0, .38);
   --teal: #4f8da2;          /* video mark accent */
   --teal-soft: rgba(79, 141, 162, .10);
 
@@ -41,8 +41,8 @@
 
   /* Interactive surfaces */
   --selection-tray-bg: rgba(255, 253, 240, .97);
-  --selection-tray-icon-bg: rgba(200, 160, 46, .16);
-  --control-hover-bg: rgba(200, 160, 46, .10);
+  --selection-tray-icon-bg: rgba(255, 85, 0, .16);
+  --control-hover-bg: rgba(255, 85, 0, .10);
   --control-hover-border: var(--gold-line);
   --focus-ring: rgba(38, 40, 45, .28);
   --primary-action: var(--ink);
@@ -62,7 +62,7 @@
 }
 
 /* Appearance design: retain the calm ink-and-paper hierarchy in both modes;
-   dark mode becomes charcoal paper with warm gold reserved for saved Marks. */
+   dark mode becomes charcoal paper with icon-dot orange reserved for saved Marks. */
 :root[data-theme='dark'] {
   color-scheme: dark;
 
@@ -79,10 +79,10 @@
   --line: #333740;
   --line-strong: #454a55;
 
-  --gold: #efc94d;
-  --gold-deep: #f6da70;
-  --gold-soft: rgba(239, 201, 77, .15);
-  --gold-line: rgba(239, 201, 77, .48);
+  --gold: #ff5500;
+  --gold-deep: #ff9566;
+  --gold-soft: rgba(255, 85, 0, .15);
+  --gold-line: rgba(255, 85, 0, .48);
   --teal: #77b4c5;
   --teal-soft: rgba(119, 180, 197, .15);
 
@@ -93,13 +93,13 @@
   --shadow-2: 0 10px 28px rgba(0, 0, 0, .30);
 
   --selection-tray-bg: rgba(37, 40, 46, .98);
-  --selection-tray-icon-bg: rgba(239, 201, 77, .18);
-  --control-hover-bg: rgba(239, 201, 77, .16);
-  --control-hover-border: rgba(239, 201, 77, .58);
-  --focus-ring: rgba(239, 201, 77, .72);
-  --primary-action: #f0cf57;
-  --primary-action-hover: #ffe38a;
-  --primary-action-ink: #1b1d21;
+  --selection-tray-icon-bg: rgba(255, 85, 0, .18);
+  --control-hover-bg: rgba(255, 85, 0, .16);
+  --control-hover-border: rgba(255, 85, 0, .58);
+  --focus-ring: rgba(255, 85, 0, .72);
+  --primary-action: #ff5500;
+  --primary-action-hover: #ff7433;
+  --primary-action-ink: #fff7f2;
 }
 
 /* ---------- Base ---------- */
@@ -138,7 +138,7 @@ button {
 }
 
 ::selection {
-  background: rgba(200, 160, 46, .30);
+  background: rgba(255, 85, 0, .30);
 }
 
 :focus-visible {
@@ -600,28 +600,28 @@ button {
 /* Active is the primary selection; multi-selection is deliberately quieter so
    the keyboard endpoint remains easy to find in a Shift range. */
 .mark-card.mark-active {
-  background: rgba(200, 160, 46, .19);
+  background: rgba(255, 85, 0, .19);
   box-shadow: none;
 }
 
 .mark-card.mark-selected {
-  background: rgba(200, 160, 46, .12);
+  background: rgba(255, 85, 0, .12);
   box-shadow: none;
 }
 
 .mark-card.mark-selected.mark-active {
-  background: rgba(200, 160, 46, .22);
+  background: rgba(255, 85, 0, .22);
   box-shadow: none;
 }
 
 .mark-card.mark-active:hover,
 .mark-card.mark-active:focus-within {
-  background: rgba(200, 160, 46, .24);
+  background: rgba(255, 85, 0, .24);
 }
 
 .mark-card.mark-selected:hover,
 .mark-card.mark-selected:focus-within {
-  background: rgba(200, 160, 46, .16);
+  background: rgba(255, 85, 0, .16);
 }
 
 .mark-card.mark-active .mark-content-text,
@@ -853,9 +853,9 @@ button {
 }
 
 @keyframes remark-note-saved {
-  0% { background: rgba(200, 160, 46, 0); }
-  30% { background: rgba(200, 160, 46, .22); }
-  100% { background: rgba(200, 160, 46, 0); }
+  0% { background: rgba(255, 85, 0, 0); }
+  30% { background: rgba(255, 85, 0, .22); }
+  100% { background: rgba(255, 85, 0, 0); }
 }
 
 .mark-note:hover,
@@ -1107,7 +1107,7 @@ button {
     background: transparent;
   }
   35% {
-    background: rgba(250, 222, 74, .32);
+    background: rgba(255, 85, 0, .32);
   }
 }
 
@@ -1930,7 +1930,7 @@ button {
 
   .remark-panel-focus {
     animation: none;
-    background: rgba(250, 222, 74, .32);
+    background: rgba(255, 85, 0, .32);
   }
 
   .clips-list.is-entering > *,

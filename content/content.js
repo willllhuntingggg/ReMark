@@ -13,7 +13,7 @@
   let loadedClipsForPage = [];
   const escHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  const DEFAULT_HIGHLIGHT_COLOR = '#FFE066';
+  const DEFAULT_HIGHLIGHT_COLOR = '#FF5500';
   function applyMarkContrastTheme() {
     const readColor = (value) => { const match = String(value || '').match(/rgba?\(([^)]+)\)/); if (!match) return null; const parts = match[1].split(',').map((part) => Number.parseFloat(part)); if (parts.length < 3 || (parts.length > 3 && parts[3] === 0)) return null; return parts; };
     const bodyColor = document.body ? readColor(getComputedStyle(document.body).backgroundColor) : null;

@@ -42,6 +42,12 @@
       "js": ["lib/i18n.js", "lib/storage.js", "content/content.js"]
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/icons/icon48.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "icons": {
     "16": "assets/icons/icon16.png",
     "24": "assets/icons/icon24.png",

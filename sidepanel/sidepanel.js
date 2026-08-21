@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const importBackupFile = $('#import-backup-file');
   const backupStatus = $('#backup-status');
   const languageSetting = $('#language-setting');
+  const themeSetting = $('#theme-setting');
   const settingsOpenButton = $('#settings-open');
   const settingsBackButton = $('#settings-back');
   const timelineControls = $('#timeline-controls');
@@ -40,7 +41,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const feedbackCopyEmailButton = $('#feedback-copy-email');
   const FEEDBACK_RECIPIENT = 'xuzijian2222@gmail.com';
   const GMAIL_COMPOSE_URL = 'https://mail.google.com/mail/u/0/';
+  const REPLAY_CONTENT_SCRIPT_FILES = ['lib/i18n.js', 'lib/storage.js', 'content/content.js'];
   let showingSettings = false;
+  const systemThemeQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
 
   function showSettings() {
     showingSettings = true;
@@ -75,6 +78,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function initializeLanguagePreference() {
     const settings = await ReMarkStorage.getSettings();
     await applyLanguagePreference(settings.language);
+  }
+
+  // Appearance design: the saved choice is explicit, while the effective theme
+  // is written to <html> so every existing side-panel color token flips as one.
+  function normalizeThemePreference(preference) {
+    return ['system', 'light', 'dark'].includes(preference) ? preference : 'system';
+  }
+  function effectiveTheme(preference) {
+    const normalized = normalizeThemePreference(preference);
+    return normalized === 'system' && systemThemeQuery?.matches ? 'dark' : normalized === 'system' ? 'light' : normalized;
+  }
+  function applyThemePreference(preference) {
+    const normalized = normalizeThemePreference(preference);
+    const resolved = effectiveTheme(normalized);
+    document.documentElement.dataset.theme = resolved;
+    document.documentElement.dataset.themePreference = normalized;
+    themeSetting.value = normalized;
+  }
+  async function initializeThemePreference() {
+    const settings = await ReMarkStorage.getSettings();
+    applyThemePreference(settings.theme);
   }
 
   function setBackupStatus(message, isError = false) {
@@ -144,12 +168,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+  const isReplayReceiverUnavailable = (error) => /receiving end does not exist|could not establish connection/i.test(String(error?.message || error || ''));
+  async function sendReplayMessage(tabId) {
+    return chrome.tabs.sendMessage(tabId, { action: 'REPLAY_ONBOARDING' });
+  }
+  async function injectReplayContentScript(tabId) {
+    await chrome.scripting.executeScript({
+      target: { tabId, allFrames: false },
+      files: REPLAY_CONTENT_SCRIPT_FILES
+    });
+  }
   async function replayTutorial() {
     try {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
       const tab = tabs[0];
       if (!tab?.id) return;
-      await chrome.tabs.sendMessage(tab.id, { action: 'REPLAY_ONBOARDING' });
+      let injected = false;
+      let lastError = null;
+      // A content script can disappear briefly while a page or SPA route is
+      // committing. If that occurs, reinject its normal dependency chain and
+      // retry after its listener has registered.
+      for (const delay of [0, 120, 360]) {
+        if (delay) await wait(delay);
+        try {
+          const result = await sendReplayMessage(tab.id);
+          if (result?.shown === false) throw new Error('REPLAY_ONBOARDING_NOT_SHOWN');
+          return;
+        } catch (error) {
+          lastError = error;
+          if (!isReplayReceiverUnavailable(error) || injected) continue;
+          await injectReplayContentScript(tab.id);
+          injected = true;
+        }
+      }
+      throw lastError || new Error('REPLAY_ONBOARDING_UNAVAILABLE');
     } catch (error) {
       console.warn('[ReMark] Tutorial replay unavailable for this page:', error);
     }
@@ -272,6 +325,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     void ReMarkStorage.updateSettings({ language: preference })
       .then(() => applyLanguagePreference(preference));
   });
+  themeSetting.addEventListener('change', () => {
+    const preference = normalizeThemePreference(themeSetting.value);
+    void ReMarkStorage.updateSettings({ theme: preference })
+      .then(() => applyThemePreference(preference));
+  });
+  const onSystemThemeChange = () => {
+    if (themeSetting.value === 'system') applyThemePreference('system');
+  };
+  if (systemThemeQuery?.addEventListener) systemThemeQuery.addEventListener('change', onSystemThemeChange);
+  else systemThemeQuery?.addListener?.(onSystemThemeChange);
   exportBackupButton.addEventListener('click', () => { void exportBackup(); });
   importBackupButton.addEventListener('click', () => { importBackupFile.click(); });
   importBackupFile.addEventListener('change', () => {
@@ -986,9 +1049,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (message?.action === 'SOURCE_MARK_UNAVAILABLE' || message?.action === 'SOURCE_UNAVAILABLE') showToast(t('source_unavailable'));
   });
   async function consumePendingFocus() { try { const session = globalThis.chrome?.storage?.local; if (!session) return; const data = await session.get('remark_pending_focus'); const id = data?.remark_pending_focus?.clipId || data?.remark_pending_focus?.markId; if (id) { await session.remove('remark_pending_focus'); focusFromSource(id); } } catch (_) {} }
-  globalThis.chrome?.storage?.onChanged?.addListener((changes) => { const pending = changes?.remark_pending_focus?.newValue; if (pending) focusFromSource(pending.clipId || pending.markId); void load(); });
+  globalThis.chrome?.storage?.onChanged?.addListener((changes) => {
+    const settings = changes?.[ReMarkStorage.KEYS.SETTINGS]?.newValue;
+    if (settings?.theme) applyThemePreference(settings.theme);
+    const pending = changes?.remark_pending_focus?.newValue;
+    if (pending) focusFromSource(pending.clipId || pending.markId);
+    void load();
+  });
   try {
     await ReMarkStorage.init();
+    await initializeThemePreference();
     await initializeLanguagePreference();
     await load(true);
     await consumePendingFocus();

@@ -1069,22 +1069,13 @@ html.remark-page-light mark.remark-highlight-mark {
   height: 17px;
   place-items: center;
   border-radius: 5px;
-  background: rgb(250, 222, 74);
+  background-color: transparent;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
   color: #000;
-  box-shadow: 0 1px 3px rgba(35, 37, 41, .16);
+  box-shadow: none;
   animation: ob-find-extension 7.5s linear infinite;
-}
-
-.ob-find-extension svg {
-  width: 10px;
-  height: 10px;
-  fill: #000 !important;
-  stroke: #000 !important;
-}
-
-.ob-find-extension svg path {
-  fill: #000 !important;
-  stroke: #000 !important;
 }
 
 .ob-find-extension-ring,

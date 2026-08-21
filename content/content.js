@@ -164,7 +164,7 @@
       '<div class="ob-find-toolbar">',
       '<span class="ob-find-browser-dots"><i></i><i></i><i></i></span>',
       '<span class="ob-find-address"></span>',
-      `<span class="ob-find-extension">${ONBOARDING_BLACK_MARK_PILL_ICON}</span>`,
+      `<span class="ob-find-extension" style="background-image:url('${chrome.runtime.getURL('assets/icons/icon48.png')}')" aria-hidden="true"></span>`,
       '<span class="ob-find-extension-ring"></span>',
       '</div>',
       '<div class="ob-find-page-viewport"><div class="ob-find-document">',
@@ -199,7 +199,7 @@
   }
 
   async function showFirstUseGuide(options = {}) {
-    if (document.getElementById(ONBOARDING_MODAL_ID)) return;
+    if (document.getElementById(ONBOARDING_MODAL_ID)) return true;
     const manual = Boolean(options.manual);
     try {
       if (!manual && await ReMarkStorage.getOnboardingStatus() !== 'not_started') return;
@@ -235,8 +235,10 @@
       document.documentElement.appendChild(modal);
       onboardingTutorial = { modal, manual, page: 0 };
       bindOnboardingTutorial(onboardingTutorial);
+      return true;
     } catch (error) {
       console.warn('[ReMark] Onboarding unavailable:', error);
+      return false;
     }
   }
   function bindOnboardingTutorial(tutorial) {
@@ -406,7 +408,12 @@
       const selectedText = window.getSelection().toString().trim();
       if (selectedText) quickHighlightSelection(DEFAULT_HIGHLIGHT_COLOR);
     } else if (msg.action === 'REPLAY_ONBOARDING') {
-      void showFirstUseGuide({ manual: true });
+      // Side Panel retries only when this explicit confirmation is false. This
+      // avoids losing a replay request during SPA navigation or script startup.
+      void showFirstUseGuide({ manual: true }).then((shown) => {
+        sendResponse({ shown: Boolean(shown) });
+      });
+      return true;
     } else if (msg.action === 'RESTORE_HIGHLIGHTS') {
       restorePageHighlights();
     } else if (msg.action === 'LOCATE_CLIP') {
@@ -422,6 +429,7 @@
     } else if (msg.action === 'SEEK_VIDEO_MARK') {
       seekVideoToMark(msg.time);
     }
+    return false;
   });
   async function deletePageClip(clipId) {
     const clips = await ReMarkStorage.getClips();

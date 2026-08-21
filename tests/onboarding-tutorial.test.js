@@ -7,6 +7,7 @@ const sidepanel = fs.readFileSync(path.resolve(__dirname, '../sidepanel/sidepane
 const storage = fs.readFileSync(path.resolve(__dirname, '../lib/storage.js'), 'utf8');
 const i18n = fs.readFileSync(path.resolve(__dirname, '../lib/i18n.js'), 'utf8');
 const css = fs.readFileSync(path.resolve(__dirname, '../content/content.css'), 'utf8');
+const manifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../manifest.json'), 'utf8'));
 
 // Three onboarding pages with carousel navigation and a replay entry point.
 assert.match(content, /data-onboarding-page="text"/);
@@ -18,6 +19,8 @@ assert.match(content, /ob-find-panel/);
 assert.match(content, /ob-find-mark-card/);
 assert.match(content, /onboarding_page_dot', \{ page: 3 \}/);
 assert.match(content, /showFirstUseGuide\(\{ manual: true \}\)/);
+assert.match(content, /sendResponse\(\{ shown: Boolean\(shown\) \}\)/);
+assert.match(content, /return true;\s*\}\s*else if \(msg\.action === 'RESTORE_HIGHLIGHTS'/);
 assert.match(content, /remark-onboarding-prev/);
 assert.match(content, /remark-onboarding-next/);
 assert.match(content, /remark-onboarding-skip/);
@@ -49,6 +52,11 @@ assert.doesNotMatch(content, /ob-pill/);
 assert.match(content, /close\('skipped'\)/);
 assert.match(content, /close\('completed'\)/);
 assert.match(sidepanel, /action: 'REPLAY_ONBOARDING'/);
+assert.match(sidepanel, /REPLAY_CONTENT_SCRIPT_FILES = \['lib\/i18n\.js', 'lib\/storage\.js', 'content\/content\.js'\]/);
+assert.match(sidepanel, /isReplayReceiverUnavailable/);
+assert.match(sidepanel, /chrome\.scripting\.executeScript/);
+assert.match(sidepanel, /for \(const delay of \[0, 120, 360\]\)/);
+assert.match(sidepanel, /result\?\.shown === false/);
 assert.match(storage, /getOnboardingStatus/);
 assert.match(storage, /setOnboardingStatus/);
 assert.match(storage, /\['not_started', 'completed', 'skipped'\]/);
@@ -88,9 +96,13 @@ assert.ok(videoPageMarkup.indexOf('remark-onboarding-anim') < videoPageMarkup.in
 const findPageMarkup = content.slice(content.indexOf('function onboardingFindPage'), content.indexOf('async function showFirstUseGuide'));
 assert.ok(findPageMarkup.indexOf('<h2>') < findPageMarkup.indexOf('remark-onboarding-anim'));
 assert.ok(findPageMarkup.indexOf('remark-onboarding-anim') < findPageMarkup.indexOf('remark-onboarding-hint'));
-assert.match(findPageMarkup, /ONBOARDING_BLACK_MARK_PILL_ICON/);
+assert.match(findPageMarkup, /style="background-image:url\('\$\{chrome\.runtime\.getURL\('assets\/icons\/icon48\.png'\)\}'\)"/);
 assert.match(findPageMarkup, /ob-find-extension/);
 assert.match(findPageMarkup, /ob-find-panel-header/);
+assert.deepEqual(manifest.web_accessible_resources, [{
+  resources: ['assets/icons/icon48.png'],
+  matches: ['<all_urls>']
+}]);
 
 // Both looping animations exist and reuse real ReMark visual language.
 assert.doesNotMatch(css, /ob-text-cursor/);
@@ -103,6 +115,8 @@ assert.match(css, /@keyframes ob-video-keypress/);
 assert.match(css, /@keyframes ob-video-flag/);
 assert.match(css, /\.remark-onboarding-anim--find\s*\{/);
 assert.match(css, /\.ob-find-extension\s*\{[\s\S]*?animation: ob-find-extension 7\.5s linear infinite/);
+assert.match(css, /\.ob-find-extension\s*\{[\s\S]*?background-color: transparent;[\s\S]*?background-size: 100% 100%/);
+assert.doesNotMatch(css, /\.ob-find-extension img/);
 assert.match(css, /\.ob-find-panel\s*\{[\s\S]*?animation: ob-find-panel 7\.5s/);
 assert.match(css, /\.ob-find-mark-card\s*\{[\s\S]*?animation: ob-find-mark-card 7\.5s/);
 assert.match(css, /@keyframes ob-find-document-scroll/);

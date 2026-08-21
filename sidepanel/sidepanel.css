@@ -39,6 +39,16 @@
   --shadow-1: 0 1px 2px rgba(30, 27, 22, .05);
   --shadow-2: 0 10px 28px rgba(30, 27, 22, .10);
 
+  /* Interactive surfaces */
+  --selection-tray-bg: rgba(255, 253, 240, .97);
+  --selection-tray-icon-bg: rgba(200, 160, 46, .16);
+  --control-hover-bg: rgba(200, 160, 46, .10);
+  --control-hover-border: var(--gold-line);
+  --focus-ring: rgba(38, 40, 45, .28);
+  --primary-action: var(--ink);
+  --primary-action-hover: #1b1d21;
+  --primary-action-ink: #fff;
+
   /* Shape */
   --radius-sm: 8px;
   --radius-md: 10px;
@@ -49,6 +59,47 @@
     "Microsoft YaHei", sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
     monospace;
+}
+
+/* Appearance design: retain the calm ink-and-paper hierarchy in both modes;
+   dark mode becomes charcoal paper with warm gold reserved for saved Marks. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #181a1f;
+  --surface: #21242a;
+  --surface-2: #292d34;
+  --surface-3: #343841;
+
+  --ink: #f1f2ee;
+  --ink-2: #c8ccd3;
+  --ink-3: #969ca7;
+  --ink-4: #6f7580;
+
+  --line: #333740;
+  --line-strong: #454a55;
+
+  --gold: #efc94d;
+  --gold-deep: #f6da70;
+  --gold-soft: rgba(239, 201, 77, .15);
+  --gold-line: rgba(239, 201, 77, .48);
+  --teal: #77b4c5;
+  --teal-soft: rgba(119, 180, 197, .15);
+
+  --danger: #e08c72;
+  --danger-soft: rgba(224, 140, 114, .14);
+  --ring: rgba(255, 255, 255, .18);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .22);
+  --shadow-2: 0 10px 28px rgba(0, 0, 0, .30);
+
+  --selection-tray-bg: rgba(37, 40, 46, .98);
+  --selection-tray-icon-bg: rgba(239, 201, 77, .18);
+  --control-hover-bg: rgba(239, 201, 77, .16);
+  --control-hover-border: rgba(239, 201, 77, .58);
+  --focus-ring: rgba(239, 201, 77, .72);
+  --primary-action: #f0cf57;
+  --primary-action-hover: #ffe38a;
+  --primary-action-ink: #1b1d21;
 }
 
 /* ---------- Base ---------- */
@@ -91,7 +142,7 @@ button {
 }
 
 :focus-visible {
-  outline: 2px solid rgba(38, 40, 45, .22);
+  outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
 
@@ -390,7 +441,7 @@ button {
   padding: 10px 10px 10px 11px;
   border: 1px solid var(--gold-line);
   border-radius: 12px;
-  background: rgba(255, 253, 240, .97);
+  background: var(--selection-tray-bg);
   box-shadow: var(--shadow-2);
   backdrop-filter: blur(10px);
   animation: remark-selection-tray-in .18s cubic-bezier(.2, .8, .28, 1) both;
@@ -413,7 +464,7 @@ button {
   width: 27px;
   height: 27px;
   border-radius: 8px;
-  background: rgba(200, 160, 46, .16);
+  background: var(--selection-tray-icon-bg);
   color: var(--gold-deep);
 }
 
@@ -433,8 +484,8 @@ button {
   place-items: center;
   border: 1px solid var(--surface);
   border-radius: 999px;
-  background: var(--gold-deep);
-  color: #fff;
+  background: var(--primary-action);
+  color: var(--primary-action-ink);
   font-size: 9px;
   font-weight: 750;
   line-height: 1;
@@ -496,8 +547,8 @@ button {
 .selection-copy:focus-visible,
 .selection-clear:hover,
 .selection-clear:focus-visible {
-  border-color: var(--gold-line);
-  background: rgba(200, 160, 46, .10);
+  border-color: var(--control-hover-border);
+  background: var(--control-hover-bg);
   color: var(--ink);
 }
 
@@ -1298,7 +1349,8 @@ button {
   color: var(--ink);
 }
 
-/* Language */
+/* Appearance & language */
+.appearance-section,
 .language-section {
   display: flex;
   align-items: flex-end;
@@ -1309,6 +1361,7 @@ button {
   border-bottom: 1px solid var(--line);
 }
 
+.appearance-copy h2,
 .language-copy h2 {
   margin: 0 0 3px;
   color: var(--ink);
@@ -1316,6 +1369,7 @@ button {
   font-weight: 700;
 }
 
+.appearance-copy p,
 .language-copy p {
   margin: 0;
   color: var(--ink-3);
@@ -1323,6 +1377,7 @@ button {
   line-height: 1.45;
 }
 
+.appearance-select,
 .language-select {
   min-width: 124px;
   height: 32px;
@@ -1336,8 +1391,9 @@ button {
   -webkit-appearance: none;
 }
 
+.appearance-select:focus-visible,
 .language-select:focus-visible {
-  outline: 2px solid rgba(38, 40, 45, .22);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
 
@@ -1826,6 +1882,33 @@ button {
 .feedback-submit:disabled {
   cursor: wait;
   opacity: .6;
+}
+
+/* ---------- Theme-aware interactive controls ---------- */
+
+.backup-action,
+.feedback-submit {
+  border-color: var(--primary-action);
+  background: var(--primary-action);
+  color: var(--primary-action-ink);
+}
+
+.backup-action:hover,
+.feedback-submit:hover {
+  border-color: var(--primary-action-hover);
+  background: var(--primary-action-hover);
+}
+
+.backup-action:focus-visible,
+.feedback-submit:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.feedback-select:focus-visible,
+.feedback-field textarea:focus-visible,
+.feedback-close:focus-visible {
+  outline-color: var(--focus-ring);
 }
 
 /* ---------- Motion ---------- */

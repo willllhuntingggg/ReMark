@@ -11,7 +11,7 @@
 
 :root {
   --remark-brand: rgb(255, 85, 0);
-  --remark-brand-soft: rgba(255, 85, 0, .18);
+  --remark-brand-soft: color-mix(in srgb, var(--remark-brand) 18%, transparent);
 }
 
 mark.remark-highlight-mark {
@@ -1797,13 +1797,13 @@ html.remark-page-light mark.remark-highlight-mark {
 
 @keyframes remark-gentle-focus {
   0% { background: var(--remark-brand); box-shadow: none; }
-  18%, 62% { background: rgb(255, 138, 82); box-shadow: none; }
+  18%, 62% { background: color-mix(in srgb, var(--remark-brand) 68%, white); box-shadow: none; }
   100% { background: var(--remark-brand); box-shadow: none; }
 }
 
 @keyframes remark-ink-in {
-  0% { background: rgba(255, 85, 0, .35); }
-  55% { background: rgb(255, 177, 138); }
+  0% { background: color-mix(in srgb, var(--remark-brand) 35%, transparent); }
+  55% { background: color-mix(in srgb, var(--remark-brand) 52%, white); }
   100% { background: var(--remark-brand); }
 }
 

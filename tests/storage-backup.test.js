@@ -16,7 +16,7 @@ async function expectReject(task, message) {
 async function main() {
   await storage.set(storage.KEYS.CLIPS, [{ id: 'clip_keep', text: 'local', createdAt: 10, updatedAt: 10 }]);
   await storage.set(storage.KEYS.VIDEO_MARKS, [{ id: 'vmark_keep', time: 4, createdAt: 10 }]);
-  await storage.set(storage.KEYS.SETTINGS, { defaultColor: '#111111', theme: 'dark', onboardingSeen: true });
+  await storage.set(storage.KEYS.SETTINGS, { defaultColor: '#3873B2', theme: 'dark', onboardingSeen: true });
 
   const exported = await storage.createBackup();
   assert.equal(exported.version, 1);
@@ -46,7 +46,7 @@ async function main() {
         { id: 'vmark_keep', time: 4, createdAt: 10 },
         { id: 'vmark_added', time: 12, createdAt: 30 }
       ],
-      [storage.KEYS.SETTINGS]: { defaultColor: '#222222', theme: 'light' }
+      [storage.KEYS.SETTINGS]: { defaultColor: '#FF5C5C', theme: 'light' }
     }
   };
 
@@ -55,7 +55,10 @@ async function main() {
   assert.equal((await storage.getClips()).length, 2);
   assert.equal((await storage.getVideoMarks()).length, 2);
   assert.equal((await storage.getClips()).find((item) => item.id === 'clip_keep').text, 'newer imported value');
-  assert.equal((await storage.getSettings()).defaultColor, '#111111');
+  assert.equal((await storage.getSettings()).defaultColor, '#3873B2');
+  assert.equal(storage.normalizeMarkColor('#F5C542'), '#F5C542');
+  assert.equal(storage.normalizeMarkColor('#468282'), '#468282');
+  assert.equal(storage.normalizeMarkColor('#111111'), storage.BRAND_COLOR);
 
   const second = await storage.importBackup(importable);
   assert.deepEqual(second, { added: 0, updated: 0 });

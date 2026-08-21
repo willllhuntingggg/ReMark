@@ -14,6 +14,14 @@
   const escHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   const DEFAULT_HIGHLIGHT_COLOR = '#FF5500';
+  let activeMarkColor = DEFAULT_HIGHLIGHT_COLOR;
+  function normalizeMarkColor(color) {
+    return ReMarkStorage.normalizeMarkColor?.(color) || DEFAULT_HIGHLIGHT_COLOR;
+  }
+  function applyGlobalMarkColor(color) {
+    activeMarkColor = normalizeMarkColor(color);
+    document.documentElement.style.setProperty('--remark-brand', activeMarkColor);
+  }
   function applyMarkContrastTheme() {
     const readColor = (value) => { const match = String(value || '').match(/rgba?\(([^)]+)\)/); if (!match) return null; const parts = match[1].split(',').map((part) => Number.parseFloat(part)); if (parts.length < 3 || (parts.length > 3 && parts[3] === 0)) return null; return parts; };
     const bodyColor = document.body ? readColor(getComputedStyle(document.body).backgroundColor) : null;
@@ -31,6 +39,7 @@
     const settings = await ReMarkStorage.getSettings();
     ReMarkI18n.setLocale(settings.language);
     ReMarkI18n.apply();
+    applyGlobalMarkColor(settings.defaultColor);
     showFirstUseGuide();
     schedulePageHighlightRestore();
     watchForUrlChanges();
@@ -45,6 +54,7 @@
         ReMarkI18n.setLocale(settings.language);
         ReMarkI18n.apply();
       }
+      if (settings?.defaultColor) applyGlobalMarkColor(settings.defaultColor);
       if (changes?.[ReMarkStorage.KEYS.CLIPS]) scheduleCurrentPageHighlightRecovery();
       renderVideoMarkers();
     });
@@ -371,7 +381,7 @@
       event.stopImmediatePropagation();
       suppressSelectionFollowupClick();
       currentSelection = { text, range: range.cloneRange(), sourceUrl: getSelectionSourceUrl(range) };
-      quickHighlightSelection(DEFAULT_HIGHLIGHT_COLOR, {
+      quickHighlightSelection(activeMarkColor, {
         withNote: event.shiftKey,
         anchorRect: rect
       });
@@ -406,7 +416,7 @@
   chrome.runtime.onMessage?.addListener((msg, sender, sendResponse) => {
     if (msg.action === 'CONTEXT_HIGHLIGHT') {
       const selectedText = window.getSelection().toString().trim();
-      if (selectedText) quickHighlightSelection(DEFAULT_HIGHLIGHT_COLOR);
+      if (selectedText) quickHighlightSelection(activeMarkColor);
     } else if (msg.action === 'REPLAY_ONBOARDING') {
       // Side Panel retries only when this explicit confirmation is false. This
       // avoids losing a replay request during SPA navigation or script startup.
@@ -428,6 +438,9 @@
       renderVideoMarkers();
     } else if (msg.action === 'SEEK_VIDEO_MARK') {
       seekVideoToMark(msg.time);
+    } else if (msg.action === 'APPLY_MARK_COLOR') {
+      applyGlobalMarkColor(msg.color);
+      renderVideoMarkers();
     }
     return false;
   });
@@ -630,7 +643,7 @@
   }
 
   // Silent highlight — no popup, no toast
-  async function quickHighlightSelection(colorCode, options = {}) {
+  async function quickHighlightSelection(colorCode = activeMarkColor, options = {}) {
     const sel = currentSelection;
     if (!sel || !sel.text) return;
 

@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const backupStatus = $('#backup-status');
   const languageSetting = $('#language-setting');
   const themeSetting = $('#theme-setting');
+  const markColorSwatches = [...document.querySelectorAll('.mark-color-swatch')];
   const settingsOpenButton = $('#settings-open');
   const settingsBackButton = $('#settings-back');
   const timelineControls = $('#timeline-controls');
@@ -99,6 +100,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function initializeThemePreference() {
     const settings = await ReMarkStorage.getSettings();
     applyThemePreference(settings.theme);
+  }
+
+  function normalizeMarkColor(color) {
+    return ReMarkStorage.normalizeMarkColor?.(color) || ReMarkStorage.BRAND_COLOR;
+  }
+  function applyMarkColorPreference(color) {
+    const normalized = normalizeMarkColor(color);
+    document.documentElement.style.setProperty('--mark-color', normalized);
+    markColorSwatches.forEach((swatch) => {
+      swatch.setAttribute('aria-checked', String(swatch.dataset.markColor === normalized));
+    });
+  }
+  async function initializeMarkColorPreference() {
+    const settings = await ReMarkStorage.getSettings();
+    applyMarkColorPreference(settings.defaultColor);
+  }
+  async function syncMarkColorToOpenTabs(color) {
+    try {
+      const tabs = await globalThis.chrome?.tabs?.query({});
+      await Promise.all((tabs || []).filter((tab) => Number.isInteger(tab.id)).map((tab) => safeSendMessage(tab.id, { action: 'APPLY_MARK_COLOR', color })));
+    } catch (_) {}
   }
 
   function setBackupStatus(message, isError = false) {
@@ -329,6 +351,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const preference = normalizeThemePreference(themeSetting.value);
     void ReMarkStorage.updateSettings({ theme: preference })
       .then(() => applyThemePreference(preference));
+  });
+  markColorSwatches.forEach((swatch) => {
+    swatch.addEventListener('click', () => {
+      const color = normalizeMarkColor(swatch.dataset.markColor);
+      void ReMarkStorage.updateSettings({ defaultColor: color }).then((settings) => {
+        applyMarkColorPreference(settings.defaultColor);
+        return syncMarkColorToOpenTabs(settings.defaultColor);
+      });
+    });
   });
   const onSystemThemeChange = () => {
     if (themeSetting.value === 'system') applyThemePreference('system');
@@ -1052,6 +1083,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   globalThis.chrome?.storage?.onChanged?.addListener((changes) => {
     const settings = changes?.[ReMarkStorage.KEYS.SETTINGS]?.newValue;
     if (settings?.theme) applyThemePreference(settings.theme);
+    if (settings?.defaultColor) applyMarkColorPreference(settings.defaultColor);
     const pending = changes?.remark_pending_focus?.newValue;
     if (pending) focusFromSource(pending.clipId || pending.markId);
     void load();
@@ -1060,6 +1092,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await ReMarkStorage.init();
     await initializeThemePreference();
     await initializeLanguagePreference();
+    await initializeMarkColorPreference();
     await load(true);
     await consumePendingFocus();
   } catch (error) {

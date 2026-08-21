@@ -23,7 +23,11 @@
     "default_title": "__MSG_open_sidepanel__",
     "default_icon": {
       "16": "assets/icons/icon16.png",
+      "24": "assets/icons/icon24.png",
+      "32": "assets/icons/icon32.png",
       "48": "assets/icons/icon48.png",
+      "64": "assets/icons/icon64.png",
+      "96": "assets/icons/icon96.png",
       "128": "assets/icons/icon128.png"
     }
   },
@@ -39,7 +43,11 @@
   ],
   "icons": {
     "16": "assets/icons/icon16.png",
+    "24": "assets/icons/icon24.png",
+    "32": "assets/icons/icon32.png",
     "48": "assets/icons/icon48.png",
+    "64": "assets/icons/icon64.png",
+    "96": "assets/icons/icon96.png",
     "128": "assets/icons/icon128.png"
   }
 }

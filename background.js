@@ -45,7 +45,16 @@ chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((error) => console.error(error));
 
-chrome.runtime.onInstalled.addListener(() => { void syncNativeLanguage(); });
+chrome.runtime.onInstalled.addListener((details) => {
+  void syncNativeLanguage();
+  if (details?.reason === 'install') {
+    // First install only: open the Welcome page. The existing onboarding
+    // flow and its state logic are left untouched.
+    chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') }, () => {
+      void chrome.runtime.lastError;
+    });
+  }
+});
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && changes?.[SETTINGS_KEY]) void syncNativeLanguage();
 });

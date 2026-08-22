@@ -332,3 +332,12 @@
 - [x] 审查待提交文件、当前 main 分支与远程跟踪状态。
 - [x] 创建包含全局 Mark Color 和 Harbor Mist 更新的 Git 提交。
 - [x] 推送 main 分支并确认 GitHub 远程同步完成。
+- [x] 审查 Manifest、上架素材和 ZIP 归档排除范围。
+- [x] 运行全量测试与样式构建作为上架前校验。
+- [x] 生成干净的 Chrome Web Store ZIP 包并检查其中内容。
+- [x] 审查 Side Panel 打开、教程重放和当前页内容脚本注入路径。
+- [x] 在首次安装状态下对当前可注入页面按需加载内容脚本并展示 Onboarding。
+- [x] 覆盖已注入页面、未注入页面及浏览器受限页面的回退行为并验证回归测试。
+- [ ] 审查无刷新首次 Onboarding 改动、当前 main 分支与远程跟踪状态。
+- [ ] 创建包含按需内容脚本注入和 Onboarding 回归测试的 Git 提交。
+- [ ] 推送 main 分支并确认 GitHub 远程同步完成。

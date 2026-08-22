@@ -417,6 +417,11 @@
     if (msg.action === 'CONTEXT_HIGHLIGHT') {
       const selectedText = window.getSelection().toString().trim();
       if (selectedText) quickHighlightSelection(activeMarkColor);
+    } else if (msg.action === 'SHOW_FIRST_USE_ONBOARDING') {
+      void showFirstUseGuide().then((shown) => {
+        sendResponse({ shown: Boolean(shown) });
+      });
+      return true;
     } else if (msg.action === 'REPLAY_ONBOARDING') {
       // Side Panel retries only when this explicit confirmation is false. This
       // avoids losing a replay request during SPA navigation or script startup.

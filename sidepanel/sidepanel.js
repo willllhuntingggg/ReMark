@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const FEEDBACK_RECIPIENT = 'xuzijian2222@gmail.com';
   const GMAIL_COMPOSE_URL = 'https://mail.google.com/mail/u/0/';
   const REPLAY_CONTENT_SCRIPT_FILES = ['lib/i18n.js', 'lib/storage.js', 'content/content.js'];
+  const CONTENT_STYLE_FILE = 'content/content.css';
   let showingSettings = false;
   const systemThemeQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
 
@@ -195,11 +196,45 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function sendReplayMessage(tabId) {
     return chrome.tabs.sendMessage(tabId, { action: 'REPLAY_ONBOARDING' });
   }
+  async function sendFirstUseOnboardingMessage(tabId) {
+    return chrome.tabs.sendMessage(tabId, { action: 'SHOW_FIRST_USE_ONBOARDING' });
+  }
   async function injectReplayContentScript(tabId) {
     await chrome.scripting.executeScript({
       target: { tabId, allFrames: false },
       files: REPLAY_CONTENT_SCRIPT_FILES
     });
+  }
+  async function injectFirstUseContentScript(tabId) {
+    await chrome.scripting.insertCSS({
+      target: { tabId, allFrames: false },
+      files: [CONTENT_STYLE_FILE]
+    });
+    await injectReplayContentScript(tabId);
+  }
+  async function ensureFirstUseOnCurrentPage() {
+    if (await ReMarkStorage.getOnboardingStatus() !== 'not_started') return false;
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = tabs[0];
+      if (!tab?.id) return false;
+      let injected = false;
+      for (const delay of [0, 120, 360]) {
+        if (delay) await wait(delay);
+        try {
+          const result = await sendFirstUseOnboardingMessage(tab.id);
+          return Boolean(result?.shown);
+        } catch (error) {
+          if (!isReplayReceiverUnavailable(error) || injected) return false;
+          await injectFirstUseContentScript(tab.id);
+          injected = true;
+        }
+      }
+    } catch (error) {
+      // Browser-internal pages and protected documents cannot host content scripts.
+      console.debug('[ReMark] First-use onboarding unavailable for this page:', error);
+    }
+    return false;
   }
   async function replayTutorial() {
     try {
@@ -1094,6 +1129,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initializeLanguagePreference();
     await initializeMarkColorPreference();
     await load(true);
+    void ensureFirstUseOnCurrentPage();
     await consumePendingFocus();
   } catch (error) {
     console.error('[ReMark] Sidepanel initialization failed:', error);

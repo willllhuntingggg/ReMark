@@ -1,0 +1,44 @@
+[
+  {
+    "source": "screenshots/01-hero.html",
+    "output": "exports/01-hero.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "source": "screenshots/02-text-mark.html",
+    "output": "exports/02-text-mark.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "source": "screenshots/03-video-mark.html",
+    "output": "exports/03-video-mark.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "source": "screenshots/04-note.html",
+    "output": "exports/04-note.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "source": "screenshots/05-find-way-back.html",
+    "output": "exports/05-find-way-back.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "source": "promo/small-promo.html",
+    "output": "exports/small-promo.png",
+    "width": 440,
+    "height": 280
+  },
+  {
+    "source": "promo/marquee.html",
+    "output": "exports/marquee.png",
+    "width": 1400,
+    "height": 560
+  }
+]

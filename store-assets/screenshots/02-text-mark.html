@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ReMark Store Screenshot — Text Mark</title>
+  <link rel="stylesheet" href="../shared/brand.css">
+  <style>
+    .asset { width: 1280px; height: 800px; }
+    .brand { top: 42px; right: 58px; }
+    .copy-block { position: absolute; top: 212px; right: 80px; z-index: 8; width: 390px; }
+    .headline { font-size: 56px; }
+    .copy { margin-top: 22px; font-size: 18px; max-width: 330px; }
+    .rule { right: 82px; top: 186px; }
+    .passage { left: 84px; top: 126px; width: 692px; height: 528px; transform: rotate(-0.8deg); }
+    .passage .ui-shot { object-position: 50% 42%; }
+    .caption-chip { left: 214px; top: 610px; }
+    .marker.one { left: 428px; top: 336px; }
+    .marker.two { left: 880px; top: 200px; width: 11px; height: 11px; }
+  </style>
+</head>
+<body>
+  <main class="asset">
+    <div class="brand"><span class="brand-dot"></span> ReMark</div>
+    <div class="rule"></div>
+    <section class="copy-block">
+      <p class="eyebrow">Text Marks</p>
+      <h1 class="headline">Mark what catches your attention.</h1>
+      <p class="copy">Highlight a passage and keep the exact moment that made you stop.</p>
+    </section>
+
+    <div class="ui-frame passage">
+      <img class="ui-shot" src="../assets/raw/article-passage.png" alt="A highlighted passage kept with ReMark">
+    </div>
+
+    <span class="caption-chip"><span class="tiny-dot"></span>The exact passage, kept</span>
+    <span class="marker one"></span>
+    <span class="marker two forest"></span>
+
+    <svg class="path" viewBox="0 0 1280 800" aria-hidden="true">
+      <path d="M 447 338 C 540 318, 680 296, 846 226 S 878 212, 885 204"></path>
+      <circle cx="846" cy="226" r="3" class="forest"></circle>
+    </svg>
+  </main>
+</body>
+</html>

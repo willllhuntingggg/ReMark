@@ -36,7 +36,7 @@
       lastError: null,
       id: 'fignfifoniblkonapihmkfakmlgkbkcf',
       getManifest() {
-        return { manifest_version: 3, name: 'ReMark', version: '1.0.0', description: 'Mark it now. Find it later.' };
+        return { manifest_version: 3, name: 'ReMark', version: '1.0.1', description: 'Mark it now. Find it later.' };
       },
       getURL(path) {
         return 'chrome-extension://' + this.id + '/' + String(path).replace(/^\//, '');

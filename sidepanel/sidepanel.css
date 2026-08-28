@@ -1188,9 +1188,8 @@ button {
   font-size: 10.5px;
 }
 
-.source-collection-source-row > span:last-child {
+.source-collection-count {
   flex: 0 0 auto;
-  margin-left: auto;
   color: var(--ink-3);
   font-size: 10.5px;
   font-weight: 400;

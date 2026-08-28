@@ -548,9 +548,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const locale = ReMarkI18n.locale === 'zh' ? 'zh-CN' : 'en-US';
     return new Intl.DateTimeFormat(locale, { month: 'long', day: 'numeric' }).format(date);
   }
-  function setViewTitle(label, count) {
+  function setViewTitle(label, count, showCount = true) {
     const countLabel = t(count === 1 ? 'one_mark' : 'marks_count', { count });
-    subtitle.innerHTML = `${esc(label)} <span class="view-title-count">(${esc(countLabel)})</span>`;
+    subtitle.innerHTML = showCount
+      ? `${esc(label)} <span class="view-title-count">(${esc(countLabel)})</span>`
+      : esc(label);
   }
   function isMacPlatform() {
     const platform = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent || '';
@@ -673,11 +675,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     back.hidden = !inSource;
     viewIdentity.hidden = false;
     settingsOpenButton.hidden = inSource;
+    timelineControls.hidden = inSource;
     appContainer.classList.toggle('is-source-view', inSource);
     search.placeholder = t('search_placeholder');
     if (inSource) {
       const sourceRows = sourceRowsFor(sourceUrl);
-      setViewTitle(t('source_marks'), sourceRows.length);
+      setViewTitle(t('timeline'), sourceRows.length, false);
+      const countLabel = t(sourceRows.length === 1 ? 'one_mark' : 'marks_count', { count: sourceRows.length }).toLowerCase();
       const sourceTitle = sourceRows[0]?.title || t('source_collection');
       const sourceIcon = sourceIconHtml(sourceUrl, 'source-collection-favicon', 'source-collection-fallback');
       context.hidden = false;
@@ -687,6 +691,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         '<div class="source-collection-source-row">',
         sourceIcon,
         `<span class="source-collection-url" title="${esc(sourceUrl)}">${esc(host(sourceUrl) || sourceUrl)}</span>`,
+        `<span class="source-collection-count">· ${esc(countLabel)}</span>`,
         '</div>',
         '</div>'
       ].join('');
@@ -1025,7 +1030,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function jump(item) {
     if (!item) return;
     const pageUrl = item.type === 'highlight' ? (item.pageUrl || item.url) : item.url;
+    const collectionUrl = item.url || pageUrl;
     const isLinkedSource = item.type === 'highlight' && item.url && pageUrl && !sameUrl(item.url, pageUrl);
+    // Timeline Mark-title navigation explicitly opens the matching source Collection.
+    showSourceCollection(collectionUrl);
     try {
       const tabs = await chrome.tabs.query({});
       if (isLinkedSource) {
@@ -1146,8 +1154,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   search.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.stopPropagation(); clearSearch(); } });
   clear.addEventListener('click', () => { clearSearch(); search.focus(); });
   document.addEventListener('keydown', async (event) => { if (event.key === 'Tab' || event.key.startsWith('Arrow')) keyboardFocus = true; if (event.key === 'Escape' && !feedbackModal.hidden) { event.preventDefault(); closeFeedback(); return; } const editing = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable; if (!editing && event.key === 'ArrowDown') { event.preventDefault(); moveActive(1); return; } if (!editing && event.key === 'ArrowUp') { event.preventDefault(); moveActive(-1); return; } if (!editing && event.key === 'Enter' && event.shiftKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); openNote(selected); return; } if (!editing && (event.metaKey || event.ctrlKey) && event.key === 'Enter' && selected) { event.preventDefault(); openNote(selected); } else if (!editing && !event.isComposing && ['Delete','Backspace'].includes(event.key) && selectedKeys.size) { event.preventDefault(); await deleteMarks(); } else if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (await ReMarkStorage.undoLast()) await load(); } else if (!editing && event.key === 'Escape' && selectedKeys.size) { clearSelection(); } else if (!editing && event.key === '/') { event.preventDefault(); search.focus(); } else if (!editing && event.key === 'Escape' && showingSettings) { showTimeline(); } else if (!editing && event.key === 'Escape' && sourceUrl !== null) { sourceUrl = null; clearSelection(); render(true); } });
+  async function followActivePageCollection(url, windowId) {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (windowId !== undefined && tab?.windowId !== undefined && tab.windowId !== windowId) return;
+      await load();
+      const collectionUrl = all().find((item) => sameUrl(item.url, url))?.url;
+      if (collectionUrl) showSourceCollection(collectionUrl);
+      else if (sourceUrl !== null) { sourceUrl = null; clearSelection(); render(true); }
+    } catch (_) {}
+  }
   globalThis.chrome?.runtime?.onMessage?.addListener((message) => {
     if (message?.action === 'REMARK_STORAGE_UPDATED') void load();
+    if (message?.action === 'ACTIVE_PAGE_COLLECTION_CHANGED') void followActivePageCollection(message.url, message.windowId);
     if (message?.action === 'FOCUS_CLIP') focusFromSource(message.clipId || message.markId);
     if (message?.action === 'SOURCE_MARK_UNAVAILABLE' || message?.action === 'SOURCE_UNAVAILABLE') showToast(t('source_unavailable'));
   });

@@ -56,12 +56,17 @@ chrome.runtime.onInstalled.addListener((details) => {
     });
   }
 });
-chrome.runtime.onStartup.addListener(() => void syncAllActionIcons());
+chrome.runtime.onStartup.addListener(() => {
+  void syncAllActionIcons();
+});
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== 'local') return;
   if (changes?.[SETTINGS_KEY]) void syncNativeLanguage();
   if (changes?.[ReMarkStorage.KEYS.CLIPS] || changes?.[ReMarkStorage.KEYS.VIDEO_MARKS]) {
     void syncAllActionIcons();
+    chrome.tabs.query({ active: true, lastFocusedWindow: true })
+      .then((tabs) => { if (tabs[0]?.id) void syncActivePagePanel(tabs[0].id, tabs[0].url); })
+      .catch(() => {});
   }
 });
 
@@ -141,6 +146,26 @@ async function syncAllActionIcons() {
   } catch (_) {}
 }
 
+async function syncActivePagePanel(tabId, url) {
+  let tab;
+  try {
+    tab = await chrome.tabs.get(tabId);
+  } catch (_) {
+    return;
+  }
+  if (!tab.active || !isNavigablePageUrl(url || tab.url)) return;
+  const normalizedUrl = String(url || tab.url).split('#')[0];
+  let hasMarks = false;
+  try {
+    hasMarks = await markedUrlHasReMarkMarks(normalizedUrl);
+  } catch (_) {}
+  chrome.runtime.sendMessage({
+    action: 'ACTIVE_PAGE_COLLECTION_CHANGED',
+    windowId: tab.windowId,
+    url: hasMarks ? normalizedUrl : null
+  }).catch(() => {});
+}
+
 function trackSourceNavigation(tabId, clipId, url) {
   const pending = { clipId, url: url || '' };
   pendingSourceNavigations.set(tabId, pending);
@@ -174,6 +199,7 @@ function acknowledgePendingSourceLocate(tabId, clipId) {
 chrome.webNavigation.onCompleted.addListener((details) => {
   if (details.frameId !== 0) return;
   void syncActionIconForPage(details.tabId, details.url);
+  void syncActivePagePanel(details.tabId, details.url);
   const pending = pendingSourceNavigations.get(details.tabId);
   if (pending) deliverPendingSourceLocate(details.tabId, pending);
 });
@@ -181,15 +207,22 @@ chrome.webNavigation.onCompleted.addListener((details) => {
 chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
   if (details.frameId !== 0) return;
   void syncActionIconForPage(details.tabId, details.url);
+  void syncActivePagePanel(details.tabId, details.url);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.url) void syncActionIconForPage(tabId, tab.url || changeInfo.url);
+  if (!changeInfo.url) return;
+  const url = tab.url || changeInfo.url;
+  void syncActionIconForPage(tabId, url);
+  void syncActivePagePanel(tabId, url);
 });
 
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   chrome.tabs.get(tabId)
-    .then((tab) => syncActionIconForPage(tabId, tab.url))
+    .then((tab) => {
+      void syncActionIconForPage(tabId, tab.url);
+      void syncActivePagePanel(tabId, tab.url);
+    })
     .catch(() => {});
 });
 

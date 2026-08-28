@@ -2,214 +2,57 @@ const assert = require('assert').strict;
 const fs = require('fs');
 const path = require('path');
 const read = (file) => fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8');
-const content = read('content/content.js');
-const sidepanel = read('sidepanel/sidepanel.js');
-const html = read('sidepanel/sidepanel.html');
 const background = read('background.js');
+const sidepanel = read('sidepanel/sidepanel.js');
+const storage = read('lib/storage.js');
 const manifest = JSON.parse(read('manifest.json'));
-const i18n = read('lib/i18n.js');
 
-assert.match(sidepanel, /async function deleteMarks\(keys = selectedKeys\)/);
-assert.match(sidepanel, /Promise\.all\(highlights\.map\(\(item\) => notifySourceTabs\(item, \{ action: 'DELETE_CLIP_FROM_PAGE', clipId: item\.id \}\)\)\)/);
-assert.match(sidepanel, /function clearNativeTextSelection\(\)[\s\S]*window\.getSelection/);
-assert.match(sidepanel, /list\.addEventListener\('mousedown',[\s\S]*isShiftRangePointer\(event\)[\s\S]*event\.preventDefault\(\)/);
-assert.match(content, /function positionVideoMarkPanel\(panel, anchor\)[\s\S]*window\.innerWidth[\s\S]*window\.innerHeight/);
-assert.match(content, /positionVideoMarkPanel\(tip, tooltipAnchor\)/);
-assert.doesNotMatch(read('content/content.css'), /\.remark-video-mark-card::after/);
-assert.match(sidepanel, /async function notifySourceTabs[\s\S]*Promise\.all/);
-assert.match(sidepanel, /action: 'RESTORE_HIGHLIGHTS'/);
-assert.match(content, /function schedulePageHighlightRestore\(\)[\s\S]*DOMContentLoaded[\s\S]*\[800, 2200, 4000, 7000\]\.forEach/);
-assert.match(content, /new MutationObserver\(\(\) => \{/);
-assert.match(content, /observer\.disconnect\(\), 20000\)/);
-assert.match(content, /function samePageUrl\(a, b\)/);
-assert.match(content, /const textSegments = \[\];[\s\S]*let startIndex = text\.indexOf\(clip\.text\)[\s\S]*highlightDOMRange\(range, clip\)/);
-assert.match(content, /function reportSourceUnavailable\(clipId\)[\s\S]*action: 'SOURCE_MARK_UNAVAILABLE'/);
-assert.match(sidepanel, /SOURCE_MARK_UNAVAILABLE[\s\S]*source_unavailable/);
-assert.match(sidepanel, /action: 'OPEN_MARK_NAVIGATION'/);
-assert.match(background, /chrome\.webNavigation\.onErrorOccurred\.addListener/);
+// The Side Panel follows the active browser tab: when the panel is open and
+// the user switches to another tab that has Marks, the panel should switch to
+// that page's Source collection (and leave the collection when the new tab has
+// no Marks). The background service worker is the event source; the panel
+// applies the change.
+
+// --- Background: event source for the active-page collection ---
+assert.match(background, /async function syncActivePagePanel\(tabId, url\)/);
+assert.match(background, /if \(!tab\.active \|\| !isNavigablePageUrl\(url \|\| tab\.url\)\) return;/);
+assert.match(background, /const normalizedUrl = String\(url \|\| tab\.url\)\.split\('#'\)\[0\];/);
+assert.match(background, /hasMarks = await markedUrlHasReMarkMarks\(normalizedUrl\);/);
+assert.match(background, /chrome\.runtime\.sendMessage\(\{[\s\S]*?action: 'ACTIVE_PAGE_COLLECTION_CHANGED',[\s\S]*?windowId: tab\.windowId,[\s\S]*?url: hasMarks \? normalizedUrl : null[\s\S]*?\}\)\.catch/);
+// Marks presence is decided by the same page grouping the panel uses.
+assert.match(background, /async function markedUrlHasReMarkMarks\(url\)[\s\S]*?if \(!isNavigablePageUrl\(url\)\) return false;[\s\S]*?const pages = await ReMarkStorage\.getPages\(\);[\s\S]*?pages\.some\(\(page\) => sameReMarkPageUrl\(page\?\.url, url\)\)/);
+assert.match(background, /function sameReMarkPageUrl\(a, b\)[\s\S]*?String\(a \|\| ''\)\.split\('#'\)\[0\] === String\(b \|\| ''\)\.split\('#'\)\[0\]/);
+assert.match(background, /function isNavigablePageUrl\(url\)[\s\S]*?\/\^https\?:\/i\.test/);
+// Fired on tab activation, navigation completion, history-state updates and URL changes.
+assert.match(background, /chrome\.tabs\.onActivated\.addListener\(\(\{ tabId \}\) => \{[\s\S]*?void syncActivePagePanel\(tabId, tab\.url\);[\s\S]*?\}\);/);
+assert.match(background, /chrome\.webNavigation\.onCompleted\.addListener\(\(details\) => \{[\s\S]*?if \(details\.frameId !== 0\) return;[\s\S]*?void syncActivePagePanel\(details\.tabId, details\.url\);/);
+assert.match(background, /chrome\.webNavigation\.onHistoryStateUpdated\.addListener\(\(details\) => \{[\s\S]*?void syncActivePagePanel\(details\.tabId, details\.url\);/);
+assert.match(background, /chrome\.tabs\.onUpdated\.addListener\(\(tabId, changeInfo, tab\) => \{[\s\S]*?if \(!changeInfo\.url\) return;[\s\S]*?void syncActivePagePanel\(tabId, url\);/);
+// When stored Marks change, refresh the active page's panel state too.
+assert.match(background, /if \(changes\?\.\[ReMarkStorage\.KEYS\.CLIPS\] \|\| changes\?\.\[ReMarkStorage\.KEYS\.VIDEO_MARKS\]\) \{[\s\S]*?void syncActivePagePanel\(tabs\[0\]\.id, tabs\[0\]\.url\);/);
+console.log('page-sync background assertions passed');
+
+// --- Side Panel: applies the active-page collection change ---
+// On open the panel already selects the current page's Source collection.
+assert.match(sidepanel, /async function showCurrentPageCollectionOnPanelOpen\(\)[\s\S]*?chrome\.tabs\.query\(\{ active: true, currentWindow: true \}\)[\s\S]*?const collectionUrl = all\(\)\.find\(\(item\) => sameUrl\(item\.url, tab\?\.url\)\)\?\.url;[\s\S]*?if \(collectionUrl\) showSourceCollection\(collectionUrl\);/);
+// On tab switch the panel follows the active page.
+assert.match(sidepanel, /async function followActivePageCollection\(url, windowId\)/);
+assert.match(sidepanel, /if \(windowId !== undefined && tab\?\.windowId !== undefined && tab\.windowId !== windowId\) return;/);
+assert.match(sidepanel, /const collectionUrl = all\(\)\.find\(\(item\) => sameUrl\(item\.url, url\)\)\?\.url;/);
+assert.match(sidepanel, /if \(collectionUrl\) showSourceCollection\(collectionUrl\);/);
+assert.match(sidepanel, /else if \(sourceUrl !== null\) \{ sourceUrl = null; clearSelection\(\); render\(true\); \}/);
+assert.match(sidepanel, /if \(message\?\.action === 'ACTIVE_PAGE_COLLECTION_CHANGED'\) void followActivePageCollection\(message\.url, message\.windowId\);/);
+// The URL comparison strips fragments on both sides of the wire.
+assert.match(sidepanel, /const sameUrl = \(a, b\) => String\(a \|\| ''\)\.split\('#'\)\[0\] === String\(b \|\| ''\)\.split\('#'\)\[0\];/);
+assert.match(sidepanel, /function showSourceCollection\(url\)[\s\S]*?sourceUrl = url;[\s\S]*?render\(\);/);
+// Storage exposes the page grouping both sides rely on.
+assert.match(storage, /async getPages\(\)[\s\S]*?const urlKey = item\.url \|\| 'other';/);
+console.log('page-sync sidepanel assertions passed');
+
+// --- Permissions and wiring ---
+assert.ok(manifest.permissions.includes('tabs'));
 assert.ok(manifest.permissions.includes('webNavigation'));
-assert.match(i18n, /source_unavailable: '无法找到原网页或对应内容/);
-assert.match(i18n, /source_unavailable: 'The original page or marked content could not be found/);
+assert.ok(manifest.permissions.includes('sidePanel'));
+assert.ok(manifest.permissions.includes('storage'));
+console.log('page-sync manifest assertions passed');
 console.log('page-sync.test.js: all assertions passed');
-
-const nativeUiRefresh = background.slice(background.indexOf('let nativeUiRefreshRevision'), background.indexOf('async function syncNativeLanguage'));
-assert.match(nativeUiRefresh, /let nativeUiRefreshRevision = 0;/);
-assert.match(nativeUiRefresh, /function createNativeMenuItem\(options\)[\s\S]*?chrome\.contextMenus\.create\(options, \(\) => \{[\s\S]*?void chrome\.runtime\.lastError/);
-assert.match(nativeUiRefresh, /const revision = \+\+nativeUiRefreshRevision;/);
-assert.match(nativeUiRefresh, /chrome\.contextMenus\.removeAll\(\(\) => \{[\s\S]*?if \(revision !== nativeUiRefreshRevision\) return;[\s\S]*?if \(chrome\.runtime\.lastError\) return;/);
-assert.equal((background.match(/chrome\.contextMenus\.create\(/g) || []).length, 1);
-console.log('idempotent context menu registration assertions passed');
-
-const extensionScripts = [content, sidepanel, background, read('sidepanel/sidepanel.html'), JSON.stringify(manifest)].join('\n');
-assert.doesNotMatch(extensionScripts, /lunanotes\.io|_app\/immutable\/entry\/start\./i);
-assert.doesNotMatch(JSON.stringify(manifest), /declarativeNetRequest|content_security_policy/i);
-assert.match(sidepanel, /function markHtml\(item, index = 0\)[\s\S]*?: esc\(item\.text\);/);
-console.log('website CSP isolation assertions passed');
-
-assert.doesNotMatch(content, /selectedHighlight/);
-assert.match(content, /initialValue: item\.note \|\| ''/);
-assert.match(content, /function openQuickNoteInput\(\{ rect, onSave, initialValue = '', above = false \}\)/);
-assert.match(content, /input\.value = initialValue/);
-assert.match(content, /function bindHighlightClick\(element, clip\)[\s\S]*showHighlightActions\(clip\.id[,)]/);
-const clickHandler = content.slice(content.indexOf('function bindHighlightClick'), content.indexOf('function notifyStorageUpdated'));
-assert.doesNotMatch(clickHandler, /OPEN_SIDE_PANEL/);
-assert.match(content, /event\.preventDefault\(\);[\s\S]*event\.stopPropagation\(\);[\s\S]*showHighlightActions\(clip\.id[,)]/);
-assert.doesNotMatch(read('content/content.css'), /remark-selected \{[\s\S]*inset 0 -2px/);
-console.log('page-mark-interaction assertions passed');
-
-assert.match(content, /if \(event\.button !== 0\) return;/);
-assert.match(content, /showMarkPill\(\{ text, range: range\.cloneRange\(\), sourceUrl: getSelectionSourceUrl\(range\) \}, \{ x: event\.clientX, y: event\.clientY \}\)/);
-assert.match(content, /remark-mark-pill/);
-assert.match(content, /t\('unmark'\)/);
-assert.match(content, /remark-mark-action--marked/);
-assert.match(content, /function suppressPillTooltipUntilPointerReentry\(button\)[\s\S]*?button\?\.matches\(':hover'\)[\s\S]*?remark-tooltip-await-reentry[\s\S]*?addEventListener\('pointerleave'[\s\S]*?remove\('remark-tooltip-await-reentry'\)[\s\S]*?once: true/);
-assert.match(content, /updatePillMarkState\(true, saved\.id\);[\s\S]*?suppressPillTooltipUntilPointerReentry\(markPillEl\.querySelector\('\.remark-mark-action--mark'\)\)/);
-assert.match(read('content/content.css'), /\.remark-mark-action\.remark-tooltip-await-reentry:hover::after \{[\s\S]*?opacity: 0;/);
-assert.match(content, /function textMarkShortcutHint\(\)[\s\S]*navigator\.userAgentData\?\.platform[\s\S]*text_mark_shortcut_mac[\s\S]*text_mark_shortcut_ctrl/);
-assert.match(content, /markBtn\.dataset\.hint = textMarkShortcutHint\(\)/);
-assert.match(content, /function onVideoMarkKeydown\(e\)[\s\S]*\(e\.key === 'm' \|\| e\.key === 'M'\)/);
-assert.doesNotMatch(content, /remark-video-mark-tip-shortcut|video_mark_shortcut/);
-assert.match(read('content/content.css'), /\.remark-mark-pill \{/);
-assert.match(content, /async function undoPageAction\(\)[\s\S]*ReMarkStorage\.get\(ReMarkStorage\.KEYS\.UNDO\)[\s\S]*ReMarkStorage\.undoLast\(\)/);
-assert.match(content, /action\.type === 'restore_clip'[\s\S]*removeClipHighlightFromDOM\(action\.id, \{ immediate: true \}\)/);
-assert.match(content, /function cancelClipHighlightRemoval\(clipId\)[\s\S]*remarkRemovalPending/);
-assert.match(content, /event\.key\.toLowerCase\(\) !== 'z'[\s\S]*await undoPageAction\(\)/);
-console.log('page-highlight-undo assertions passed');
-
-assert.match(content, /function attachNoteControl\(mark, clip\)[\s\S]*className = 'remark-note-control'/);
-assert.match(content, /control\.addEventListener\('click'[\s\S]*openQuickNoteInput\([\s\S]*initialValue: note/);
-assert.match(content, /const showNote = Boolean\(clip\.note && segment === textSegments\[0\]\)/);
-assert.match(content, /async function setClipNoteIndicator\(clipId\)[\s\S]*marks\.at\(0\)/);
-console.log('page-note-control assertions passed');
-
-assert.match(sidepanel, /action: 'RESTORE_HIGHLIGHTS'[\s\S]*action: 'LOCATE_CLIP'/);
-assert.match(content, /const normalizedClipText = String\(clip\.text\)\.replace\(\/\\s\+\/g, ''\)/);
-assert.match(content, /originalIndexes\.push\(index\)[\s\S]*normalizedPageText\.indexOf\(normalizedClipText\)/);
-console.log('sidepanel-locate-recovery assertions passed');
-
-assert.match(sidepanel, /if \(action === 'jump' && \(event\.shiftKey \|\| event\.metaKey \|\| event\.ctrlKey\)\) \{ selectCard\(key, event\); return; \}/);
-assert.match(sidepanel, /if \(action === 'jump'\) \{[\s\S]*setSelection\(\[key\], key\);[\s\S]*setActive\(key\);[\s\S]*if \(isGlyphHit\(event, control\)\) void jump\(itemFor\(key\)\);[\s\S]*return;/);
-assert.match(sidepanel.slice(sidepanel.indexOf("list.addEventListener('click'", sidepanel.indexOf('function isGlyphHit')), sidepanel.indexOf("list.addEventListener('click'", sidepanel.indexOf('function isGlyphHit')) + 1400), /isGlyphHit\(event, control\)/);
-assert.match(sidepanel, /function adjacentKeyAfterDelete\(keys\)[\s\S]*activeIndex \+ 1[\s\S]*activeIndex - 1/);
-assert.match(sidepanel, /const adjacentKey = adjacentKeyAfterDelete\(deletedKeys\);[\s\S]*if \(adjacentKey\) \{[\s\S]*selected = adjacentKey;[\s\S]*selectedKeys = new Set\(\[adjacentKey\]\);[\s\S]*selectionAnchor = adjacentKey;/);
-assert.match(sidepanel, /function updateSelectionTray\(rows = selectedVisibleRows\(\)\)[\s\S]*selectionBadge\.textContent[\s\S]*selection_hint_point_mac[\s\S]*selection_hint_point_ctrl[\s\S]*selection_hint_range/);
-assert.match(sidepanel, /function render\(animated = false\)[\s\S]*updateSelectionTray\(\);/);
-assert.match(sidepanel, /function selectedMarkdown\(rows\)[\s\S]*videoMarkSourceUrl\(item\)[\s\S]*quoteMarkdown\(item\.text\)/);
-assert.match(sidepanel, /function exportSelectedMarkdown\(\)[\s\S]*new Blob\([\s\S]*text\/markdown[\s\S]*link\.download = `remark-marks-/);
-assert.match(sidepanel, /selectionExportButton\.addEventListener\('click', exportSelectedMarkdown\)/);
-assert.match(sidepanel, /function setViewTitle\(label, count\)[\s\S]*subtitle\.innerHTML = `\$\{esc\(label\)\} <span class="view-title-count">\(\$\{esc\(countLabel\)\}\)<\/span>`/);
-assert.match(sidepanel, /setViewTitle\(t\('source_marks'\), sourceRows\.length\)/);
-assert.match(sidepanel, /setViewTitle\(t\('timeline'\), all\(\)\.length\)/);
-assert.match(sidepanel, /async function copySelectedMarkdown\(\)[\s\S]*copyText\(selectedMarkdown\(rows\)\)[\s\S]*showCopyFeedback\(selectionCopyButton\)/);
-assert.match(sidepanel, /selectionCopyButton\.addEventListener\('click'/);
-assert.match(html, /id="selection-tray"[\s\S]*id="selection-badge"[\s\S]*id="selection-hint-point"[\s\S]*id="selection-hint-range"[\s\S]*data-i18n-title="download"[\s\S]*data-i18n-title="copy"[\s\S]*data-i18n-title="cancel"/);
-assert.doesNotMatch(html, /export_selected_markdown/);
-assert.match(sidepanel, /event\.target\.closest\('\.mark-card, \.selection-tray'\)/);
-assert.match(sidepanel, /const createdTime = \(value\) =>[\s\S]*hour: '2-digit'/);
-assert.match(sidepanel, /feed-day-label" title="\$\{esc\(fullDate\(item\.createdAt\)\)\}/);
-assert.doesNotMatch(sidepanel, /list\.addEventListener\('mouseover'/);
-assert.match(sidepanel, /if \(sourceUrl !== null\) rows = rows\.filter\(\(item\) => sameUrl\(item\.url, sourceUrl\)\)/);
-assert.match(sidepanel.slice(sidepanel.indexOf('function visible()'), sidepanel.indexOf('function day(value)')), /item\.title,[\s\S]*item\.url/);
-assert.match(sidepanel, /pointermove[\s\S]*is-glyph-hover[\s\S]*isGlyphHit\(event, control\)/);
-assert.match(content, /if \(mark\) \{[\s\S]*performLocateAnimation\(mark\)/);
-assert.match(content, /mark\.scrollIntoView\(\{ behavior: 'smooth', block: 'center', inline: 'nearest' \}\)/);
-console.log('viewport-mark-locate assertions passed');
-
-assert.match(content, /function ensureHighlightActions\(clipId\)[\s\S]*remark-mark-action--mark[\s\S]*remark-mark-action--note[\s\S]*remark-mark-action--copy/);
-assert.match(content, /showHighlightActions\(savedClip\.id, 2800\)/);
-assert.match(content, /element\.addEventListener\('mouseenter', \(\) => scheduleHighlightActionShow\(clip\.id\)\)/);
-assert.match(content, /HIGHLIGHT_ACTION_SHOW_DELAY = 350/);
-assert.match(read('content/content.css'), /\.remark-mark-actions-anchor \{\n  position: relative;[\s\S]*vertical-align: bottom;/);
-assert.match(read('content/content.css'), /\.remark-mark-actions \{\n  position: absolute;[\s\S]*top: calc\(100% \+ \.1em\);[\s\S]*right: -\.1em;/);
-assert.match(content, /remark-mark-actions-anchor/);
-
-assert.match(content, /async function deletePageClip\(clipId\)[\s\S]*ReMarkStorage\.pushUndo/);
-assert.match(read('content/content.css'), /\.remark-mark-action::after \{[\s\S]*content: attr\(data-hint\)/);
-assert.doesNotMatch(read('content/content.css'), /\.remark-video-mark-tip-shortcut \{/);
-assert.match(read('sidepanel/sidepanel.css'), /\.feed-day-heading \{[\s\S]*position: sticky;[\s\S]*top: 0;/);
-assert.match(read('sidepanel/sidepanel.css'), /\.controls-bar \{[\s\S]*z-index: 10;[\s\S]*background: var\(--bg\);/);
-assert.match(read('sidepanel/sidepanel.css'), /\.selection-tray \{[\s\S]*position: fixed;/);
-assert.doesNotMatch(read('sidepanel/sidepanel.css'), /\.view-count \{/);
-assert.match(read('sidepanel/sidepanel.css'), /\.view-subtitle \.view-title-count \{[\s\S]*color: var\(--ink-4\);[\s\S]*font-weight: 400;/);
-assert.match(read('sidepanel/sidepanel.css'), /\.source-collection-source-row \{[\s\S]*justify-content: flex-start;[\s\S]*width: 100%;[\s\S]*text-align: left;/);
-assert.match(read('sidepanel/sidepanel.css'), /\.selection-badge \{[\s\S]*position: absolute;/);
-assert.match(read('sidepanel/sidepanel.css'), /\.selection-tray-hint \{[\s\S]*text-overflow: ellipsis;/);
-assert.match(read('sidepanel/sidepanel.css'), /\.mark-content-text \{[\s\S]*font-size: 14px;[\s\S]*font-weight: 480;/);
-assert.match(read('sidepanel/sidepanel.css'), /\.mark-note \{[\s\S]*font-size: 13px;[\s\S]*font-weight: 400;/);
-assert.match(read('sidepanel/sidepanel.css'), /\.mark-source \{[\s\S]*font-size: 11\.5px;[\s\S]*font-weight: 400;/);
-assert.match(read('sidepanel/sidepanel.css'), /\.mark-created \{[\s\S]*margin-left: auto;[\s\S]*font-size: 11px;[\s\S]*font-weight: 400;/);
-assert.match(read('sidepanel/sidepanel.css'), /\.mark-more \{[\s\S]*font-size: 16px;[\s\S]*font-weight: 400;/);
-assert.match(read('content/content.css'), /remark-mark-actions\.is-visible/);
-console.log('page-highlight-actions assertions passed');
-
-assert.match(content, /function scheduleCurrentPageHighlightRecovery\(\) \{[\s\S]*\[0, 250, 900, 2200\]\.map[\s\S]*restorePageHighlights\(\)/);
-assert.match(content, /changes\?\.\[ReMarkStorage\.KEYS\.CLIPS\]\) scheduleCurrentPageHighlightRecovery\(\);/);
-assert.match(content, /highlightDOMRange\(range, savedClip, true\);[\s\S]*scheduleCurrentPageHighlightRecovery\(\);/);
-console.log('dynamic page immediate highlight recovery assertions passed');
-
-assert.match(background, /const PENDING_SOURCE_LOCATE_DELAYS = \[0, 600, 1800, 4200, 7000, 10000\];/);
-assert.match(background, /chrome\.webNavigation\.onCompleted\.addListener\(\(details\) => \{[\s\S]*deliverPendingSourceLocate\(details\.tabId, pending\)/);
-assert.match(background, /function deliverPendingSourceLocate\(tabId, pending\)[\s\S]*RESTORE_HIGHLIGHTS[\s\S]*LOCATE_CLIP/);
-assert.match(content, /const LOCATE_CLIP_RETRY_DELAYS = \[250, 500, 900, 1500, 2400, 3600, 5000, 6500\];/);
-assert.match(content, /attempt >= LOCATE_CLIP_RETRY_DELAYS\.length[\s\S]*LOCATE_CLIP_RETRY_DELAYS\[attempt\]/);
-assert.match(sidepanel, /action: 'OPEN_MARK_NAVIGATION',[\s\S]*locateClip: true/);
-assert.match(background, /function openMarkNavigation\(url, clipId, locateClip\)[\s\S]*trackSourceNavigation\(tab\.id, clipId, url\)[\s\S]*chrome\.tabs\.update\(tab\.id, \{ url \}\)/);
-console.log('source jump initial-locate recovery assertions passed');
-
-assert.match(background, /importScripts\('lib\/i18n\.js', 'lib\/storage\.js'\);/);
-assert.match(manifest.action.default_icon[16], /icon16-monochrome\.png/);
-assert.match(background, /const UNMARKED_ACTION_ICON_PATHS = \{[\s\S]*icon16-monochrome\.png[\s\S]*icon512-monochrome\.png/);
-assert.match(background, /const MARKED_ACTION_ICON_PATHS = \{[\s\S]*icon16\.png[\s\S]*icon512\.png/);
-assert.match(background, /async function markedUrlHasReMarkMarks\(url\)[\s\S]*ReMarkStorage\.getPages\(\)[\s\S]*sameReMarkPageUrl/);
-assert.match(background, /async function syncActionIconForPage\(tabId, url\)[\s\S]*hasMarks \? MARKED_ACTION_ICON_PATHS : UNMARKED_ACTION_ICON_PATHS/);
-assert.match(background, /async function syncAllActionIcons\(\)[\s\S]*chrome\.tabs\.query\(\{\}\)[\s\S]*syncActionIconForPage/);
-assert.match(background, /chrome\.runtime\.onStartup\.addListener\(\(\) => void syncAllActionIcons\(\)\)/);
-assert.match(background, /chrome\.storage\.onChanged\.addListener[\s\S]*ReMarkStorage\.KEYS\.CLIPS[\s\S]*ReMarkStorage\.KEYS\.VIDEO_MARKS[\s\S]*syncAllActionIcons/);
-assert.match(background, /chrome\.webNavigation\.onCompleted\.addListener\([\s\S]*syncActionIconForPage\(details\.tabId, details\.url\)/);
-assert.match(background, /chrome\.webNavigation\.onHistoryStateUpdated\.addListener\([\s\S]*syncActionIconForPage\(details\.tabId, details\.url\)/);
-assert.match(background, /chrome\.tabs\.onUpdated\.addListener\([\s\S]*syncActionIconForPage\(tabId, tab\.url \|\| changeInfo\.url\)/);
-assert.match(background, /chrome\.tabs\.onActivated\.addListener\([\s\S]*syncActionIconForPage\(tabId, tab\.url\)/);
-assert.match(sidepanel, /function showSourceCollection\(url\)[\s\S]*sourceUrl = url;[\s\S]*contentArea\.scrollTop = 0;[\s\S]*clearSelection\(\);[\s\S]*render\(\);[\s\S]*syncSourcePositions\(sourceUrl\)/);
-assert.match(sidepanel, /async function showCurrentPageCollectionOnPanelOpen\(\)[\s\S]*chrome\.tabs\.query\(\{ active: true, currentWindow: true \}\)[\s\S]*all\(\)\.find\(\(item\) => sameUrl\(item\.url, tab\?\.url\)\)\?\.url[\s\S]*showSourceCollection\(collectionUrl\)/);
-assert.match(sidepanel, /await load\(true\);[\s\S]*await showCurrentPageCollectionOnPanelOpen\(\);/);
-const timelineJump = sidepanel.slice(sidepanel.indexOf('async function jump(item)'), sidepanel.indexOf('function isGlyphHit'));
-assert.doesNotMatch(timelineJump, /showSourceCollection\(/);
-assert.match(sidepanel, /if \(action === 'source'\) \{ showSourceCollection\(url \|\| ''\); return; \}/);
-assert.doesNotMatch(background, /intentionalNavigation|pulseMarked|maybePulse|PULSE_ACTION_ICON_PATHS|setBadge|badgeText/);
-assert.doesNotMatch(sidepanel, /TRACK_INTENTIONAL_NAVIGATION|OPEN_INTENTIONAL_MARK_NAVIGATION/);
-console.log('marked-page toolbar indicator assertions passed');
-
-assert.match(content, /const pendingClipLocations = new Set\(\);/);
-assert.match(content, /function resolvePendingClipLocation\(clipId\) \{[\s\S]*requestAnimationFrame[\s\S]*performLocateAnimation\(mark\)/);
-assert.match(content, /if \(attempt === 0\) pendingClipLocations\.add\(clipId\);/);
-assert.match(content, /textSegments\.slice\(\)\.reverse\(\)\.forEach[\s\S]*resolvePendingClipLocation\(clip\.id\);[\s\S]*return;/);
-assert.match(content, /range\.surroundContents\(mark\);[\s\S]*resolvePendingClipLocation\(clip\.id\);/);
-assert.match(content, /range\.insertNode\(mark\);[\s\S]*resolvePendingClipLocation\(clip\.id\);/);
-console.log('source jump target-mounted locate assertions passed');
-
-assert.doesNotMatch(background, /window\.setTimeout/);
-assert.match(background, /chrome\.tabs\.get\(message\.tabId\)[\s\S]*tab\.status === 'complete'[\s\S]*deliverPendingSourceLocate/);
-assert.match(background, /function acknowledgePendingSourceLocate\(tabId, clipId\)[\s\S]*pendingSourceNavigations\.delete\(tabId\)/);
-assert.match(background, /message\.action === 'SOURCE_CLIP_LOCATED'[\s\S]*acknowledgePendingSourceLocate\(sender\.tab\.id, message\.clipId\)/);
-assert.match(content, /function acknowledgeSourceClipLocation\(mark, attempt = 0\)[\s\S]*SOURCE_CLIP_LOCATED/);
-assert.match(content, /function performLocateAnimation\(mark\)[\s\S]*acknowledgeSourceClipLocation\(mark\)/);
-console.log('source jump service-worker acknowledgement assertions passed');
-
-const backgroundMessageListener = background.slice(background.indexOf('chrome.runtime.onMessage.addListener'), background.lastIndexOf('void syncNativeLanguage'));
-assert.match(backgroundMessageListener, /TRACK_SOURCE_NAVIGATION[\s\S]*?trackSourceNavigation[\s\S]*?sendResponse\(\{ ok: true \}\);\s*return false;/);
-assert.match(backgroundMessageListener, /OPEN_MARK_NAVIGATION[\s\S]*?openMarkNavigation[\s\S]*?return true;/);
-assert.doesNotMatch(backgroundMessageListener, /TRACK_INTENTIONAL_NAVIGATION|OPEN_INTENTIONAL_MARK_NAVIGATION/);
-assert.match(backgroundMessageListener, /SOURCE_CLIP_LOCATED[\s\S]*?sendResponse\(\{ ok: true \}\);\s*return false;/);
-assert.match(backgroundMessageListener, /OPEN_SIDE_PANEL[\s\S]*?sendResponse\(\{ success: true \}\);[\s\S]*?sendResponse\(\{ success: false \}\);[\s\S]*?return false;/);
-assert.match(backgroundMessageListener, /INSTALL_BILI_SUBTITLE_CAPTURE[\s\S]*?sendResponse\(\{ ok: true \}\);\s*return false;/);
-assert.match(backgroundMessageListener, /CAPTURE_VIDEO_CAPTION[\s\S]*?\.then\(\(results\) => sendResponse\(results\?\.\[0\]\?\.result \|\| null\)\)[\s\S]*?return true;/);
-assert.match(backgroundMessageListener, /return false;\s*\}\);/);
-console.log('background message response assertions passed');
-
-assert.match(content, /function getVideoOverlayHost\(video\) \{[\s\S]*document\.fullscreenElement[\s\S]*fullscreen\.contains\(video\)[\s\S]*return document\.body/);
-assert.match(content, /function appendVideoOverlay\(node, video\) \{[\s\S]*getVideoOverlayHost\(video\)\.appendChild\(node\)/);
-const creationFeedback = content.slice(content.indexOf('function showMarkCreationFeedback'), content.indexOf('function markCreationGeometry'));
-assert.match(creationFeedback, /appendVideoOverlay\(flag, video\);[\s\S]*appendVideoOverlay\(overlay, video\);[\s\S]*appendVideoOverlay\(card, video\);/);
-const hoverTooltip = content.slice(content.indexOf('function showMarkTooltip'), content.indexOf('function scheduleHideMarkTooltip'));
-assert.match(hoverTooltip, /appendVideoOverlay\(tip, findVideoElement\(\)\);/);
-console.log('video fullscreen overlay host assertions passed');

@@ -86,7 +86,9 @@ assert.match(script, /const footer = sourceUrl === null[\s\S]*<footer class="mar
 assert.doesNotMatch(html, /class="search-icon"/);
 assert.doesNotMatch(html, /class="search-kbd"/);
 assert.match(script, /search\.placeholder = t\('search_placeholder'\)/);
-assert.match(script, /if \(inSource\) \{[\s\S]*setViewTitle\(t\('source_marks'\), sourceRows\.length\)/);
+assert.match(script, /if \(inSource\) \{[\s\S]*setViewTitle\(t\('timeline'\), sourceRows\.length, false\)/);
+assert.match(script, /source-collection-count.*· \$\{esc\(countLabel\)\}/);
+assert.match(script, /timelineControls\.hidden = inSource/);
 assert.doesNotMatch(html, /id="view-count"/);
 assert.match(i18n, /timeline: 'Timeline'/);
 assert.match(i18n, /source_marks: 'Collection'/);

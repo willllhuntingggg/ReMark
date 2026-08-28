@@ -936,6 +936,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     }).catch(() => {});
   }
+  function showSourceCollection(url) {
+    if (!url) return;
+    sourceUrl = url;
+    contentArea.scrollTop = 0;
+    clearSelection();
+    render();
+    syncSourcePositions(sourceUrl);
+  }
+  async function showCurrentPageCollectionOnPanelOpen() {
+    let tab = null;
+    try {
+      [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab) [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    } catch (_) {
+      return;
+    }
+    const collectionUrl = all().find((item) => sameUrl(item.url, tab?.url))?.url;
+    if (collectionUrl) showSourceCollection(collectionUrl);
+  }
   function setActive(key) { selected = key; list.querySelectorAll('.mark-active').forEach((node) => node.classList.remove('mark-active')); cardFor(key)?.classList.add('mark-active'); }
   function clearActive(key) { if (selected === key) { selected = null; cardFor(key)?.classList.remove('mark-active'); } }
   function setSelection(keys, anchor = null) {
@@ -1015,7 +1034,13 @@ document.addEventListener('DOMContentLoaded', async () => {
           await chrome.tabs.update(sourceTab.id, { active: true });
           if (sourceTab.windowId) await chrome.windows.update(sourceTab.windowId, { focused: true });
         } else {
-          await chrome.tabs.create({ url: item.url, active: true });
+          const result = await chrome.runtime.sendMessage({
+            action: 'OPEN_MARK_NAVIGATION',
+            url: item.url,
+            clipId: item.id,
+            locateClip: false
+          });
+          if (!result?.ok) throw new Error('Unable to open linked source');
         }
         return;
       }
@@ -1028,9 +1053,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
       if (item.type === 'highlight') {
-        const tab = await chrome.tabs.create({ url: pageUrl, active: true });
-        try { await chrome.runtime.sendMessage({ action: 'TRACK_SOURCE_NAVIGATION', tabId: tab.id, clipId: item.id, url: pageUrl }); } catch (_) {}
-        [900, 2200, 4500].forEach((delay) => setTimeout(() => { safeSendMessage(tab.id, { action: 'RESTORE_HIGHLIGHTS' }); safeSendMessage(tab.id, { action: 'LOCATE_CLIP', clipId: item.id }); }, delay));
+        const result = await chrome.runtime.sendMessage({
+          action: 'OPEN_MARK_NAVIGATION',
+          url: pageUrl,
+          clipId: item.id,
+          locateClip: true
+        });
+        if (!result?.ok) throw new Error('Unable to open marked page');
         return;
       }
     } catch (error) {
@@ -1038,7 +1067,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       showToast(t('source_unavailable'));
       return;
     }
-    if (pageUrl) window.open(item.type === 'video' ? videoReplaySourceUrl(item) : pageUrl, '_blank');
+    if (pageUrl) {
+      const result = await chrome.runtime.sendMessage({
+        action: 'OPEN_MARK_NAVIGATION',
+        url: item.type === 'video' ? videoReplaySourceUrl(item) : pageUrl,
+        clipId: item.id,
+        locateClip: false
+      });
+      if (!result?.ok) throw new Error('Unable to open marked page');
+    }
   }
 
   function isGlyphHit(event, element) { const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT); let node; while ((node = walker.nextNode())) { if (!node.nodeValue.trim()) continue; const range = document.createRange(); range.selectNodeContents(node); for (const rect of range.getClientRects()) { if (event.clientX >= rect.left - 1 && event.clientX <= rect.right + 1 && event.clientY >= rect.top - 1 && event.clientY <= rect.bottom + 1) return true; } } return false; }
@@ -1069,7 +1106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (isGlyphHit(event, control)) void jump(itemFor(key));
       return;
     }
-    if (action === 'source') { sourceUrl = url || ''; contentArea.scrollTop = 0; clearSelection(); render(); syncSourcePositions(sourceUrl); return; }
+    if (action === 'source') { showSourceCollection(url || ''); return; }
     if (action === 'unmark') void deleteMark(key);
     if (action === 'note') { setSelection([key], key); setActive(key); openNote(key); }
     if (action === 'copy') void copyMark(key, control);
@@ -1129,6 +1166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initializeLanguagePreference();
     await initializeMarkColorPreference();
     await load(true);
+    await showCurrentPageCollectionOnPanelOpen();
     void ensureFirstUseOnCurrentPage();
     await consumePendingFocus();
   } catch (error) {

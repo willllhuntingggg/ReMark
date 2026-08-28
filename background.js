@@ -1,4 +1,4 @@
-importScripts('lib/i18n.js');
+importScripts('lib/i18n.js', 'lib/storage.js');
 const SETTINGS_KEY = 'markit_settings';
 let nativeUiRefreshRevision = 0;
 
@@ -47,6 +47,7 @@ chrome.sidePanel
 
 chrome.runtime.onInstalled.addListener((details) => {
   void syncNativeLanguage();
+  void syncAllActionIcons();
   if (details?.reason === 'install') {
     // First install only: open the Welcome page. The existing onboarding
     // flow and its state logic are left untouched.
@@ -55,8 +56,13 @@ chrome.runtime.onInstalled.addListener((details) => {
     });
   }
 });
+chrome.runtime.onStartup.addListener(() => void syncAllActionIcons());
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === 'local' && changes?.[SETTINGS_KEY]) void syncNativeLanguage();
+  if (areaName !== 'local') return;
+  if (changes?.[SETTINGS_KEY]) void syncNativeLanguage();
+  if (changes?.[ReMarkStorage.KEYS.CLIPS] || changes?.[ReMarkStorage.KEYS.VIDEO_MARKS]) {
+    void syncAllActionIcons();
+  }
 });
 
 // Handle Context Menu clicks
@@ -74,6 +80,83 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 const pendingSourceNavigations = new Map();
 
 const PENDING_SOURCE_LOCATE_DELAYS = [0, 600, 1800, 4200, 7000, 10000];
+const UNMARKED_ACTION_ICON_PATHS = {
+  16: 'assets/icons/icon16-monochrome.png',
+  24: 'assets/icons/icon24-monochrome.png',
+  32: 'assets/icons/icon32-monochrome.png',
+  48: 'assets/icons/icon48-monochrome.png',
+  64: 'assets/icons/icon64-monochrome.png',
+  96: 'assets/icons/icon96-monochrome.png',
+  128: 'assets/icons/icon128-monochrome.png',
+  256: 'assets/icons/icon256-monochrome.png',
+  512: 'assets/icons/icon512-monochrome.png'
+};
+const MARKED_ACTION_ICON_PATHS = {
+  16: 'assets/icons/icon16.png',
+  24: 'assets/icons/icon24.png',
+  32: 'assets/icons/icon32.png',
+  48: 'assets/icons/icon48.png',
+  64: 'assets/icons/icon64.png',
+  96: 'assets/icons/icon96.png',
+  128: 'assets/icons/icon128.png',
+  256: 'assets/icons/icon256.png',
+  512: 'assets/icons/icon512.png'
+};
+
+function sameReMarkPageUrl(a, b) {
+  return String(a || '').split('#')[0] === String(b || '').split('#')[0];
+}
+
+function isNavigablePageUrl(url) {
+  return /^https?:/i.test(String(url || ''));
+}
+
+async function markedUrlHasReMarkMarks(url) {
+  if (!isNavigablePageUrl(url)) return false;
+  // Keep this lookup aligned with the Side Panel's existing URL Collection aggregation.
+  const pages = await ReMarkStorage.getPages();
+  return pages.some((page) => sameReMarkPageUrl(page?.url, url));
+}
+
+async function syncActionIconForPage(tabId, url) {
+  if (!Number.isInteger(tabId)) return;
+  let hasMarks = false;
+  try {
+    hasMarks = await markedUrlHasReMarkMarks(url);
+  } catch (_) {}
+  try {
+    await chrome.action.setIcon({
+      tabId,
+      path: hasMarks ? MARKED_ACTION_ICON_PATHS : UNMARKED_ACTION_ICON_PATHS
+    });
+  } catch (_) {}
+}
+
+async function syncAllActionIcons() {
+  try {
+    const tabs = await chrome.tabs.query({});
+    await Promise.all(tabs
+      .filter((tab) => Number.isInteger(tab.id))
+      .map((tab) => syncActionIconForPage(tab.id, tab.url)));
+  } catch (_) {}
+}
+
+function trackSourceNavigation(tabId, clipId, url) {
+  const pending = { clipId, url: url || '' };
+  pendingSourceNavigations.set(tabId, pending);
+  setTimeout(() => {
+    if (pendingSourceNavigations.get(tabId) === pending) pendingSourceNavigations.delete(tabId);
+  }, 15000);
+  return pending;
+}
+
+async function openMarkNavigation(url, clipId, locateClip) {
+  const tab = await chrome.tabs.create({ active: true });
+  if (!Number.isInteger(tab?.id)) throw new Error('Unable to create target tab');
+  if (locateClip) trackSourceNavigation(tab.id, clipId, url);
+  await chrome.tabs.update(tab.id, { url });
+  return tab.id;
+}
 
 function deliverPendingSourceLocate(tabId, pending) {
   PENDING_SOURCE_LOCATE_DELAYS.forEach((delay) => setTimeout(async () => {
@@ -90,9 +173,24 @@ function acknowledgePendingSourceLocate(tabId, clipId) {
 
 chrome.webNavigation.onCompleted.addListener((details) => {
   if (details.frameId !== 0) return;
+  void syncActionIconForPage(details.tabId, details.url);
   const pending = pendingSourceNavigations.get(details.tabId);
-  if (!pending) return;
-  deliverPendingSourceLocate(details.tabId, pending);
+  if (pending) deliverPendingSourceLocate(details.tabId, pending);
+});
+
+chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+  if (details.frameId !== 0) return;
+  void syncActionIconForPage(details.tabId, details.url);
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.url) void syncActionIconForPage(tabId, tab.url || changeInfo.url);
+});
+
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  chrome.tabs.get(tabId)
+    .then((tab) => syncActionIconForPage(tabId, tab.url))
+    .catch(() => {});
 });
 
 // Runs in the MAIN world of the video tab. Reads page-level player state and
@@ -337,14 +435,20 @@ chrome.tabs.onRemoved.addListener((tabId) => pendingSourceNavigations.delete(tab
 // Handle messages from content script or sidepanel
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'TRACK_SOURCE_NAVIGATION' && Number.isInteger(message.tabId) && message.clipId) {
-    pendingSourceNavigations.set(message.tabId, { clipId: message.clipId, url: message.url || '' });
-    setTimeout(() => pendingSourceNavigations.delete(message.tabId), 15000);
+    const pending = trackSourceNavigation(message.tabId, message.clipId, message.url || '');
     chrome.tabs.get(message.tabId).then((tab) => {
-      const pending = pendingSourceNavigations.get(message.tabId);
-      if (pending && tab.status === 'complete') deliverPendingSourceLocate(message.tabId, pending);
+      if (pendingSourceNavigations.get(message.tabId) === pending && tab.status === 'complete') {
+        deliverPendingSourceLocate(message.tabId, pending);
+      }
     }).catch(() => {});
     sendResponse({ ok: true });
     return false;
+  }
+  if (message.action === 'OPEN_MARK_NAVIGATION' && message.url) {
+    openMarkNavigation(message.url, message.clipId || '', Boolean(message.locateClip))
+      .then((tabId) => sendResponse({ ok: true, tabId }))
+      .catch(() => sendResponse({ ok: false }));
+    return true;
   }
   if (message.action === 'SOURCE_CLIP_LOCATED' && sender.tab?.id && message.clipId) {
     acknowledgePendingSourceLocate(sender.tab.id, message.clipId);

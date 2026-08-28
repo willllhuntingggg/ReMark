@@ -32,7 +32,7 @@ assert.match(source, /const linkedMark = event\.target\.closest\('a\[href\]'\);/
 assert.match(source, /if \(linkedMark && isLinkedSource\) return;/);
 assert.match(sidepanel, /const isLinkedSource = item\.type === 'highlight' && item\.url && pageUrl && !sameUrl\(item\.url, pageUrl\);/);
 assert.match(sidepanel, /if \(isLinkedSource\) \{/);
-assert.match(sidepanel, /await chrome\.tabs\.create\(\{ url: item\.url, active: true \}\);/);
+assert.match(sidepanel, /action: 'OPEN_MARK_NAVIGATION',[\s\S]*url: item\.url,[\s\S]*locateClip: false/);
 assert.match(sidepanel, /Font Awesome Free 6\.7\.2 — fa-link/);
 assert.match(sidepanel, /const isLinkedSource = item\.type === 'highlight' && item\.url && item\.pageUrl && !sameUrl\(item\.url, item\.pageUrl\);/);
 assert.match(sidepanel, /class="mark-link-source"/);

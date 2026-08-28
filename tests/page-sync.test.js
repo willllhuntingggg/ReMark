@@ -25,7 +25,7 @@ assert.match(content, /function samePageUrl\(a, b\)/);
 assert.match(content, /const textSegments = \[\];[\s\S]*let startIndex = text\.indexOf\(clip\.text\)[\s\S]*highlightDOMRange\(range, clip\)/);
 assert.match(content, /function reportSourceUnavailable\(clipId\)[\s\S]*action: 'SOURCE_MARK_UNAVAILABLE'/);
 assert.match(sidepanel, /SOURCE_MARK_UNAVAILABLE[\s\S]*source_unavailable/);
-assert.match(sidepanel, /action: 'TRACK_SOURCE_NAVIGATION'/);
+assert.match(sidepanel, /action: 'OPEN_MARK_NAVIGATION'/);
 assert.match(background, /chrome\.webNavigation\.onErrorOccurred\.addListener/);
 assert.ok(manifest.permissions.includes('webNavigation'));
 assert.match(i18n, /source_unavailable: '无法找到原网页或对应内容/);
@@ -152,8 +152,32 @@ assert.match(background, /chrome\.webNavigation\.onCompleted\.addListener\(\(det
 assert.match(background, /function deliverPendingSourceLocate\(tabId, pending\)[\s\S]*RESTORE_HIGHLIGHTS[\s\S]*LOCATE_CLIP/);
 assert.match(content, /const LOCATE_CLIP_RETRY_DELAYS = \[250, 500, 900, 1500, 2400, 3600, 5000, 6500\];/);
 assert.match(content, /attempt >= LOCATE_CLIP_RETRY_DELAYS\.length[\s\S]*LOCATE_CLIP_RETRY_DELAYS\[attempt\]/);
-assert.match(sidepanel, /await chrome\.runtime\.sendMessage\(\{ action: 'TRACK_SOURCE_NAVIGATION'[\s\S]*\[900, 2200, 4500\][\s\S]*LOCATE_CLIP/);
+assert.match(sidepanel, /action: 'OPEN_MARK_NAVIGATION',[\s\S]*locateClip: true/);
+assert.match(background, /function openMarkNavigation\(url, clipId, locateClip\)[\s\S]*trackSourceNavigation\(tab\.id, clipId, url\)[\s\S]*chrome\.tabs\.update\(tab\.id, \{ url \}\)/);
 console.log('source jump initial-locate recovery assertions passed');
+
+assert.match(background, /importScripts\('lib\/i18n\.js', 'lib\/storage\.js'\);/);
+assert.match(manifest.action.default_icon[16], /icon16-monochrome\.png/);
+assert.match(background, /const UNMARKED_ACTION_ICON_PATHS = \{[\s\S]*icon16-monochrome\.png[\s\S]*icon512-monochrome\.png/);
+assert.match(background, /const MARKED_ACTION_ICON_PATHS = \{[\s\S]*icon16\.png[\s\S]*icon512\.png/);
+assert.match(background, /async function markedUrlHasReMarkMarks\(url\)[\s\S]*ReMarkStorage\.getPages\(\)[\s\S]*sameReMarkPageUrl/);
+assert.match(background, /async function syncActionIconForPage\(tabId, url\)[\s\S]*hasMarks \? MARKED_ACTION_ICON_PATHS : UNMARKED_ACTION_ICON_PATHS/);
+assert.match(background, /async function syncAllActionIcons\(\)[\s\S]*chrome\.tabs\.query\(\{\}\)[\s\S]*syncActionIconForPage/);
+assert.match(background, /chrome\.runtime\.onStartup\.addListener\(\(\) => void syncAllActionIcons\(\)\)/);
+assert.match(background, /chrome\.storage\.onChanged\.addListener[\s\S]*ReMarkStorage\.KEYS\.CLIPS[\s\S]*ReMarkStorage\.KEYS\.VIDEO_MARKS[\s\S]*syncAllActionIcons/);
+assert.match(background, /chrome\.webNavigation\.onCompleted\.addListener\([\s\S]*syncActionIconForPage\(details\.tabId, details\.url\)/);
+assert.match(background, /chrome\.webNavigation\.onHistoryStateUpdated\.addListener\([\s\S]*syncActionIconForPage\(details\.tabId, details\.url\)/);
+assert.match(background, /chrome\.tabs\.onUpdated\.addListener\([\s\S]*syncActionIconForPage\(tabId, tab\.url \|\| changeInfo\.url\)/);
+assert.match(background, /chrome\.tabs\.onActivated\.addListener\([\s\S]*syncActionIconForPage\(tabId, tab\.url\)/);
+assert.match(sidepanel, /function showSourceCollection\(url\)[\s\S]*sourceUrl = url;[\s\S]*contentArea\.scrollTop = 0;[\s\S]*clearSelection\(\);[\s\S]*render\(\);[\s\S]*syncSourcePositions\(sourceUrl\)/);
+assert.match(sidepanel, /async function showCurrentPageCollectionOnPanelOpen\(\)[\s\S]*chrome\.tabs\.query\(\{ active: true, currentWindow: true \}\)[\s\S]*all\(\)\.find\(\(item\) => sameUrl\(item\.url, tab\?\.url\)\)\?\.url[\s\S]*showSourceCollection\(collectionUrl\)/);
+assert.match(sidepanel, /await load\(true\);[\s\S]*await showCurrentPageCollectionOnPanelOpen\(\);/);
+const timelineJump = sidepanel.slice(sidepanel.indexOf('async function jump(item)'), sidepanel.indexOf('function isGlyphHit'));
+assert.doesNotMatch(timelineJump, /showSourceCollection\(/);
+assert.match(sidepanel, /if \(action === 'source'\) \{ showSourceCollection\(url \|\| ''\); return; \}/);
+assert.doesNotMatch(background, /intentionalNavigation|pulseMarked|maybePulse|PULSE_ACTION_ICON_PATHS|setBadge|badgeText/);
+assert.doesNotMatch(sidepanel, /TRACK_INTENTIONAL_NAVIGATION|OPEN_INTENTIONAL_MARK_NAVIGATION/);
+console.log('marked-page toolbar indicator assertions passed');
 
 assert.match(content, /const pendingClipLocations = new Set\(\);/);
 assert.match(content, /function resolvePendingClipLocation\(clipId\) \{[\s\S]*requestAnimationFrame[\s\S]*performLocateAnimation\(mark\)/);
@@ -172,7 +196,9 @@ assert.match(content, /function performLocateAnimation\(mark\)[\s\S]*acknowledge
 console.log('source jump service-worker acknowledgement assertions passed');
 
 const backgroundMessageListener = background.slice(background.indexOf('chrome.runtime.onMessage.addListener'), background.lastIndexOf('void syncNativeLanguage'));
-assert.match(backgroundMessageListener, /TRACK_SOURCE_NAVIGATION[\s\S]*?sendResponse\(\{ ok: true \}\);\s*return false;/);
+assert.match(backgroundMessageListener, /TRACK_SOURCE_NAVIGATION[\s\S]*?trackSourceNavigation[\s\S]*?sendResponse\(\{ ok: true \}\);\s*return false;/);
+assert.match(backgroundMessageListener, /OPEN_MARK_NAVIGATION[\s\S]*?openMarkNavigation[\s\S]*?return true;/);
+assert.doesNotMatch(backgroundMessageListener, /TRACK_INTENTIONAL_NAVIGATION|OPEN_INTENTIONAL_MARK_NAVIGATION/);
 assert.match(backgroundMessageListener, /SOURCE_CLIP_LOCATED[\s\S]*?sendResponse\(\{ ok: true \}\);\s*return false;/);
 assert.match(backgroundMessageListener, /OPEN_SIDE_PANEL[\s\S]*?sendResponse\(\{ success: true \}\);[\s\S]*?sendResponse\(\{ success: false \}\);[\s\S]*?return false;/);
 assert.match(backgroundMessageListener, /INSTALL_BILI_SUBTITLE_CAPTURE[\s\S]*?sendResponse\(\{ ok: true \}\);\s*return false;/);

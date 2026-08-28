@@ -16,6 +16,6 @@ assert.match(content, /dot\.addEventListener\('click', \(e\) => \{[\s\S]*seekVid
 assert.match(sidepanel, /const videoMarkSourceUrl = \(item\) => \{[\s\S]*url\.searchParams\.set\('t', String\(time\)\)/);
 assert.match(sidepanel, /const videoReplaySourceUrl = \(item\) => \{[\s\S]*Math\.floor\(\(Number\(item\?\.time\) \|\| 0\) - 5\)[\s\S]*url\.searchParams\.set\('t', String\(time\)\)/);
 assert.match(sidepanel, /async function copyMark\(key, button\)[\s\S]*videoMarkSourceUrl\(item\)/);
-assert.match(sidepanel, /window\.open\(item\.type === 'video' \? videoReplaySourceUrl\(item\) : pageUrl/);
+assert.match(sidepanel, /action: 'OPEN_MARK_NAVIGATION',[\s\S]*url: item\.type === 'video' \? videoReplaySourceUrl\(item\) : pageUrl,[\s\S]*locateClip: false/);
 
 console.log('video-copy-source-url.test.js: all assertions passed');

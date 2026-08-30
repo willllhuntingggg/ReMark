@@ -410,8 +410,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const [file] = importBackupFile.files || [];
     if (file) void importBackup(file);
   });
-  const search = $('#search-input'), clear = $('#search-clear'), back = $('#source-back');
-  const searchToggle = $('#search-toggle'), searchBox = $('#search-box'), selectModeButton = $('#select-mode');
+  const search = $('#search-input'), back = $('#source-back');
+  const searchControl = $('#search-control'), searchToggle = $('#search-toggle'), searchClear = $('#search-clear'), selectModeButton = $('#select-mode');
   const subtitle = $('#view-subtitle'), context = $('#collection-context');
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
   settingsOpenButton.addEventListener('click', showSettings);
@@ -587,8 +587,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   function selectedVisibleRows(rows = visible()) {
     return rows.filter((item) => selectedKeys.has(item.key));
   }
+  // The selection actions bar only belongs to Select mode: a single Mark
+  // selected by a jump keeps its highlight, but never summons the tray.
   function updateSelectionTray(rows = selectedVisibleRows()) {
-    const count = rows.length;
+    const count = selectMode ? rows.length : 0;
     selectionTray.hidden = count === 0;
     appContainer.classList.toggle('has-selection-tray', count > 0);
     if (!count) return;
@@ -699,7 +701,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     back.hidden = !inSource;
     viewIdentity.hidden = false;
     settingsOpenButton.hidden = inSource;
-    timelineControls.hidden = inSource;
+    // Source collections support Select only; search stays on the timeline.
+    searchControl.hidden = inSource;
+    selectModeButton.hidden = inSource ? false : searchExpanded;
     appContainer.classList.toggle('is-source-view', inSource);
     search.placeholder = t('search_placeholder');
     if (inSource) {
@@ -970,6 +974,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Entering a collection (via Back-to-source, jump, or page-follow) is an
     // explicit choice that supersedes any earlier "back to timeline".
     exitedSourceUrl = null;
+    // Source collections do not search; drop any active timeline query.
+    collapseSearch();
     sourceUrl = url;
     contentArea.scrollTop = 0;
     render();
@@ -1182,28 +1188,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('pointerdown', (event) => { keyboardFocus = false; if (!event.target.closest('.mark-card, .selection-tray, .app-header, .controls-bar')) clearSelection(); });
   document.addEventListener('click', (event) => { if (!event.target.closest('.mark-actions')) document.querySelectorAll('.mark-menu:not([hidden])').forEach((node) => { node.hidden = true; }); });
   back.addEventListener('click', () => { leaveSourceCollection(); });
-  // Search collapses into a magnifier toggle; while searching the Select
-  // button is hidden so the bar never offers two competing modes at once.
+  // Search is collapsed by default: only the magnifier icon shows. Clicking it
+  // slides the field out to the right as one unit. While expanded, the × clears
+  // the query and collapses; Esc and clicking the icon again collapse too.
+  // Source collections do not search — only the Select action is available there.
+  let searchExpanded = false;
   function collapseSearch() {
-    if (searchBox.hidden) return;
-    searchBox.hidden = true;
-    searchToggle.hidden = false;
+    if (!searchExpanded) return;
+    searchExpanded = false;
+    searchControl.classList.remove('is-expanded');
+    searchClear.hidden = true;
     selectModeButton.hidden = false;
     search.value = '';
     query = '';
-    clear.hidden = true;
+    search.tabIndex = -1;
     render();
   }
   function expandSearch() {
-    searchBox.hidden = false;
-    searchToggle.hidden = true;
+    if (searchExpanded) return;
+    searchExpanded = true;
+    searchControl.classList.add('is-expanded');
+    searchClear.hidden = false;
     selectModeButton.hidden = true;
+    search.tabIndex = 0;
     search.focus();
   }
-  searchToggle.addEventListener('click', expandSearch);
-  search.addEventListener('input', () => { query = search.value; clear.hidden = !query; render(); });
+  searchToggle.addEventListener('click', () => { if (searchExpanded) collapseSearch(); else expandSearch(); });
+  search.addEventListener('input', () => { query = search.value; render(); });
   search.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.stopPropagation(); collapseSearch(); } });
-  clear.addEventListener('click', () => { collapseSearch(); });
+  searchClear.addEventListener('click', () => { collapseSearch(); });
   selectModeButton.addEventListener('click', () => {
     selectMode = !selectMode;
     selectModeButton.classList.toggle('is-active', selectMode);

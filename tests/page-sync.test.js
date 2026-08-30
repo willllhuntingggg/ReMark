@@ -86,14 +86,24 @@ assert.match(sidepanel, /if \(selectMode \|\| event\.shiftKey \|\| event\.metaKe
 assert.match(sidepanel, /event\.key === 'Enter' && !event\.shiftKey && !event\.metaKey && !event\.ctrlKey && selected/);
 console.log('page-sync card-interaction assertions passed');
 
-// --- Controls: magnifier toggle search; Select button gates multi-select ---
+// --- Controls: magnifier expands a unified search unit; Select gates multi-select ---
 const html = read('sidepanel/sidepanel.html');
+assert.match(html, /id="search-control"/);
 assert.match(html, /id="search-toggle"/);
-assert.match(html, /id="search-box"/);
+assert.match(html, /id="search-input"/);
 assert.match(html, /id="select-mode"/);
-assert.match(sidepanel, /function collapseSearch\(\)[\s\S]*?searchBox\.hidden = true;[\s\S]*?searchToggle\.hidden = false;[\s\S]*?selectModeButton\.hidden = false;/);
-assert.match(sidepanel, /function expandSearch\(\)[\s\S]*?searchBox\.hidden = false;[\s\S]*?searchToggle\.hidden = true;[\s\S]*?selectModeButton\.hidden = true;/);
+assert.match(sidepanel, /let searchExpanded = false;/);
+assert.match(sidepanel, /function collapseSearch\(\)[\s\S]*?searchExpanded = false;[\s\S]*?searchControl\.classList\.remove\('is-expanded'\);[\s\S]*?search\.value = '';[\s\S]*?query = '';/);
+assert.match(sidepanel, /function expandSearch\(\)[\s\S]*?searchExpanded = true;[\s\S]*?searchControl\.classList\.add\('is-expanded'\);[\s\S]*?search\.focus\(\);/);
+assert.match(sidepanel, /searchToggle\.addEventListener\('click', \(\) => \{ if \(searchExpanded\) collapseSearch\(\); else expandSearch\(\); \}\)/);
+assert.match(sidepanel, /searchClear\.addEventListener\('click', \(\) => \{ collapseSearch\(\); \}\)/);
 assert.match(sidepanel, /selectModeButton\.addEventListener\('click', \(\) => \{[\s\S]*?selectMode = !selectMode;[\s\S]*?selectModeButton\.textContent = t\(selectMode \? 'cancel' : 'select_mode'\);[\s\S]*?if \(!selectMode\) clearSelection\(\);/);
+assert.match(sidepanel, /searchControl\.hidden = inSource;/);
+assert.match(sidepanel, /selectModeButton\.hidden = inSource \? false : searchExpanded;/);
+assert.match(sidepanel, /function showSourceCollection\(url\) \{[\s\S]*?collapseSearch\(\);/);
+// The selection actions bar belongs to Select mode only; a single Mark picked
+// up by a jump keeps its highlight but never summons the tray.
+assert.match(sidepanel, /const count = selectMode \? rows\.length : 0;/);
 assert.match(sidepanel, /let clips = \[\], videos = \[\], sourceUrl = null, query = '', selected = null, selectedKeys = new Set\(\), selectionAnchor = null, keyboardFocus = false, selectMode = false;/);
 console.log('page-sync controls assertions passed');
 

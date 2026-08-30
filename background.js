@@ -112,6 +112,26 @@ function sameReMarkPageUrl(a, b) {
   return String(a || '').split('#')[0] === String(b || '').split('#')[0];
 }
 
+function videoKeyFromUrl(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, '');
+    if (host.endsWith('youtube.com') || host === 'youtu.be') {
+      const v = url.searchParams.get('v');
+      if (v) return v;
+      const match = url.pathname.match(/\/(?:shorts|embed|e|live)\/([\w-]{6,})/) || url.pathname.match(/^\/([\w-]{6,})/);
+      return match ? match[1] : '';
+    }
+    if (host.endsWith('bilibili.com')) {
+      const match = url.pathname.match(/\/video\/(BV[a-zA-Z0-9]+)/i);
+      if (!match) return '';
+      const p = url.searchParams.get('p');
+      return p ? match[1] + '?p=' + p : match[1];
+    }
+  } catch (_) {}
+  return '';
+}
+
 function isNavigablePageUrl(url) {
   return /^https?:/i.test(String(url || ''));
 }
@@ -120,7 +140,13 @@ async function markedUrlHasReMarkMarks(url) {
   if (!isNavigablePageUrl(url)) return false;
   // Keep this lookup aligned with the Side Panel's existing URL Collection aggregation.
   const pages = await ReMarkStorage.getPages();
-  return pages.some((page) => sameReMarkPageUrl(page?.url, url));
+  if (pages.some((page) => sameReMarkPageUrl(page?.url, url))) return true;
+  // Video pages carry player time and tracking params that would break exact
+  // URL matching, so a video tab is "marked" when its video id matches a Mark.
+  const videoKey = videoKeyFromUrl(url);
+  if (!videoKey) return false;
+  const marks = await ReMarkStorage.getVideoMarks();
+  return marks.some((mark) => mark?.videoKey === videoKey);
 }
 
 async function syncActionIconForPage(tabId, url) {

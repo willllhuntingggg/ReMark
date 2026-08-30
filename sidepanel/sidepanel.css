@@ -255,14 +255,71 @@ button {
   position: relative;
   z-index: 10;
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 2px 18px 0;
   background: var(--bg);
+}
+
+.search-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
+}
+
+.search-toggle:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+.search-toggle svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+
+.select-mode-btn {
+  flex: 0 0 auto;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.select-mode-btn:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+.select-mode-btn.is-active {
+  background: var(--primary-action);
+  border-color: var(--primary-action);
+  color: var(--primary-action-ink);
 }
 
 .search-box {
   position: relative;
   display: flex;
   align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .search-icon {
@@ -583,6 +640,7 @@ button {
   padding: 13px 58px 14px 50px;
   border: 0;
   background: transparent;
+  cursor: pointer;
   transition: background-color .14s ease, box-shadow .14s ease;
 }
 
@@ -639,14 +697,14 @@ button {
   opacity: 1;
 }
 
-/* Mark glyph — only the actual text navigates; card space selects. */
+/* The whole card is the jump target; card space also selects. */
 .mark-content {
   position: relative;
   display: block;
   width: 100%;
   margin: 0 0 7px;
   padding: 0;
-  cursor: default;
+  cursor: inherit;
 }
 
 .mark-content-text {
@@ -659,27 +717,18 @@ button {
   max-width: 100%;
   margin: 0;
   padding: 0;
-  border: 0;
-  background: transparent;
   color: var(--ink);
   font: inherit;
   font-size: 14px;
   font-weight: 480;
   line-height: 1.58;
   text-align: left;
-  cursor: default;
-}
-
-.mark-content-text.is-glyph-hover {
-  cursor: pointer;
+  cursor: inherit;
 }
 
 .mark-content-text:hover,
 .mark-content-text:focus-visible {
   color: var(--ink);
-  text-decoration: underline;
-  text-decoration-color: rgba(38, 40, 45, .28);
-  text-underline-offset: 3px;
   outline: none;
 }
 
@@ -916,8 +965,6 @@ button {
   margin: 0;
   overflow: hidden;
   padding: 0;
-  border: 0;
-  background: transparent;
   color: var(--ink-4);
   font-family: inherit;
   font-size: 11.5px;
@@ -926,8 +973,6 @@ button {
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: pointer;
-  transition: color .15s ease;
 }
 
 .mark-source > span {
@@ -935,29 +980,6 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.mark-source:hover,
-.mark-source:focus-visible {
-  color: var(--ink-2);
-  outline: none;
-}
-
-.mark-source-arrow {
-  flex: 0 0 auto;
-  margin-left: -1px;
-  color: var(--ink-3);
-  font-size: 15px;
-  line-height: 1;
-  opacity: 0;
-  transform: translate(-2px, -1px);
-  transition: opacity .14s ease, transform .14s ease;
-}
-
-.mark-source:hover .mark-source-arrow,
-.mark-source:focus-visible .mark-source-arrow {
-  opacity: 1;
-  transform: translate(0, -1px);
 }
 
 .mark-created {

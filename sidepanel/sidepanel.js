@@ -3,6 +3,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const t = ReMarkI18n.t;
   ReMarkI18n.apply();
   let clips = [], videos = [], sourceUrl = null, query = '', selected = null, selectedKeys = new Set(), selectionAnchor = null, keyboardFocus = false;
+  // Source collection the user deliberately left via Back/Escape: same-page
+  // storage refreshes must not pull the panel back into that collection.
+  let exitedSourceUrl = null;
   const $ = (s, root = document) => root.querySelector(s);
   const list = $('#clips-container'), empty = $('#clips-empty-state');
   const exportBackupButton = $('#export-backup');
@@ -943,11 +946,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   function showSourceCollection(url) {
     if (!url) return;
+    // Entering a collection (via Back-to-source, jump, or page-follow) is an
+    // explicit choice that supersedes any earlier "back to timeline".
+    exitedSourceUrl = null;
     sourceUrl = url;
     contentArea.scrollTop = 0;
     clearSelection();
     render();
     syncSourcePositions(sourceUrl);
+  }
+  function leaveSourceCollection() {
+    exitedSourceUrl = sourceUrl;
+    sourceUrl = null;
+    clearSelection();
+    render(true);
   }
   async function showCurrentPageCollectionOnPanelOpen() {
     let tab = null;
@@ -1148,20 +1160,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   selectionClearButton.addEventListener('click', clearSelection);
   document.addEventListener('pointerdown', (event) => { keyboardFocus = false; if (!event.target.closest('.mark-card, .selection-tray')) clearSelection(); });
   document.addEventListener('click', (event) => { if (!event.target.closest('.mark-actions')) document.querySelectorAll('.mark-menu:not([hidden])').forEach((node) => { node.hidden = true; }); });
-  back.addEventListener('click', () => { sourceUrl = null; clearSelection(); render(true); });
+  back.addEventListener('click', () => { leaveSourceCollection(); });
   function clearSearch() { search.value = ''; query = ''; clear.hidden = true; render(); }
   search.addEventListener('input', () => { query = search.value; clear.hidden = !query; render(); });
   search.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.stopPropagation(); clearSearch(); } });
   clear.addEventListener('click', () => { clearSearch(); search.focus(); });
-  document.addEventListener('keydown', async (event) => { if (event.key === 'Tab' || event.key.startsWith('Arrow')) keyboardFocus = true; if (event.key === 'Escape' && !feedbackModal.hidden) { event.preventDefault(); closeFeedback(); return; } const editing = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable; if (!editing && event.key === 'ArrowDown') { event.preventDefault(); moveActive(1); return; } if (!editing && event.key === 'ArrowUp') { event.preventDefault(); moveActive(-1); return; } if (!editing && event.key === 'Enter' && event.shiftKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); openNote(selected); return; } if (!editing && (event.metaKey || event.ctrlKey) && event.key === 'Enter' && selected) { event.preventDefault(); openNote(selected); } else if (!editing && !event.isComposing && ['Delete','Backspace'].includes(event.key) && selectedKeys.size) { event.preventDefault(); await deleteMarks(); } else if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (await ReMarkStorage.undoLast()) await load(); } else if (!editing && event.key === 'Escape' && selectedKeys.size) { clearSelection(); } else if (!editing && event.key === '/') { event.preventDefault(); search.focus(); } else if (!editing && event.key === 'Escape' && showingSettings) { showTimeline(); } else if (!editing && event.key === 'Escape' && sourceUrl !== null) { sourceUrl = null; clearSelection(); render(true); } });
+  document.addEventListener('keydown', async (event) => { if (event.key === 'Tab' || event.key.startsWith('Arrow')) keyboardFocus = true; if (event.key === 'Escape' && !feedbackModal.hidden) { event.preventDefault(); closeFeedback(); return; } const editing = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable; if (!editing && event.key === 'ArrowDown') { event.preventDefault(); moveActive(1); return; } if (!editing && event.key === 'ArrowUp') { event.preventDefault(); moveActive(-1); return; } if (!editing && event.key === 'Enter' && event.shiftKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); openNote(selected); return; } if (!editing && (event.metaKey || event.ctrlKey) && event.key === 'Enter' && selected) { event.preventDefault(); openNote(selected); } else if (!editing && !event.isComposing && ['Delete','Backspace'].includes(event.key) && selectedKeys.size) { event.preventDefault(); await deleteMarks(); } else if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (await ReMarkStorage.undoLast()) await load(); } else if (!editing && event.key === 'Escape' && selectedKeys.size) { clearSelection(); } else if (!editing && event.key === '/') { event.preventDefault(); search.focus(); } else if (!editing && event.key === 'Escape' && showingSettings) { showTimeline(); } else if (!editing && event.key === 'Escape' && sourceUrl !== null) { leaveSourceCollection(); } });
   async function followActivePageCollection(url, windowId) {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (windowId !== undefined && tab?.windowId !== undefined && tab.windowId !== windowId) return;
       await load();
       const collectionUrl = all().find((item) => sameUrl(item.url, url))?.url;
-      if (collectionUrl) showSourceCollection(collectionUrl);
-      else if (sourceUrl !== null) { sourceUrl = null; clearSelection(); render(true); }
+      if (collectionUrl) {
+        // The user explicitly returned to the timeline for this page; storage
+        // refreshes for the same page (e.g. highlight position backfill) must
+        // not pull the panel back into its Source collection. Following a
+        // different page clears that choice.
+        if (exitedSourceUrl !== null && sameUrl(exitedSourceUrl, url)) return;
+        showSourceCollection(collectionUrl);
+      } else if (sourceUrl !== null) {
+        sourceUrl = null;
+        clearSelection();
+        render(true);
+      } else if (exitedSourceUrl !== null && !sameUrl(exitedSourceUrl, url || '')) {
+        // The active page changed away from the page the user left, so the
+        // "back to timeline" choice no longer applies.
+        exitedSourceUrl = null;
+      }
     } catch (_) {}
   }
   globalThis.chrome?.runtime?.onMessage?.addListener((message) => {

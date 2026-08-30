@@ -1227,9 +1227,13 @@
       const mark = [...document.querySelectorAll(`mark[data-clip-id="${clip.id}"]`)].at(-1);
       if (!mark) continue;
       const rect = mark.getBoundingClientRect();
+      const nextPosition = Math.round(rect.top + window.scrollY);
+      const nextPositionX = Math.round(rect.left);
+      const unchanged = Number.isFinite(Number(clip.sourcePosition)) && Number.isFinite(Number(clip.sourcePositionX)) && Number(clip.sourcePosition) === nextPosition && Number(clip.sourcePositionX) === nextPositionX;
+      if (unchanged) continue;
       await ReMarkStorage.updateClip(clip.id, {
-        sourcePosition: Math.round(rect.top + window.scrollY),
-        sourcePositionX: Math.round(rect.left)
+        sourcePosition: nextPosition,
+        sourcePositionX: nextPositionX
       });
     }
     notifyStorageUpdated();

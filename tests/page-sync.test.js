@@ -5,6 +5,7 @@ const read = (file) => fs.readFileSync(path.resolve(__dirname, '..', file), 'utf
 const background = read('background.js');
 const sidepanel = read('sidepanel/sidepanel.js');
 const storage = read('lib/storage.js');
+const content = read('content/content.js');
 const manifest = JSON.parse(read('manifest.json'));
 
 // The Side Panel follows the active browser tab: when the panel is open and
@@ -39,14 +40,26 @@ assert.match(sidepanel, /async function showCurrentPageCollectionOnPanelOpen\(\)
 assert.match(sidepanel, /async function followActivePageCollection\(url, windowId\)/);
 assert.match(sidepanel, /if \(windowId !== undefined && tab\?\.windowId !== undefined && tab\.windowId !== windowId\) return;/);
 assert.match(sidepanel, /const collectionUrl = all\(\)\.find\(\(item\) => sameUrl\(item\.url, url\)\)\?\.url;/);
-assert.match(sidepanel, /if \(collectionUrl\) showSourceCollection\(collectionUrl\);/);
-assert.match(sidepanel, /else if \(sourceUrl !== null\) \{ sourceUrl = null; clearSelection\(\); render\(true\); \}/);
+assert.match(sidepanel, /if \(collectionUrl\) \{[\s\S]*?if \(exitedSourceUrl !== null && sameUrl\(exitedSourceUrl, url\)\) return;[\s\S]*?showSourceCollection\(collectionUrl\);/);
+assert.match(sidepanel, /else if \(sourceUrl !== null\) \{[\s\S]*?sourceUrl = null;[\s\S]*?clearSelection\(\);[\s\S]*?render\(true\);/);
 assert.match(sidepanel, /if \(message\?\.action === 'ACTIVE_PAGE_COLLECTION_CHANGED'\) void followActivePageCollection\(message\.url, message\.windowId\);/);
+// A deliberate "back to timeline" choice is remembered per page, so same-page
+// storage refreshes (e.g. highlight position backfill) cannot yank the panel
+// back into the Source collection; switching pages clears the choice.
+assert.match(sidepanel, /let exitedSourceUrl = null;/);
+assert.match(sidepanel, /function leaveSourceCollection\(\) \{[\s\S]*?exitedSourceUrl = sourceUrl;[\s\S]*?sourceUrl = null;/);
+assert.match(sidepanel, /function showSourceCollection\(url\) \{[\s\S]*?exitedSourceUrl = null;[\s\S]*?sourceUrl = url;/);
+assert.match(sidepanel, /else if \(exitedSourceUrl !== null && !sameUrl\(exitedSourceUrl, url \|\| ''\)\) \{[\s\S]*?exitedSourceUrl = null;/);
+assert.match(sidepanel, /back\.addEventListener\('click', \(\) => \{ leaveSourceCollection\(\); \}\)/);
+assert.match(sidepanel, /event\.key === 'Escape' && sourceUrl !== null\) \{ leaveSourceCollection\(\); \}/);
 // The URL comparison strips fragments on both sides of the wire.
 assert.match(sidepanel, /const sameUrl = \(a, b\) => String\(a \|\| ''\)\.split\('#'\)\[0\] === String\(b \|\| ''\)\.split\('#'\)\[0\];/);
 assert.match(sidepanel, /function showSourceCollection\(url\)[\s\S]*?sourceUrl = url;[\s\S]*?render\(\);/);
 // Storage exposes the page grouping both sides rely on.
 assert.match(storage, /async getPages\(\)[\s\S]*?const urlKey = item\.url \|\| 'other';/);
+// The content script's position backfill must not rewrite unchanged values,
+// which would churn storage and re-trigger the panel-follow message loop.
+assert.match(content, /async function computeClipPositionsForPage\(options = \{\}\)[\s\S]*?const unchanged = Number\.isFinite\(Number\(clip\.sourcePosition\)\) && Number\.isFinite\(Number\(clip\.sourcePositionX\)\) && Number\(clip\.sourcePosition\) === nextPosition && Number\(clip\.sourcePositionX\) === nextPositionX;[\s\S]*?if \(unchanged\) continue;/);
 console.log('page-sync sidepanel assertions passed');
 
 // --- Permissions and wiring ---

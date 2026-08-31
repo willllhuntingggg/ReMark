@@ -1109,19 +1109,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!result?.ok) throw new Error('Unable to open marked page');
         return;
       }
+      if (pageUrl) {
+        const result = await chrome.runtime.sendMessage({
+          action: 'OPEN_MARK_NAVIGATION',
+          url: item.type === 'video' ? videoReplaySourceUrl(item) : pageUrl,
+          clipId: item.id,
+          locateClip: false
+        });
+        if (!result?.ok) throw new Error('Unable to open marked page');
+      }
     } catch (error) {
       console.warn('[ReMark] Mark jump failed:', error);
       showToast(t('source_unavailable'));
       return;
-    }
-    if (pageUrl) {
-      const result = await chrome.runtime.sendMessage({
-        action: 'OPEN_MARK_NAVIGATION',
-        url: item.type === 'video' ? videoReplaySourceUrl(item) : pageUrl,
-        clipId: item.id,
-        locateClip: false
-      });
-      if (!result?.ok) throw new Error('Unable to open marked page');
     }
   }
 

@@ -73,12 +73,15 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 // Handle Context Menu clicks
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'remark_highlight' && tab?.id) {
+    // The tab can close or lose its content script between the menu being
+    // shown and the click; consume the failure instead of surfacing an
+    // "Unchecked runtime.lastError" in the service worker.
     chrome.tabs.sendMessage(tab.id, {
       action: 'CONTEXT_HIGHLIGHT',
       text: info.selectionText
-    });
+    }).catch(() => {});
   } else if (info.menuItemId === 'remark_open_sidepanel' && tab?.windowId) {
-    chrome.sidePanel.open({ windowId: tab.windowId });
+    chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
   }
 });
 

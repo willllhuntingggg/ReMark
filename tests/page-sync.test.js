@@ -31,6 +31,10 @@ assert.match(background, /chrome\.webNavigation\.onHistoryStateUpdated\.addListe
 assert.match(background, /chrome\.tabs\.onUpdated\.addListener\(\(tabId, changeInfo, tab\) => \{[\s\S]*?if \(!changeInfo\.url\) return;[\s\S]*?void syncActivePagePanel\(tabId, url\);/);
 // When stored Marks change, refresh the active page's panel state too.
 assert.match(background, /if \(changes\?\.\[ReMarkStorage\.KEYS\.CLIPS\] \|\| changes\?\.\[ReMarkStorage\.KEYS\.VIDEO_MARKS\]\) \{[\s\S]*?void syncActivePagePanel\(tabs\[0\]\.id, tabs\[0\]\.url\);/);
+// Context-menu actions must consume stale-tab failures instead of surfacing
+// "Unchecked runtime.lastError: No tab with id".
+assert.match(background, /chrome\.tabs\.sendMessage\(tab\.id, \{[\s\S]*?action: 'CONTEXT_HIGHLIGHT'[\s\S]*?\}\)\.catch\(\(\) => \{\}\);/);
+assert.match(background, /chrome\.sidePanel\.open\(\{ windowId: tab\.windowId \}\)\.catch\(\(\) => \{\}\);/);
 console.log('page-sync background assertions passed');
 
 // --- Side Panel: applies the active-page collection change ---
@@ -89,6 +93,9 @@ assert.match(sidepanel, /event\.key === 'Enter' && !event\.shiftKey && !event\.m
 // suppresses the follow for that collection instead of opening it.
 assert.match(sidepanel, /async function jump\(item\)[\s\S]*?exitedSourceUrl = collectionUrl;/);
 assert.doesNotMatch(sidepanel.slice(sidepanel.indexOf('async function jump'), sidepanel.indexOf('function isShiftRangePointer')), /showSourceCollection\(collectionUrl\)/);
+// The whole jump body (including the video open-navigation path) stays inside
+// the try so a stale tab / closed message port cannot leak an unhandled error.
+assert.match(sidepanel, /if \(pageUrl\) \{[\s\S]*?videoReplaySourceUrl\(item\)[\s\S]*?Unable to open marked page[\s\S]*?\} catch \(error\) \{/);
 console.log('page-sync card-interaction assertions passed');
 
 // --- Controls: full-width search on the timeline, hidden in Source ---

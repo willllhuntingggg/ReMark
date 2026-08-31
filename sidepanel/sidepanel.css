@@ -263,7 +263,9 @@ button {
 }
 
 /* Search is one unit: the magnifier icon stays attached as the leading part
-   of the pill, and the field slides out to the right when expanded. */
+   of the pill, and the field slides out to the right when expanded. Collapsed
+   the pill is invisible — only the plain icon button shows, so there is no
+   "search box" until the user clicks it. */
 .search-control {
   position: relative;
   display: flex;
@@ -273,9 +275,13 @@ button {
   height: 34px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
+  background: transparent;
+  transition: background-color .18s ease, border-color .18s ease,
+    box-shadow .18s ease;
+}
+
+.search-control.is-expanded {
   background: var(--surface-2);
-  transition: background-color .15s ease, border-color .15s ease,
-    box-shadow .15s ease;
 }
 
 .search-control:focus-within {
@@ -297,10 +303,15 @@ button {
   background: transparent;
   color: var(--ink-3);
   cursor: pointer;
-  transition: color .15s ease;
+  transition: background-color .15s ease, color .15s ease;
 }
 
-.search-toggle:hover {
+.search-control:not(.is-expanded) .search-toggle:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+
+.search-control.is-expanded .search-toggle:hover {
   color: var(--ink);
 }
 

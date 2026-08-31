@@ -76,35 +76,37 @@ assert.match(storage, /async getPages\(\)[\s\S]*?const urlKey = item\.url \|\| '
 assert.match(content, /async function computeClipPositionsForPage\(options = \{\}\)[\s\S]*?const unchanged = Number\.isFinite\(Number\(clip\.sourcePosition\)\) && Number\.isFinite\(Number\(clip\.sourcePositionX\)\) && Number\(clip\.sourcePosition\) === nextPosition && Number\(clip\.sourcePositionX\) === nextPositionX;[\s\S]*?if \(unchanged\) continue;/);
 console.log('page-sync sidepanel assertions passed');
 
-// --- Card interaction: whole card jumps, Select mode only selects ---
+// --- Card interaction: the whole card locates the source; the source title
+// opens the Source collection; a selection summons the actions bar. ---
 assert.doesNotMatch(sidepanel, /data-action="jump"/);
-assert.doesNotMatch(sidepanel, /data-action="source"/);
-assert.doesNotMatch(sidepanel, /mark-source-arrow/);
+assert.match(sidepanel, /data-action="source"[\s\S]*sourceIcon/);
+assert.match(sidepanel, /mark-source-arrow/);
 assert.match(sidepanel, /<span class="mark-content-text">\$\{content\}<\/span>/);
-assert.match(sidepanel, /const card = event\.target\.closest\('\.mark-card'\);[\s\S]*?if \(selectMode && !event\.shiftKey && !event\.metaKey && !event\.ctrlKey\) \{[\s\S]*?selectCard\(key, \{ shiftKey: false, metaKey: true, ctrlKey: true \}\)/);
-assert.match(sidepanel, /if \(selectMode \|\| event\.shiftKey \|\| event\.metaKey \|\| event\.ctrlKey\) \{[\s\S]*?selectCard\(key, event\);[\s\S]*?return;[\s\S]*?\}[\s\S]*?selectCard\(key, event\);[\s\S]*?void jump\(itemFor\(key\)\);/);
+assert.match(sidepanel, /const card = event\.target\.closest\('\.mark-card'\);[\s\S]*?if \(event\.shiftKey \|\| event\.metaKey \|\| event\.ctrlKey\) \{[\s\S]*?selectCard\(key, event\);[\s\S]*?return;[\s\S]*?\}[\s\S]*?selectCard\(key, event\);[\s\S]*?void jump\(itemFor\(key\)\);/);
+assert.match(sidepanel, /if \(action === 'source'\) \{ showSourceCollection\(url \|\| ''\); return; \}/);
 assert.match(sidepanel, /event\.key === 'Enter' && !event\.shiftKey && !event\.metaKey && !event\.ctrlKey && selected/);
+// A timeline click locates the Mark but keeps the panel on the timeline: jump
+// suppresses the follow for that collection instead of opening it.
+assert.match(sidepanel, /async function jump\(item\)[\s\S]*?exitedSourceUrl = collectionUrl;/);
+assert.doesNotMatch(sidepanel.slice(sidepanel.indexOf('async function jump'), sidepanel.indexOf('function isShiftRangePointer')), /showSourceCollection\(collectionUrl\)/);
 console.log('page-sync card-interaction assertions passed');
 
-// --- Controls: magnifier expands a unified search unit; Select gates multi-select ---
+// --- Controls: full-width search on the timeline, hidden in Source ---
 const html = read('sidepanel/sidepanel.html');
-assert.match(html, /id="search-control"/);
-assert.match(html, /id="search-toggle"/);
+assert.match(html, /class="search-box"/);
 assert.match(html, /id="search-input"/);
-assert.match(html, /id="select-mode"/);
-assert.match(sidepanel, /let searchExpanded = false;/);
-assert.match(sidepanel, /function collapseSearch\(\)[\s\S]*?searchExpanded = false;[\s\S]*?searchControl\.classList\.remove\('is-expanded'\);[\s\S]*?search\.value = '';[\s\S]*?query = '';/);
-assert.match(sidepanel, /function expandSearch\(\)[\s\S]*?searchExpanded = true;[\s\S]*?searchControl\.classList\.add\('is-expanded'\);[\s\S]*?search\.focus\(\);/);
-assert.match(sidepanel, /searchToggle\.addEventListener\('click', \(\) => \{ if \(searchExpanded\) collapseSearch\(\); else expandSearch\(\); \}\)/);
-assert.match(sidepanel, /searchClear\.addEventListener\('click', \(\) => \{ collapseSearch\(\); \}\)/);
-assert.match(sidepanel, /selectModeButton\.addEventListener\('click', \(\) => \{[\s\S]*?selectMode = !selectMode;[\s\S]*?selectModeButton\.textContent = t\(selectMode \? 'cancel' : 'select_mode'\);[\s\S]*?if \(!selectMode\) clearSelection\(\);/);
-assert.match(sidepanel, /searchControl\.hidden = inSource;/);
-assert.match(sidepanel, /selectModeButton\.hidden = inSource \? false : searchExpanded;/);
-assert.match(sidepanel, /function showSourceCollection\(url\) \{[\s\S]*?collapseSearch\(\);/);
-// The selection actions bar belongs to Select mode only; a single Mark picked
-// up by a jump keeps its highlight but never summons the tray.
-assert.match(sidepanel, /const count = selectMode \? rows\.length : 0;/);
-assert.match(sidepanel, /let clips = \[\], videos = \[\], sourceUrl = null, query = '', selected = null, selectedKeys = new Set\(\), selectionAnchor = null, keyboardFocus = false, selectMode = false;/);
+assert.doesNotMatch(html, /id="select-mode"/);
+assert.doesNotMatch(html, /id="search-toggle"/);
+assert.doesNotMatch(html, /id="search-control"/);
+assert.match(sidepanel, /function clearSearch\(\)[\s\S]*?search\.value = '';[\s\S]*?query = '';[\s\S]*?searchClear\.hidden = true;/);
+assert.match(sidepanel, /search\.addEventListener\('input', \(\) => \{ query = search\.value; searchClear\.hidden = !query; render\(\); \}\)/);
+assert.match(sidepanel, /searchClear\.addEventListener\('click', \(\) => \{ clearSearch\(\); search\.focus\(\); \}\)/);
+assert.match(sidepanel, /timelineControls\.hidden = inSource;/);
+assert.doesNotMatch(sidepanel, /selectMode|searchExpanded|is-expanded/);
+assert.match(sidepanel, /function showSourceCollection\(url\) \{[\s\S]*?clearSearch\(\);/);
+// The selection actions bar appears for any selected Marks — single or multi.
+assert.match(sidepanel, /function updateSelectionTray\(rows = selectedVisibleRows\(\)\) \{[\s\S]*?const count = rows\.length;/);
+assert.match(sidepanel, /let clips = \[\], videos = \[\], sourceUrl = null, query = '', selected = null, selectedKeys = new Set\(\), selectionAnchor = null, keyboardFocus = false;/);
 console.log('page-sync controls assertions passed');
 
 // --- Permissions and wiring ---

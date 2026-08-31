@@ -2,7 +2,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
   const t = ReMarkI18n.t;
   ReMarkI18n.apply();
-  let clips = [], videos = [], sourceUrl = null, query = '', selected = null, selectedKeys = new Set(), selectionAnchor = null, keyboardFocus = false, selectMode = false;
+  let clips = [], videos = [], sourceUrl = null, query = '', selected = null, selectedKeys = new Set(), selectionAnchor = null, keyboardFocus = false;
   // Source collection the user deliberately left via Back/Escape: same-page
   // storage refreshes must not pull the panel back into that collection.
   let exitedSourceUrl = null;
@@ -410,8 +410,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const [file] = importBackupFile.files || [];
     if (file) void importBackup(file);
   });
-  const search = $('#search-input'), back = $('#source-back');
-  const searchControl = $('#search-control'), searchToggle = $('#search-toggle'), searchClear = $('#search-clear'), selectModeButton = $('#select-mode');
+  const search = $('#search-input'), searchClear = $('#search-clear'), back = $('#source-back');
   const subtitle = $('#view-subtitle'), context = $('#collection-context');
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
   settingsOpenButton.addEventListener('click', showSettings);
@@ -587,10 +586,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   function selectedVisibleRows(rows = visible()) {
     return rows.filter((item) => selectedKeys.has(item.key));
   }
-  // The selection actions bar only belongs to Select mode: a single Mark
-  // selected by a jump keeps its highlight, but never summons the tray.
+  // The selection actions bar appears whenever Marks are selected — a single
+  // Mark picked up by a jump or a multi-selection built with Cmd/Shift.
   function updateSelectionTray(rows = selectedVisibleRows()) {
-    const count = selectMode ? rows.length : 0;
+    const count = rows.length;
     selectionTray.hidden = count === 0;
     appContainer.classList.toggle('has-selection-tray', count > 0);
     if (!count) return;
@@ -666,10 +665,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isLinkedSource = item.type === 'highlight' && item.url && item.pageUrl && !sameUrl(item.url, item.pageUrl);
     const source = item.title || host(item.url) || item.url;
     const sourceIcon = sourceIconHtml(item.url, 'mark-source-favicon', 'mark-source-fallback');
-    // The source is context only — the whole card is the jump target, so the
-    // source title is no longer a separate click affordance.
+    // The source title is its own affordance: it opens the Source collection,
+    // while a click anywhere else on the card locates the Mark in its source.
     const sourceControl = sourceUrl === null
-      ? `<span class="mark-source-slot"><span class="mark-source" title="${esc(item.url)}">${sourceIcon}<span class="mark-source-label">${esc(source)}</span></span></span>`
+      ? `<span class="mark-source-slot"><button class="mark-source" data-action="source" data-url="${esc(item.url)}" type="button" title="${esc(item.url)}">${sourceIcon}<span class="mark-source-label">${esc(source)}</span><span class="mark-source-arrow" aria-hidden="true">›</span></button></span>`
       : '';
     const footer = sourceUrl === null
       ? `<footer class="mark-footer">${sourceControl}<time class="mark-created" datetime="${new Date(item.createdAt).toISOString()}" title="${esc(fullDate(item.createdAt))}">${esc(createdTime(item.createdAt))}</time></footer>`
@@ -701,9 +700,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     back.hidden = !inSource;
     viewIdentity.hidden = false;
     settingsOpenButton.hidden = inSource;
-    // Source collections support Select only; search stays on the timeline.
-    searchControl.hidden = inSource;
-    selectModeButton.hidden = inSource ? false : searchExpanded;
+    // Source collections do not search: the whole controls bar hides there.
+    timelineControls.hidden = inSource;
     appContainer.classList.toggle('is-source-view', inSource);
     search.placeholder = t('search_placeholder');
     if (inSource) {
@@ -971,11 +969,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   function showSourceCollection(url) {
     if (!url) return;
-    // Entering a collection (via Back-to-source, jump, or page-follow) is an
-    // explicit choice that supersedes any earlier "back to timeline".
+    // Entering a collection (via the source title, back-to-source, or
+    // page-follow) is an explicit choice that supersedes any earlier
+    // "stay on timeline" suppression.
     exitedSourceUrl = null;
     // Source collections do not search; drop any active timeline query.
-    collapseSearch();
+    clearSearch();
     sourceUrl = url;
     contentArea.scrollTop = 0;
     render();
@@ -1069,16 +1068,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pageUrl = item.type === 'highlight' ? (item.pageUrl || item.url) : item.url;
     const collectionUrl = item.url || pageUrl;
     const isLinkedSource = item.type === 'highlight' && item.url && pageUrl && !sameUrl(item.url, pageUrl);
-    // Timeline Mark-title navigation explicitly opens the matching source Collection.
-    showSourceCollection(collectionUrl);
-    // Keep the jumped-to Mark in view: it is selected and stays selected when
-    // the user returns to the timeline.
-    const locatedCard = list.querySelector(`.mark-card[data-key="${CSS.escape(item.key)}"]`);
-    if (locatedCard) {
-      locatedCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      locatedCard.classList.add('remark-panel-focus');
-      setTimeout(() => locatedCard.classList.remove('remark-panel-focus'), 900);
-    }
+    // A timeline click locates the Mark in its source but keeps the panel on
+    // the timeline — entering the Source collection is the source-title's job.
+    // Suppressing the follow for this collection stops the tab activation from
+    // pulling the panel into the collection view.
+    exitedSourceUrl = collectionUrl;
     try {
       const tabs = await chrome.tabs.query({});
       if (isLinkedSource) {
@@ -1141,7 +1135,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   list.addEventListener('click', (event) => {
     const control = event.target.closest('[data-action]');
     if (control) {
-      const { action, key } = control.dataset;
+      const { action, key, url } = control.dataset;
+      if (action === 'source') { showSourceCollection(url || ''); return; }
       if (action === 'unmark') { void deleteMark(key); return; }
       if (action === 'note') { setSelection([key], key); setActive(key); openNote(key); return; }
       if (action === 'copy') { void copyMark(key, control); return; }
@@ -1154,16 +1149,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     // The whole card is the jump target: a plain click selects the Mark and
-    // locates it in its source. In Select mode (or with Shift/Cmd/Ctrl) the
-    // click only builds the selection — never navigates.
+    // locates it in its source. Shift/Cmd/Ctrl clicks only build the selection.
     const card = event.target.closest('.mark-card');
     if (!card || event.target.closest('.mark-note-textarea')) return;
     const key = card.dataset.key;
-    if (selectMode && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
-      selectCard(key, { shiftKey: false, metaKey: true, ctrlKey: true });
-      return;
-    }
-    if (selectMode || event.shiftKey || event.metaKey || event.ctrlKey) {
+    if (event.shiftKey || event.metaKey || event.ctrlKey) {
       selectCard(key, event);
       return;
     }
@@ -1188,42 +1178,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('pointerdown', (event) => { keyboardFocus = false; if (!event.target.closest('.mark-card, .selection-tray, .app-header, .controls-bar')) clearSelection(); });
   document.addEventListener('click', (event) => { if (!event.target.closest('.mark-actions')) document.querySelectorAll('.mark-menu:not([hidden])').forEach((node) => { node.hidden = true; }); });
   back.addEventListener('click', () => { leaveSourceCollection(); });
-  // Search is collapsed by default: only the magnifier icon shows. Clicking it
-  // slides the field out to the right as one unit. While expanded, the × clears
-  // the query and collapses; Esc and clicking the icon again collapse too.
-  // Source collections do not search — only the Select action is available there.
-  let searchExpanded = false;
-  function collapseSearch() {
-    if (!searchExpanded) return;
-    searchExpanded = false;
-    searchControl.classList.remove('is-expanded');
-    searchClear.hidden = true;
-    selectModeButton.hidden = false;
+  // Search is a plain full-width field on the timeline; Source collections
+  // hide it entirely. The × clears the query; Esc does the same.
+  function clearSearch() {
     search.value = '';
     query = '';
-    search.tabIndex = -1;
+    searchClear.hidden = true;
     render();
   }
-  function expandSearch() {
-    if (searchExpanded) return;
-    searchExpanded = true;
-    searchControl.classList.add('is-expanded');
-    searchClear.hidden = false;
-    selectModeButton.hidden = true;
-    search.tabIndex = 0;
-    search.focus();
-  }
-  searchToggle.addEventListener('click', () => { if (searchExpanded) collapseSearch(); else expandSearch(); });
-  search.addEventListener('input', () => { query = search.value; render(); });
-  search.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.stopPropagation(); collapseSearch(); } });
-  searchClear.addEventListener('click', () => { collapseSearch(); });
-  selectModeButton.addEventListener('click', () => {
-    selectMode = !selectMode;
-    selectModeButton.classList.toggle('is-active', selectMode);
-    selectModeButton.textContent = t(selectMode ? 'cancel' : 'select_mode');
-    if (!selectMode) clearSelection();
-  });
-  document.addEventListener('keydown', async (event) => { if (event.key === 'Tab' || event.key.startsWith('Arrow')) keyboardFocus = true; if (event.key === 'Escape' && !feedbackModal.hidden) { event.preventDefault(); closeFeedback(); return; } const editing = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable; if (!editing && event.key === 'ArrowDown') { event.preventDefault(); moveActive(1); return; } if (!editing && event.key === 'ArrowUp') { event.preventDefault(); moveActive(-1); return; } if (!editing && event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); void jump(itemFor(selected)); return; } if (!editing && event.key === 'Enter' && event.shiftKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); openNote(selected); return; } if (!editing && (event.metaKey || event.ctrlKey) && event.key === 'Enter' && selected) { event.preventDefault(); openNote(selected); } else if (!editing && !event.isComposing && ['Delete','Backspace'].includes(event.key) && selectedKeys.size) { event.preventDefault(); await deleteMarks(); } else if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (await ReMarkStorage.undoLast()) await load(); } else if (!editing && event.key === 'Escape' && selectedKeys.size) { clearSelection(); } else if (!editing && event.key === '/') { event.preventDefault(); if (sourceUrl === null) expandSearch(); } else if (!editing && event.key === 'Escape' && showingSettings) { showTimeline(); } else if (!editing && event.key === 'Escape' && sourceUrl !== null) { leaveSourceCollection(); } });
+  search.addEventListener('input', () => { query = search.value; searchClear.hidden = !query; render(); });
+  search.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.stopPropagation(); clearSearch(); } });
+  searchClear.addEventListener('click', () => { clearSearch(); search.focus(); });
+  document.addEventListener('keydown', async (event) => { if (event.key === 'Tab' || event.key.startsWith('Arrow')) keyboardFocus = true; if (event.key === 'Escape' && !feedbackModal.hidden) { event.preventDefault(); closeFeedback(); return; } const editing = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable; if (!editing && event.key === 'ArrowDown') { event.preventDefault(); moveActive(1); return; } if (!editing && event.key === 'ArrowUp') { event.preventDefault(); moveActive(-1); return; } if (!editing && event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); void jump(itemFor(selected)); return; } if (!editing && event.key === 'Enter' && event.shiftKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); openNote(selected); return; } if (!editing && (event.metaKey || event.ctrlKey) && event.key === 'Enter' && selected) { event.preventDefault(); openNote(selected); } else if (!editing && !event.isComposing && ['Delete','Backspace'].includes(event.key) && selectedKeys.size) { event.preventDefault(); await deleteMarks(); } else if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (await ReMarkStorage.undoLast()) await load(); } else if (!editing && event.key === 'Escape' && selectedKeys.size) { clearSelection(); } else if (!editing && event.key === '/') { event.preventDefault(); if (sourceUrl === null) { search.focus(); search.select(); } } else if (!editing && event.key === 'Escape' && showingSettings) { showTimeline(); } else if (!editing && event.key === 'Escape' && sourceUrl !== null) { leaveSourceCollection(); } });
   async function followActivePageCollection(url, windowId) {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

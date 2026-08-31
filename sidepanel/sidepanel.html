@@ -28,21 +28,15 @@
       </button>
     </header>
     <div id="timeline-controls" class="controls-bar">
-      <div id="search-control" class="search-control">
-        <button id="search-toggle" class="search-toggle" type="button"
-          data-i18n-aria-label="search_marks" aria-label="Search Marks">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.398.312.762.674 1.057 1.06l3.19 3.19a1 1 0 0 0 1.415-1.414l-3.19-3.19a6.5 6.5 0 0 0-1.074-1.044zm-5.24.656a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
-        </button>
-        <input type="text" id="search-input" class="search-input"
+      <div class="search-box">
+        <input type="text" id="search-input"
           data-i18n-placeholder="search_placeholder"
           data-i18n-aria-label="search_marks"
           placeholder="Search Marks, notes, sources, or timestamps"
-          aria-label="Search Marks" tabindex="-1">
+          aria-label="Search Marks">
         <button id="search-clear" class="clear-btn" type="button"
           data-i18n-aria-label="clear_search" aria-label="Clear search" hidden>×</button>
       </div>
-      <button id="select-mode" class="select-mode-btn" type="button"
-        data-i18n="select_mode">Select</button>
     </div>
     <main class="content-area">
       <section id="panel-clips" class="tab-panel active">

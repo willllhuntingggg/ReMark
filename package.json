@@ -8,8 +8,7 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "node tests/storage-backup.test.js && node tests/batch-mark-delete.test.js && node tests/i18n.test.js && node tests/mark-note-gesture.test.js && node tests/onboarding-tutorial.test.js && node tests/more-panel.test.js && node tests/cross-line-highlight.test.js && node tests/ai-block-highlight.test.js && node tests/sidebar-note-entry.test.js && node tests/source-favicon.test.js && node tests/page-sync.test.js && node tests/link-source-detection.test.js && node tests/source-markdown-export.test.js && node tests/video-copy-source-url.test.js && node tests/video-title-sync.test.js && node tests/source-reading-order.test.js && node tests/video-card-content.test.js && node tests/feedback-mvp.test.js",
-    "build:css": "tailwindcss -i sidepanel/tailwind.input.css -o sidepanel/tailwind.css --minify"
+    "test": "node tests/storage-backup.test.js && node tests/batch-mark-delete.test.js && node tests/i18n.test.js && node tests/mark-note-gesture.test.js && node tests/onboarding-tutorial.test.js && node tests/more-panel.test.js && node tests/cross-line-highlight.test.js && node tests/ai-block-highlight.test.js && node tests/sidebar-note-entry.test.js && node tests/source-favicon.test.js && node tests/page-sync.test.js && node tests/link-source-detection.test.js && node tests/source-markdown-export.test.js && node tests/video-copy-source-url.test.js && node tests/video-title-sync.test.js && node tests/source-reading-order.test.js && node tests/video-card-content.test.js && node tests/feedback-mvp.test.js"
   },
   "repository": {
     "type": "git",
@@ -21,11 +20,5 @@
   "bugs": {
     "url": "https://github.com/willllhuntingggg/ReMark/issues"
   },
-  "homepage": "https://github.com/willllhuntingggg/ReMark#readme",
-  "devDependencies": {
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "postcss-cli": "^11.0.1",
-    "tailwindcss": "^3.4.17"
-  }
+  "homepage": "https://github.com/willllhuntingggg/ReMark#readme"
 }

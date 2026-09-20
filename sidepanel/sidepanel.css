@@ -1479,6 +1479,170 @@ button {
   line-height: 1.45;
 }
 
+/* Cloud Backup Card */
+.cloud-backup-card {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card, rgba(0, 0, 0, 0.02));
+}
+
+.cloud-backup-header {
+  margin-bottom: 10px;
+}
+
+.cloud-backup-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.cloud-backup-description {
+  margin: 2px 0 0;
+  color: var(--ink-3);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.google-auth-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.google-auth-button:hover {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
+  border-color: var(--ink-3);
+}
+
+.google-auth-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.google-icon {
+  flex-shrink: 0;
+}
+
+.cloud-backup-user-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+}
+
+.cloud-backup-account-label {
+  color: var(--ink-3);
+  font-size: 10.5px;
+}
+
+.cloud-backup-email {
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cloud-backup-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cloud-backup-status-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.cloud-backup-badge {
+  color: #2f7d4f;
+  font-weight: 600;
+}
+
+.cloud-backup-badge.is-error {
+  color: var(--danger);
+}
+
+.cloud-backup-time {
+  color: var(--ink-3);
+}
+
+.cloud-backup-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cloud-mini-btn {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.cloud-mini-btn:hover {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
+  border-color: var(--ink-3);
+}
+
+.cloud-mini-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cloud-signout-btn {
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  padding: 4px 6px;
+}
+
+.cloud-signout-btn:hover {
+  color: var(--danger);
+  background: transparent;
+}
+
+.cloud-backup-feedback {
+  margin: 8px 0 0;
+  padding: 6px 9px;
+  border-radius: var(--radius-sm);
+  background: rgba(47, 125, 79, .10);
+  color: #2f7d4f;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.cloud-backup-feedback.is-error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
 .backup-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -12,6 +12,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   const importBackupButton = $('#import-backup');
   const importBackupFile = $('#import-backup-file');
   const backupStatus = $('#backup-status');
+  const cloudBackupUnauth = $('#cloud-backup-unauth');
+  const cloudBackupAuth = $('#cloud-backup-auth');
+  const googleAuthButton = $('#google-auth-button');
+  const googleAuthBtnLabel = $('#google-auth-btn-label');
+  const cloudUserEmail = $('#cloud-user-email');
+  const cloudBackupBadge = $('#cloud-backup-badge');
+  const cloudLastBackup = $('#cloud-last-backup');
+  const cloudBackupNowButton = $('#cloud-backup-now');
+  const authSignoutButton = $('#auth-signout');
+  const cloudBackupFeedback = $('#cloud-backup-feedback');
   const languageSetting = $('#language-setting');
   const themeSetting = $('#theme-setting');
   const markColorSwatches = [...document.querySelectorAll('.mark-color-swatch')];
@@ -59,6 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     appContainer.classList.add('is-more-open');
     viewIdentity.hidden = true;
     updateSelectionTray([]);
+    void renderCloudBackupStatus();
   }
 
   function showTimeline() {
@@ -78,6 +89,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ReMarkI18n.apply();
     applyShortcutModifierLabels();
     languageSetting.value = normalized;
+    void renderCloudBackupStatus();
     if (!showingSettings) render();
   }
   async function initializeLanguagePreference() {
@@ -191,6 +203,85 @@ document.addEventListener('DOMContentLoaded', async () => {
     } finally {
       setBackupBusy(false);
       importBackupFile.value = '';
+    }
+  }
+
+  function formatRelativeTime(timestamp) {
+    if (!timestamp) return t('never_backed_up');
+    const diff = Math.max(0, Date.now() - Number(timestamp));
+    const seconds = Math.floor(diff / 1000);
+    if (seconds < 60) return t('just_now');
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return t('minutes_ago', { count: minutes });
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return t('hours_ago', { count: hours });
+    const days = Math.floor(hours / 24);
+    if (days === 1) return t('yesterday');
+    if (days < 30) return t('days_ago', { count: days });
+    const d = new Date(timestamp);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function setCloudBackupFeedback(message, isError = false) {
+    if (!cloudBackupFeedback) return;
+    if (!message) {
+      cloudBackupFeedback.hidden = true;
+      cloudBackupFeedback.textContent = '';
+      return;
+    }
+    cloudBackupFeedback.textContent = message;
+    cloudBackupFeedback.hidden = false;
+    cloudBackupFeedback.classList.toggle('is-error', isError);
+    setTimeout(() => {
+      if (cloudBackupFeedback.textContent === message) {
+        cloudBackupFeedback.hidden = true;
+      }
+    }, 5000);
+  }
+
+  async function renderCloudBackupStatus() {
+    if (!cloudBackupUnauth || !cloudBackupAuth) return;
+    try {
+      const response = await new Promise((resolve) => {
+        chrome.runtime?.sendMessage?.({ action: 'AUTH_GET_STATUS' }, (res) => {
+          if (chrome.runtime?.lastError) resolve({ ok: false });
+          else resolve(res || { ok: false });
+        });
+      });
+
+      if (response?.ok && response.authenticated) {
+        cloudBackupUnauth.hidden = true;
+        cloudBackupAuth.hidden = false;
+        const email = response.user?.email || response.user?.name || '';
+        if (cloudUserEmail) cloudUserEmail.textContent = email;
+
+        const lastTime = response.meta?.lastBackupTime;
+        const status = response.meta?.status;
+
+        if (status === 'error') {
+          if (cloudBackupBadge) {
+            cloudBackupBadge.innerHTML = `<span class="is-error">${t('backup_failed')}</span>`;
+          }
+        } else {
+          if (cloudBackupBadge) {
+            cloudBackupBadge.innerHTML = `✓ <span>${t('backed_up')}</span>`;
+          }
+        }
+
+        if (cloudLastBackup) {
+          if (lastTime) {
+            cloudLastBackup.textContent = `· ${t('last_backed_up', { time: formatRelativeTime(lastTime) })}`;
+          } else {
+            cloudLastBackup.textContent = '';
+          }
+        }
+      } else {
+        cloudBackupUnauth.hidden = false;
+        cloudBackupAuth.hidden = true;
+      }
+    } catch (_) {
+      cloudBackupUnauth.hidden = false;
+      cloudBackupAuth.hidden = true;
     }
   }
 
@@ -410,6 +501,73 @@ document.addEventListener('DOMContentLoaded', async () => {
     const [file] = importBackupFile.files || [];
     if (file) void importBackup(file);
   });
+  if (googleAuthButton) {
+    googleAuthButton.addEventListener('click', async () => {
+      googleAuthButton.disabled = true;
+      if (googleAuthBtnLabel) googleAuthBtnLabel.textContent = t('signing_in');
+      setCloudBackupFeedback(null);
+      try {
+        const res = await new Promise((resolve) => {
+          chrome.runtime?.sendMessage?.({ action: 'AUTH_LOGIN' }, (response) => {
+            if (chrome.runtime?.lastError) resolve({ ok: false, error: chrome.runtime.lastError.message });
+            else resolve(response || { ok: false, error: 'Login failed' });
+          });
+        });
+
+        if (res?.ok) {
+          await renderCloudBackupStatus();
+          if (res.restored) {
+            await load();
+            setCloudBackupFeedback(t('cloud_backup_restored', { count: res.restoredCount || 0 }));
+          }
+        } else if (res?.error) {
+          setCloudBackupFeedback(res.error, true);
+        }
+      } catch (err) {
+        setCloudBackupFeedback(err.message, true);
+      } finally {
+        googleAuthButton.disabled = false;
+        if (googleAuthBtnLabel) googleAuthBtnLabel.textContent = t('continue_with_google');
+      }
+    });
+  }
+  if (authSignoutButton) {
+    authSignoutButton.addEventListener('click', async () => {
+      authSignoutButton.disabled = true;
+      try {
+        await new Promise((resolve) => {
+          chrome.runtime?.sendMessage?.({ action: 'AUTH_LOGOUT' }, resolve);
+        });
+        await renderCloudBackupStatus();
+      } catch (_) {} finally {
+        authSignoutButton.disabled = false;
+      }
+    });
+  }
+  if (cloudBackupNowButton) {
+    cloudBackupNowButton.addEventListener('click', async () => {
+      cloudBackupNowButton.disabled = true;
+      cloudBackupNowButton.textContent = t('backing_up');
+      try {
+        const res = await new Promise((resolve) => {
+          chrome.runtime?.sendMessage?.({ action: 'CLOUD_BACKUP_NOW' }, (response) => {
+            if (chrome.runtime?.lastError) resolve({ ok: false, error: chrome.runtime.lastError.message });
+            else resolve(response || { ok: false, error: 'Backup failed' });
+          });
+        });
+        if (res?.ok) {
+          await renderCloudBackupStatus();
+        } else {
+          setCloudBackupFeedback(res?.error || t('backup_failed'), true);
+        }
+      } catch (err) {
+        setCloudBackupFeedback(err.message, true);
+      } finally {
+        cloudBackupNowButton.disabled = false;
+        cloudBackupNowButton.textContent = t('backup_now');
+      }
+    });
+  }
   const search = $('#search-input'), searchClear = $('#search-clear'), back = $('#source-back');
   const subtitle = $('#view-subtitle'), context = $('#collection-context');
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -1230,6 +1388,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (settings?.defaultColor) applyMarkColorPreference(settings.defaultColor);
     const pending = changes?.remark_pending_focus?.newValue;
     if (pending) focusFromSource(pending.clipId || pending.markId);
+    if (changes?.[ReMarkStorage.KEYS.AUTH_SESSION] || changes?.[ReMarkStorage.KEYS.CLOUD_BACKUP_META]) {
+      void renderCloudBackupStatus();
+    }
     void load();
   });
   try {

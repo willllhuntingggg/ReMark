@@ -1,4 +1,4 @@
-importScripts('lib/i18n.js', 'lib/storage.js');
+importScripts('lib/i18n.js', 'lib/storage.js', 'lib/supabase.js');
 const SETTINGS_KEY = 'markit_settings';
 let nativeUiRefreshRevision = 0;
 
@@ -59,6 +59,27 @@ chrome.runtime.onInstalled.addListener((details) => {
 chrome.runtime.onStartup.addListener(() => {
   void syncAllActionIcons();
 });
+let cloudBackupDebounceTimer = null;
+const CLOUD_BACKUP_DEBOUNCE_MS = 1500;
+
+function scheduleCloudBackup() {
+  if (cloudBackupDebounceTimer) clearTimeout(cloudBackupDebounceTimer);
+  cloudBackupDebounceTimer = setTimeout(async () => {
+    cloudBackupDebounceTimer = null;
+    try {
+      if (typeof ReMarkSupabase === 'undefined') return;
+      const session = await ReMarkSupabase.getValidSession();
+      if (!session) return;
+      console.log('[ReMark] Triggering debounced cloud backup...');
+      const backup = await ReMarkStorage.createBackup();
+      const res = await ReMarkSupabase.uploadBackup(backup);
+      console.log('[ReMark] Cloud backup completed:', res);
+    } catch (err) {
+      console.warn('[ReMark] Auto cloud backup error:', err);
+    }
+  }, CLOUD_BACKUP_DEBOUNCE_MS);
+}
+
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== 'local') return;
   if (changes?.[SETTINGS_KEY]) void syncNativeLanguage();
@@ -67,6 +88,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     chrome.tabs.query({ active: true, lastFocusedWindow: true })
       .then((tabs) => { if (tabs[0]?.id) void syncActivePagePanel(tabs[0].id, tabs[0].url); })
       .catch(() => {});
+    scheduleCloudBackup();
   }
 });
 
@@ -555,6 +577,96 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
       .then((results) => sendResponse(results?.[0]?.result || null))
       .catch(() => sendResponse(null));
+    return true;
+  }
+  if (message.action === 'REMARK_STORAGE_UPDATED') {
+    scheduleCloudBackup();
+    return false;
+  }
+  if (message.action === 'AUTH_LOGIN') {
+    (async () => {
+      try {
+        const loginRes = await ReMarkSupabase.signInWithGoogle();
+        if (!loginRes.ok) {
+          return { ok: false, error: loginRes.error };
+        }
+
+        let restored = false;
+        let restoredCount = 0;
+        const cloudRes = await ReMarkSupabase.fetchBackup();
+
+        if (cloudRes.ok && cloudRes.data) {
+          const localClips = await ReMarkStorage.getClips();
+          const localVideos = await ReMarkStorage.getVideoMarks();
+          const hasOnlyDemo = localVideos.length === 0 && localClips.every((c) => c.id.startsWith('clip_demo_'));
+
+          const importRes = await ReMarkStorage.importBackup(cloudRes.data);
+          restored = true;
+          restoredCount = (importRes?.added || 0) + (importRes?.updated || 0);
+
+          if (hasOnlyDemo) {
+            const currentClips = await ReMarkStorage.getClips();
+            const realClips = currentClips.filter((c) => !c.id.startsWith('clip_demo_'));
+            if (realClips.length > 0) {
+              await ReMarkStorage.set(ReMarkStorage.KEYS.CLIPS, realClips);
+            }
+          }
+
+          await ReMarkStorage.setCloudBackupMeta({
+            lastBackupTime: cloudRes.updatedAt ? Date.parse(cloudRes.updatedAt) : Date.now(),
+            status: 'success',
+            lastError: null
+          });
+        } else {
+          const localBackup = await ReMarkStorage.createBackup();
+          await ReMarkSupabase.uploadBackup(localBackup);
+        }
+
+        const meta = await ReMarkStorage.getCloudBackupMeta();
+        return {
+          ok: true,
+          user: loginRes.session.user,
+          restored,
+          restoredCount,
+          meta
+        };
+      } catch (err) {
+        return { ok: false, error: err.message };
+      }
+    })().then(sendResponse);
+    return true;
+  }
+  if (message.action === 'AUTH_LOGOUT') {
+    (async () => {
+      await ReMarkSupabase.signOut();
+      return { ok: true };
+    })().then(sendResponse);
+    return true;
+  }
+  if (message.action === 'AUTH_GET_STATUS') {
+    (async () => {
+      const session = await ReMarkSupabase.getValidSession();
+      const meta = await ReMarkStorage.getCloudBackupMeta();
+      return {
+        ok: true,
+        authenticated: Boolean(session?.access_token),
+        user: session?.user || null,
+        meta
+      };
+    })().then(sendResponse);
+    return true;
+  }
+  if (message.action === 'CLOUD_BACKUP_NOW') {
+    (async () => {
+      const session = await ReMarkSupabase.getValidSession();
+      if (!session) {
+        return { ok: false, error: 'NOT_AUTHENTICATED' };
+      }
+      const backup = await ReMarkStorage.createBackup();
+      const res = await ReMarkSupabase.uploadBackup(backup);
+      const meta = await ReMarkStorage.getCloudBackupMeta();
+      return { ...res, meta };
+    })().then(sendResponse);
     return true;
   }
   return false;

@@ -181,9 +181,11 @@ async function syncActionIconForPage(tabId, url) {
     hasMarks = await markedUrlHasReMarkMarks(url);
   } catch (_) {}
   try {
-    await chrome.action.setIcon({
+    chrome.action.setIcon({
       tabId,
       path: hasMarks ? MARKED_ACTION_ICON_PATHS : UNMARKED_ACTION_ICON_PATHS
+    }, () => {
+      void chrome.runtime.lastError;
     });
   } catch (_) {}
 }
@@ -198,12 +200,19 @@ async function syncAllActionIcons() {
 }
 
 async function syncActivePagePanel(tabId, url) {
+  if (!Number.isInteger(tabId)) return;
   let tab;
   try {
-    tab = await chrome.tabs.get(tabId);
+    tab = await new Promise((resolve) => {
+      chrome.tabs.get(tabId, (t) => {
+        if (chrome.runtime.lastError) resolve(null);
+        else resolve(t || null);
+      });
+    });
   } catch (_) {
     return;
   }
+  if (!tab) return;
   if (!tab.active || !isNavigablePageUrl(url || tab.url)) return;
   const normalizedUrl = String(url || tab.url).split('#')[0];
   let hasMarks = false;
@@ -230,15 +239,24 @@ async function openMarkNavigation(url, clipId, locateClip) {
   const tab = await chrome.tabs.create({ active: true });
   if (!Number.isInteger(tab?.id)) throw new Error('Unable to create target tab');
   if (locateClip) trackSourceNavigation(tab.id, clipId, url);
-  await chrome.tabs.update(tab.id, { url });
+  await new Promise((resolve) => {
+    chrome.tabs.update(tab.id, { url }, () => {
+      void chrome.runtime.lastError;
+      resolve();
+    });
+  });
   return tab.id;
 }
 
 function deliverPendingSourceLocate(tabId, pending) {
-  PENDING_SOURCE_LOCATE_DELAYS.forEach((delay) => setTimeout(async () => {
+  PENDING_SOURCE_LOCATE_DELAYS.forEach((delay) => setTimeout(() => {
     if (pendingSourceNavigations.get(tabId) !== pending) return;
-    try { await chrome.tabs.sendMessage(tabId, { action: 'RESTORE_HIGHLIGHTS' }); } catch (_) {}
-    try { await chrome.tabs.sendMessage(tabId, { action: 'LOCATE_CLIP', clipId: pending.clipId }); } catch (_) {}
+    chrome.tabs.sendMessage(tabId, { action: 'RESTORE_HIGHLIGHTS' }, () => {
+      void chrome.runtime.lastError;
+    });
+    chrome.tabs.sendMessage(tabId, { action: 'LOCATE_CLIP', clipId: pending.clipId }, () => {
+      void chrome.runtime.lastError;
+    });
   }, delay));
 }
 function acknowledgePendingSourceLocate(tabId, clipId) {
@@ -269,12 +287,12 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 chrome.tabs.onActivated.addListener(({ tabId }) => {
-  chrome.tabs.get(tabId)
-    .then((tab) => {
-      void syncActionIconForPage(tabId, tab.url);
-      void syncActivePagePanel(tabId, tab.url);
-    })
-    .catch(() => {});
+  if (!Number.isInteger(tabId)) return;
+  chrome.tabs.get(tabId, (tab) => {
+    if (chrome.runtime.lastError || !tab) return;
+    void syncActionIconForPage(tabId, tab.url);
+    void syncActivePagePanel(tabId, tab.url);
+  });
 });
 
 // Runs in the MAIN world of the video tab. Reads page-level player state and
@@ -520,11 +538,12 @@ chrome.tabs.onRemoved.addListener((tabId) => pendingSourceNavigations.delete(tab
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'TRACK_SOURCE_NAVIGATION' && Number.isInteger(message.tabId) && message.clipId) {
     const pending = trackSourceNavigation(message.tabId, message.clipId, message.url || '');
-    chrome.tabs.get(message.tabId).then((tab) => {
+    chrome.tabs.get(message.tabId, (tab) => {
+      if (chrome.runtime.lastError || !tab) return;
       if (pendingSourceNavigations.get(message.tabId) === pending && tab.status === 'complete') {
         deliverPendingSourceLocate(message.tabId, pending);
       }
-    }).catch(() => {});
+    });
     sendResponse({ ok: true });
     return false;
   }
@@ -544,9 +563,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const focus = { clipId: message.clipId, markId: message.markId };
       chrome.storage.local.set({ remark_pending_focus: focus }).catch(() => {});
       chrome.sidePanel.open({ windowId: sender.tab.windowId }).then(() => {
-        setTimeout(() => chrome.runtime.sendMessage({ action: 'FOCUS_CLIP', ...focus }), 180);
-        setTimeout(() => chrome.runtime.sendMessage({ action: 'FOCUS_CLIP', ...focus }), 700);
-      });
+        setTimeout(() => chrome.runtime.sendMessage({ action: 'FOCUS_CLIP', ...focus }).catch(() => {}), 180);
+        setTimeout(() => chrome.runtime.sendMessage({ action: 'FOCUS_CLIP', ...focus }).catch(() => {}), 700);
+      }).catch(() => {});
       sendResponse({ success: true });
     } else {
       sendResponse({ success: false });
@@ -559,7 +578,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         target: { tabId: sender.tab.id },
         world: 'MAIN',
         func: installBiliSubtitleCaptureInMainWorld
-      }).catch(() => {});
+      }, () => {
+        void chrome.runtime.lastError;
+      });
     }
     sendResponse({ ok: true });
     return false;
@@ -574,9 +595,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       world: 'MAIN',
       func: captureVideoCaptionInMainWorld,
       args: [message.payload]
-    })
-      .then((results) => sendResponse(results?.[0]?.result || null))
-      .catch(() => sendResponse(null));
+    }, (results) => {
+      if (chrome.runtime.lastError) {
+        sendResponse(null);
+        return;
+      }
+      sendResponse(results?.[0]?.result || null);
+    });
     return true;
   }
   if (message.action === 'REMARK_STORAGE_UPDATED') {

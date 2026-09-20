@@ -286,23 +286,43 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-  const isReplayReceiverUnavailable = (error) => /receiving end does not exist|could not establish connection/i.test(String(error?.message || error || ''));
+  const isReplayReceiverUnavailable = (error) => /receiving end does not exist|could not establish connection|no tab with id/i.test(String(error?.message || error || ''));
   async function sendReplayMessage(tabId) {
-    return chrome.tabs.sendMessage(tabId, { action: 'REPLAY_ONBOARDING' });
+    return new Promise((resolve, reject) => {
+      chrome.tabs.sendMessage(tabId, { action: 'REPLAY_ONBOARDING' }, (res) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(res);
+      });
+    });
   }
   async function sendFirstUseOnboardingMessage(tabId) {
-    return chrome.tabs.sendMessage(tabId, { action: 'SHOW_FIRST_USE_ONBOARDING' });
+    return new Promise((resolve, reject) => {
+      chrome.tabs.sendMessage(tabId, { action: 'SHOW_FIRST_USE_ONBOARDING' }, (res) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(res);
+      });
+    });
   }
   async function injectReplayContentScript(tabId) {
-    await chrome.scripting.executeScript({
-      target: { tabId, allFrames: false },
-      files: REPLAY_CONTENT_SCRIPT_FILES
+    return new Promise((resolve, reject) => {
+      chrome.scripting.executeScript({
+        target: { tabId, allFrames: false },
+        files: REPLAY_CONTENT_SCRIPT_FILES
+      }, (res) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(res);
+      });
     });
   }
   async function injectFirstUseContentScript(tabId) {
-    await chrome.scripting.insertCSS({
-      target: { tabId, allFrames: false },
-      files: [CONTENT_STYLE_FILE]
+    await new Promise((resolve, reject) => {
+      chrome.scripting.insertCSS({
+        target: { tabId, allFrames: false },
+        files: [CONTENT_STYLE_FILE]
+      }, (res) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(res);
+      });
     });
     await injectReplayContentScript(tabId);
   }
@@ -1102,7 +1122,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { root.textContent = ''; }, options.duration ?? 4200);
   }
-  function safeSendMessage(tabId, message) { const tabs = globalThis.chrome?.tabs; if (!tabs?.sendMessage || !Number.isInteger(tabId)) return Promise.resolve(); return tabs.sendMessage(tabId, message).catch((error) => { if (!/Receiving end does not exist/i.test(error?.message || "")) console.debug("[ReMark] Message delivery skipped:", error); }); }
+
+  function safeSendMessage(tabId, message) {
+    const tabs = globalThis.chrome?.tabs;
+    if (!tabs?.sendMessage || !Number.isInteger(tabId)) return Promise.resolve();
+    return new Promise((resolve) => {
+      tabs.sendMessage(tabId, message, (response) => {
+        const err = chrome.runtime?.lastError;
+        if (err) {
+          if (!/Receiving end does not exist|No tab with id/i.test(err.message || '')) {
+            console.debug('[ReMark] Message delivery skipped:', err);
+          }
+          resolve(null);
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  }
+
   async function notifySourceTabs(item, message) {
     const pageUrl = item?.pageUrl || item?.url;
     if (item?.type !== 'highlight' || !pageUrl) return;

@@ -144,3 +144,47 @@ assert.match(i18n, /shortcut_mark_video_note: 'Mark video moment and add a note'
 const videoShortcut = content.slice(content.indexOf('function onVideoMarkKeydown'), content.indexOf('function getVideoTimelineBar'));
 assert.match(videoShortcut, /recordVideoMark\(\{ withNote: e\.shiftKey \}\)/);
 console.log('video-note-shortcut assertions passed');
+
+// Preferences & Marking Habits Setting assertions
+assert.match(html, /class="preferences-section"/);
+assert.match(html, /class="preference-row"/);
+assert.match(html, /data-i18n="preferences_title"/);
+assert.match(html, /id="modifier-highlight-setting"/);
+assert.match(html, /id="show-mark-pill-setting"/);
+assert.match(html, /data-i18n="show_mark_pill_setting_title"/);
+assert.match(html, /data-i18n="show_mark_pill_setting_description"/);
+assert.match(css, /\.preferences-section \{/);
+assert.match(css, /\.preference-row \{/);
+assert.match(css, /\.setting-switch \{/);
+assert.match(css, /\.setting-switch input:checked \+ \.setting-switch-slider \{/);
+assert.match(storage, /quickHighlightModifier: true/);
+assert.match(storage, /showMarkPill: true/);
+assert.match(script, /const modifierHighlightSetting = \$?\('#modifier-highlight-setting'\)/);
+assert.match(script, /const showMarkPillSetting = \$?\('#show-mark-pill-setting'\)/);
+assert.match(script, /function updateModifierHighlightLabels\(\)/);
+assert.match(script, /function applyModifierHighlightPreference\(enabled\)/);
+assert.match(script, /function applyShowMarkPillPreference\(enabled\)/);
+assert.match(script, /updateSettings\(\{ quickHighlightModifier: enabled \}\)/);
+assert.match(script, /updateSettings\(\{ showMarkPill: enabled \}\)/);
+assert.match(content, /let cachedQuickHighlightModifier = true/);
+assert.match(content, /let cachedShowMarkPill = true/);
+assert.match(content, /cachedQuickHighlightModifier = settings\.quickHighlightModifier !== false/);
+assert.match(content, /cachedShowMarkPill = settings\.showMarkPill !== false/);
+assert.match(content, /if \(!\(event\.metaKey \|\| event\.ctrlKey\) \|\| !cachedQuickHighlightModifier\)/);
+assert.match(content, /if \(!cachedShowMarkPill\) \{ hideMarkPill\(\); return; \}/);
+assert.match(content, /if \(!cachedQuickHighlightModifier\) return t\('mark_action'\)/);
+assert.match(i18n, /preferences_title: '用户习惯'/);
+assert.match(i18n, /preferences_title: 'Preferences'/);
+assert.match(i18n, /shortcut_highlight_setting_title: '按住 %%mod%% 拖选快速标记'/);
+assert.match(i18n, /shortcut_highlight_setting_title: '%%mod%% \+ Drag Highlight'/);
+assert.match(i18n, /show_mark_pill_setting_title: '划选后显示 Mark 胶囊'/);
+assert.match(i18n, /show_mark_pill_setting_title: 'Show Mark Pill on selection'/);
+assert.match(i18n, /at_least_one_marking_method: '至少需保留一种划词标记方式'/);
+assert.match(i18n, /at_least_one_marking_method: 'Keep at least one marking method enabled'/);
+assert.match(script, /showToast\(t\('at_least_one_marking_method'\)\)/);
+assert.match(css, /\.remark-toast-root\s*\{[\s\S]*position:\s*fixed;[\s\S]*top:\s*18px;[\s\S]*z-index:\s*99999;/);
+assert.match(css, /\.remark-toast\s*\{[\s\S]*display:\s*inline-flex;[\s\S]*border-radius:\s*999px;/);
+assert.match(css, /@keyframes remark-toast-slide-down\s*\{/);
+console.log('preferences-and-habits-setting assertions passed');
+
+

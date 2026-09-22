@@ -102,6 +102,34 @@
             <option value="zh" data-i18n="language_chinese">Chinese</option>
           </select>
         </section>
+        <section class="preferences-section" aria-labelledby="preferences-heading">
+          <div class="preferences-copy">
+            <h2 id="preferences-heading" data-i18n="preferences_title">Preferences</h2>
+            <p data-i18n="preferences_description">Customize your marking behavior and tools.</p>
+          </div>
+
+          <div class="preference-row">
+            <div class="preference-item-copy">
+              <h3 id="modifier-highlight-title" class="preference-item-title"></h3>
+              <p id="modifier-highlight-desc" class="preference-item-description"></p>
+            </div>
+            <label class="setting-switch" for="modifier-highlight-setting">
+              <input type="checkbox" id="modifier-highlight-setting" checked>
+              <span class="setting-switch-slider" aria-hidden="true"></span>
+            </label>
+          </div>
+
+          <div class="preference-row">
+            <div class="preference-item-copy">
+              <h3 id="show-mark-pill-title" class="preference-item-title" data-i18n="show_mark_pill_setting_title">Show Mark Pill on selection</h3>
+              <p id="show-mark-pill-desc" class="preference-item-description" data-i18n="show_mark_pill_setting_description">Show the floating action pill next to selected text. Turn off to reduce visual distraction and mark with shortcuts.</p>
+            </div>
+            <label class="setting-switch" for="show-mark-pill-setting">
+              <input type="checkbox" id="show-mark-pill-setting" checked>
+              <span class="setting-switch-slider" aria-hidden="true"></span>
+            </label>
+          </div>
+        </section>
         <section class="backup-section" aria-labelledby="backup-heading">
           <div class="backup-copy">
             <h2 id="backup-heading" data-i18n="data">Data</h2>

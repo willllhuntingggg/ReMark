@@ -24,6 +24,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const cloudBackupFeedback = $('#cloud-backup-feedback');
   const languageSetting = $('#language-setting');
   const themeSetting = $('#theme-setting');
+  const modifierHighlightSetting = $('#modifier-highlight-setting');
+  const showMarkPillSetting = $('#show-mark-pill-setting');
   const markColorSwatches = [...document.querySelectorAll('.mark-color-swatch')];
   const settingsOpenButton = $('#settings-open');
   const settingsBackButton = $('#settings-back');
@@ -88,6 +90,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ReMarkI18n.setLocale(normalized);
     ReMarkI18n.apply();
     applyShortcutModifierLabels();
+    updateModifierHighlightLabels();
     languageSetting.value = normalized;
     void renderCloudBackupStatus();
     if (!showingSettings) render();
@@ -131,6 +134,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function initializeMarkColorPreference() {
     const settings = await ReMarkStorage.getSettings();
     applyMarkColorPreference(settings.defaultColor);
+  }
+  function updateModifierHighlightLabels() {
+    const modSymbol = isMacPlatform() ? '⌘' : 'Ctrl';
+    const modWord = isMacPlatform() ? 'Command' : 'Ctrl';
+    const titleEl = $('#modifier-highlight-title');
+    const descEl = $('#modifier-highlight-desc');
+    if (titleEl) titleEl.textContent = t('shortcut_highlight_setting_title', { mod: modSymbol });
+    if (descEl) descEl.textContent = t('shortcut_highlight_setting_description', { mod: modWord });
+  }
+  function applyModifierHighlightPreference(enabled) {
+    if (modifierHighlightSetting) {
+      modifierHighlightSetting.checked = enabled !== false;
+    }
+  }
+  async function initializeModifierHighlightPreference() {
+    const settings = await ReMarkStorage.getSettings();
+    applyModifierHighlightPreference(settings.quickHighlightModifier);
+    updateModifierHighlightLabels();
+  }
+  function applyShowMarkPillPreference(enabled) {
+    if (showMarkPillSetting) {
+      showMarkPillSetting.checked = enabled !== false;
+    }
+  }
+  async function initializeShowMarkPillPreference() {
+    const settings = await ReMarkStorage.getSettings();
+    applyShowMarkPillPreference(settings.showMarkPill);
   }
   async function syncMarkColorToOpenTabs(color) {
     try {
@@ -501,6 +531,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     void ReMarkStorage.updateSettings({ theme: preference })
       .then(() => applyThemePreference(preference));
   });
+  modifierHighlightSetting?.addEventListener('change', () => {
+    if (!modifierHighlightSetting.checked && !showMarkPillSetting?.checked) {
+      modifierHighlightSetting.checked = true;
+      showToast(t('at_least_one_marking_method'));
+      return;
+    }
+    const enabled = modifierHighlightSetting.checked;
+    void ReMarkStorage.updateSettings({ quickHighlightModifier: enabled });
+  });
+  showMarkPillSetting?.addEventListener('change', () => {
+    if (!showMarkPillSetting.checked && !modifierHighlightSetting?.checked) {
+      showMarkPillSetting.checked = true;
+      showToast(t('at_least_one_marking_method'));
+      return;
+    }
+    const enabled = showMarkPillSetting.checked;
+    void ReMarkStorage.updateSettings({ showMarkPill: enabled });
+  });
   markColorSwatches.forEach((swatch) => {
     swatch.addEventListener('click', () => {
       const color = normalizeMarkColor(swatch.dataset.markColor);
@@ -612,6 +660,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const videoReplaySourceUrl = (item) => {
     const source = String(item?.url || '').split('#')[0];
     if (!source) return '';
+    if (!videoKeyFromUrl(source)) return source;
     const time = Math.max(0, Math.floor((Number(item?.time) || 0) - 5));
     try {
       const url = new URL(source);
@@ -620,6 +669,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (_) {
       return `${source}${source.includes('?') ? '&' : '?'}t=${time}`;
     }
+  };
+  const sameGenericPostUrl = (a, b) => {
+    if (!a || !b) return false;
+    try {
+      const urlA = new URL(a);
+      const urlB = new URL(b);
+      if (urlA.hostname.replace(/^www\./, '') !== urlB.hostname.replace(/^www\./, '')) return false;
+      const xMatchA = urlA.pathname.match(/^(\/[a-zA-Z0-9_]+\/status\/\d+)/);
+      const xMatchB = urlB.pathname.match(/^(\/[a-zA-Z0-9_]+\/status\/\d+)/);
+      if (xMatchA && xMatchB) return xMatchA[1] === xMatchB[1];
+      const rMatchA = urlA.pathname.match(/^(\/r\/[^\/]+\/comments\/[a-zA-Z0-9]+)/);
+      const rMatchB = urlB.pathname.match(/^(\/r\/[^\/]+\/comments\/[a-zA-Z0-9]+)/);
+      if (rMatchA && rMatchB) return rMatchA[1] === rMatchB[1];
+      const qMatchA = urlA.pathname.match(/^(\/[^/]+\/answer\/[^/?#]+)/);
+      const qMatchB = urlB.pathname.match(/^(\/[^/]+\/answer\/[^/?#]+)/);
+      if (qMatchA && qMatchB) return qMatchA[1] === qMatchB[1];
+    } catch (_) {}
+    return false;
   };
   const sameVideoTab = (item, tabUrl) => Boolean(item.raw?.videoKey) && item.raw.videoKey === videoKeyFromUrl(tabUrl);
   // Two URLs open the same collection when they are the same page (fragment
@@ -636,8 +703,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const sameSource = (item, url) => {
     if (item?.type === 'video') {
       const key = videoKeyFromUrl(url);
-      return Boolean(key) && Boolean(item.raw?.videoKey) && item.raw.videoKey === key;
+      if (key) return Boolean(key) && Boolean(item.raw?.videoKey) && item.raw.videoKey === key;
     }
+    if (sameGenericPostUrl(item.url, url)) return true;
+    if (item?.postUrl && sameGenericPostUrl(item.postUrl, url)) return true;
     return sameUrl(item.url, url);
   };
   const host = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } };
@@ -676,7 +745,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function all() {
     return [
-      ...clips.map((raw) => ({ id: raw.id, key: `h:${raw.id}`, type: 'highlight', raw, url: raw.url || '', pageUrl: raw.pageUrl || raw.url || '', title: raw.pageTitle || t('untitled_page'), text: raw.text || '', note: raw.note || '', createdAt: Number(raw.createdAt) || 0, position: Number.isFinite(Number(raw.sourcePosition)) ? Number(raw.sourcePosition) : null, posX: Number.isFinite(Number(raw.sourcePositionX)) ? Number(raw.sourcePositionX) : null })),
+      ...clips.map((raw) => ({ id: raw.id, key: `h:${raw.id}`, type: 'highlight', raw, url: raw.url || '', pageUrl: raw.pageUrl || raw.url || '', postUrl: raw.postUrl || '', title: raw.pageTitle || t('untitled_page'), text: raw.text || '', note: raw.note || '', createdAt: Number(raw.createdAt) || 0, position: Number.isFinite(Number(raw.sourcePosition)) ? Number(raw.sourcePosition) : null, posX: Number.isFinite(Number(raw.sourcePositionX)) ? Number(raw.sourcePositionX) : null })),
       ...videos.map((raw) => ({ id: raw.id, key: `v:${raw.id}`, type: 'video', raw, url: raw.url || '', title: raw.title || t('untitled_video'), text: '', note: raw.note || '', createdAt: Number(raw.createdAt) || 0, time: Number(raw.time) || 0, duration: Number(raw.duration) || 0, caption: raw.caption || null, chapter: raw.chapter || null }))
     ];
   }
@@ -1262,6 +1331,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function jump(item) {
     if (!item) return;
     const pageUrl = item.type === 'highlight' ? (item.pageUrl || item.url) : item.url;
+    const targetUrl = (item.type === 'highlight' && item.postUrl) ? item.postUrl : pageUrl;
     const collectionUrl = item.url || pageUrl;
     const isLinkedSource = item.type === 'highlight' && item.url && pageUrl && !sameUrl(item.url, pageUrl);
     // A timeline click locates the Mark in its source but keeps the panel on
@@ -1287,7 +1357,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         return;
       }
-      const target = tabs.find((tab) => item.type === 'video' ? (sameVideoTab(item, tab.url) || sameUrl(tab.url, item.url)) : sameUrl(tab.url, pageUrl));
+      const target = tabs.find((tab) => item.type === 'video' ? (sameVideoTab(item, tab.url) || sameUrl(tab.url, item.url) || sameGenericPostUrl(item.url, tab.url)) : (sameUrl(tab.url, targetUrl) || sameGenericPostUrl(targetUrl, tab.url)));
       if (target?.id) {
         await chrome.tabs.update(target.id, { active: true });
         if (target.windowId) await chrome.windows.update(target.windowId, { focused: true });
@@ -1298,7 +1368,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (item.type === 'highlight') {
         const result = await chrome.runtime.sendMessage({
           action: 'OPEN_MARK_NAVIGATION',
-          url: pageUrl,
+          url: targetUrl,
           clipId: item.id,
           locateClip: true
         });
@@ -1424,6 +1494,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const settings = changes?.[ReMarkStorage.KEYS.SETTINGS]?.newValue;
     if (settings?.theme) applyThemePreference(settings.theme);
     if (settings?.defaultColor) applyMarkColorPreference(settings.defaultColor);
+    if (typeof settings?.quickHighlightModifier !== 'undefined') applyModifierHighlightPreference(settings.quickHighlightModifier);
+    if (typeof settings?.showMarkPill !== 'undefined') applyShowMarkPillPreference(settings.showMarkPill);
     const pending = changes?.remark_pending_focus?.newValue;
     if (pending) focusFromSource(pending.clipId || pending.markId);
     if (changes?.[ReMarkStorage.KEYS.AUTH_SESSION] || changes?.[ReMarkStorage.KEYS.CLOUD_BACKUP_META]) {
@@ -1436,6 +1508,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initializeThemePreference();
     await initializeLanguagePreference();
     await initializeMarkColorPreference();
+    await initializeModifierHighlightPreference();
+    await initializeShowMarkPillPreference();
     await load(true);
     await showCurrentPageCollectionOnPanelOpen();
     void ensureFirstUseOnCurrentPage();

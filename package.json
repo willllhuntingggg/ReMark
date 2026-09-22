@@ -1,6 +1,6 @@
 {
   "name": "ReMark",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "> Mark it now. Find it later.",
   "main": "background.js",
   "directories": {
@@ -8,8 +8,8 @@
     "lib": "lib"
   },
   "scripts": {
-    "test": "node tests/storage-backup.test.js && node tests/batch-mark-delete.test.js && node tests/i18n.test.js && node tests/mark-note-gesture.test.js && node tests/onboarding-tutorial.test.js && node tests/more-panel.test.js && node tests/cross-line-highlight.test.js && node tests/ai-block-highlight.test.js && node tests/sidebar-note-entry.test.js && node tests/source-favicon.test.js && node tests/page-sync.test.js && node tests/link-source-detection.test.js && node tests/source-markdown-export.test.js && node tests/video-copy-source-url.test.js && node tests/video-title-sync.test.js && node tests/source-reading-order.test.js && node tests/video-card-content.test.js && node tests/feedback-mvp.test.js && node tests/cloud-backup.test.js",
-    "package": "mkdir -p dist && rm -f dist/remark-1.1.0.zip && zip -r dist/remark-1.1.0.zip manifest.json background.js _locales assets content lib sidepanel welcome.css welcome.html welcome.js -x '*.DS_Store*' -x '*__MACOSX*'",
+    "test": "node tests/storage-backup.test.js && node tests/batch-mark-delete.test.js && node tests/i18n.test.js && node tests/mark-note-gesture.test.js && node tests/onboarding-tutorial.test.js && node tests/more-panel.test.js && node tests/cross-line-highlight.test.js && node tests/ai-block-highlight.test.js && node tests/sidebar-note-entry.test.js && node tests/source-favicon.test.js && node tests/page-sync.test.js && node tests/link-source-detection.test.js && node tests/source-markdown-export.test.js && node tests/video-copy-source-url.test.js && node tests/video-title-sync.test.js && node tests/source-reading-order.test.js && node tests/video-card-content.test.js && node tests/feedback-mvp.test.js && node tests/cloud-backup.test.js && node tests/generic-video-mark.test.js && node tests/timeline-text-mark.test.js",
+    "package": "mkdir -p dist && rm -f dist/*.zip && zip -r dist/remark-1.2.0.zip manifest.json background.js _locales assets content lib sidepanel welcome.css welcome.html welcome.js -x '*.DS_Store*' -x '*__MACOSX*'",
     "build": "npm run package"
   },
   "repository": {

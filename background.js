@@ -238,7 +238,7 @@ function trackSourceNavigation(tabId, clipId, url) {
 async function openMarkNavigation(url, clipId, locateClip) {
   const tab = await chrome.tabs.create({ active: true });
   if (!Number.isInteger(tab?.id)) throw new Error('Unable to create target tab');
-  if (locateClip) trackSourceNavigation(tab.id, clipId, url);
+  if (locateClip || (clipId && clipId.startsWith('vmark_'))) trackSourceNavigation(tab.id, clipId, url);
   await new Promise((resolve) => {
     chrome.tabs.update(tab.id, { url }, () => {
       void chrome.runtime.lastError;

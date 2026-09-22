@@ -1458,6 +1458,113 @@ button {
   outline-offset: 2px;
 }
 
+/* Preferences / User habits section */
+.preferences-section {
+  margin: 0 18px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.preferences-copy h2 {
+  margin: 0 0 3px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.preferences-copy p {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.preference-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 14px;
+}
+
+.preference-row:not(:last-child) {
+  padding-bottom: 14px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.preference-item-copy {
+  flex: 1;
+}
+
+.preference-item-copy h3 {
+  margin: 0 0 2px;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.preference-item-copy p {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.setting-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.setting-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  pointer-events: none;
+}
+
+.setting-switch-slider {
+  position: absolute;
+  inset: 0;
+  background-color: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  transition: background-color .18s ease, border-color .18s ease;
+}
+
+.setting-switch-slider::before {
+  content: "";
+  position: absolute;
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  top: 2px;
+  background-color: var(--ink-3);
+  border-radius: 50%;
+  transition: transform .18s ease, background-color .18s ease;
+}
+
+.setting-switch input:checked + .setting-switch-slider {
+  background-color: var(--mark-color);
+  border-color: var(--mark-color);
+}
+
+.setting-switch input:checked + .setting-switch-slider::before {
+  transform: translateX(16px);
+  background-color: #ffffff;
+}
+
+.setting-switch input:focus-visible + .setting-switch-slider {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 /* Data / backup */
 .backup-section {
   margin: 0 18px;
@@ -2187,3 +2294,79 @@ button {
   min-width: 0;
   margin-left: 0;
 }
+
+/* ---------- Toast notification (top-center floating pill) ---------- */
+
+.remark-toast-root {
+  position: fixed;
+  top: 18px;
+  left: 16px;
+  right: 16px;
+  z-index: 99999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+}
+
+.remark-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(26, 28, 33, 0.94);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: auto;
+  animation: remark-toast-slide-down 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: center;
+  word-break: break-word;
+}
+
+:root[data-theme='dark'] .remark-toast {
+  background: rgba(38, 42, 50, 0.96);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.remark-toast-action {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  padding: 2px 7px;
+  border: 0;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffe082;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.remark-toast-action:hover,
+.remark-toast-action:focus-visible {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  outline: none;
+}
+
+@keyframes remark-toast-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+

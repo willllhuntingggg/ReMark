@@ -3,7 +3,7 @@
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnkVSYjULzkNcWHRkQM3633E/v2cibTegIgldTOSd4EeT1alGotxBcxXaL2+jRHR+vJqlEGYVKDSsaCk661vIz32u1iqgzqyBxB9HJAL2HsTHvsmIupNCuENsykq34TrwZJk3UmJIQoX+a4ovuTiEFM8epc/R6t4DeDC8xiizOMxApU0yEw6bJSHqIEZUy8a2HyK8zowl9ckfcvn8v2+p3kCV89y7r/lzFFdVoYSP/VrX3D4uiBaLPjkEEbzQj9Bw0H3kjaGYST8vfWRrTitaVRLfARrOphh0LiXnOBw18kxa76ZJtfMogF+g6UL+sYgDIaZUPMSK1J/KDeOIapt2LQIDAQAB",
   "default_locale": "en",
   "name": "__MSG_extension_name__",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "__MSG_extension_description__",
   "permissions": [
     "storage",

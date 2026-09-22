@@ -34,12 +34,17 @@
   window.addEventListener('load', applyMarkContrastTheme, { once: true });
 
 
+  let cachedQuickHighlightModifier = true;
+  let cachedShowMarkPill = true;
+
   // Initialize storage and apply the saved language before rendering ReMark UI.
   ReMarkStorage.init().then(async () => {
     const settings = await ReMarkStorage.getSettings();
     ReMarkI18n.setLocale(settings.language);
     ReMarkI18n.apply();
     applyGlobalMarkColor(settings.defaultColor);
+    cachedQuickHighlightModifier = settings.quickHighlightModifier !== false;
+    cachedShowMarkPill = settings.showMarkPill !== false;
     showFirstUseGuide();
     schedulePageHighlightRestore();
     watchForUrlChanges();
@@ -55,6 +60,13 @@
         ReMarkI18n.apply();
       }
       if (settings?.defaultColor) applyGlobalMarkColor(settings.defaultColor);
+      if (typeof settings?.quickHighlightModifier !== 'undefined') {
+        cachedQuickHighlightModifier = settings.quickHighlightModifier !== false;
+      }
+      if (typeof settings?.showMarkPill !== 'undefined') {
+        cachedShowMarkPill = settings.showMarkPill !== false;
+        if (!cachedShowMarkPill) hideMarkPill();
+      }
       if (changes?.[ReMarkStorage.KEYS.CLIPS]) scheduleCurrentPageHighlightRecovery();
       renderVideoMarkers();
     });
@@ -317,6 +329,7 @@
 
   document.addEventListener('mousedown', (event) => {
     if (!isMarkNoteDragStart(event)) return;
+    if (!cachedQuickHighlightModifier) return;
     const selection = window.getSelection();
     if (selection?.rangeCount) selection.removeAllRanges();
   }, true);
@@ -367,8 +380,9 @@
     const range = (() => { try { return selection && selection.rangeCount ? selection.getRangeAt(0) : null; } catch (_) { return null; } })();
     if (!text || text.length < 2 || !range || isEditableSelection(selection)) { hideMarkPill(); return; }
     if (isInsideOnboardingModal(selection)) { hideMarkPill(); return; }
-    if (!(event.metaKey || event.ctrlKey)) {
-      // Plain selection: offer a one-click Mark pill next to the selection.
+    if (!(event.metaKey || event.ctrlKey) || !cachedQuickHighlightModifier) {
+      // Plain selection or modifier gesture disabled: offer a one-click Mark pill next to the selection if enabled.
+      if (!cachedShowMarkPill) { hideMarkPill(); return; }
       const rect = range.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) return;
       showMarkPill({ text, range: range.cloneRange(), sourceUrl: getSelectionSourceUrl(range) }, { x: event.clientX, y: event.clientY });
@@ -432,7 +446,11 @@
     } else if (msg.action === 'RESTORE_HIGHLIGHTS') {
       restorePageHighlights();
     } else if (msg.action === 'LOCATE_CLIP') {
-      locateAndAnimateClip(msg.clipId);
+      if (msg.clipId && msg.clipId.startsWith('vmark_')) {
+        void locateAndSeekVideoMark(msg.clipId);
+      } else {
+        locateAndAnimateClip(msg.clipId);
+      }
     } else if (msg.action === 'DELETE_CLIP_FROM_PAGE') {
       removeClipHighlightFromDOM(msg.clipId);
     } else if (msg.action === 'DELETE_PAGE_CLIPS_FROM_PAGE') {
@@ -652,19 +670,33 @@
     const sel = currentSelection;
     if (!sel || !sel.text) return;
 
-    const { text, range, sourceUrl } = sel;
+    let { text, range, sourceUrl } = sel;
     currentSelection = null;
+
+    const postNode = range ? (range.commonAncestorContainer?.nodeType === Node.TEXT_NODE ? range.commonAncestorContainer.parentElement : range.commonAncestorContainer) : null;
+    const detectedPostUrl = postNode ? extractNodePostUrl(postNode) : null;
+    const detectedPostTitle = postNode ? extractNodePostTitle(postNode) : null;
+    const currentBaseUrl = window.location.href.split('#')[0];
+    const postUrl = (detectedPostUrl && detectedPostUrl !== currentBaseUrl) ? detectedPostUrl : null;
+    const resolvedTitle = (detectedPostTitle && detectedPostTitle !== document.title) ? detectedPostTitle : document.title;
+
+    if (postUrl && (!sourceUrl || sourceUrl === window.location.href)) {
+      sourceUrl = postUrl;
+    }
 
     const clipData = {
       url: sourceUrl || window.location.href,
       pageUrl: window.location.href,
-      pageTitle: document.title,
+      postUrl,
+      feedUrl: postUrl ? window.location.href : null,
+      pageTitle: resolvedTitle,
       text,
       sourcePosition: range ? Math.round(range.getBoundingClientRect().top + window.scrollY) : null,
       sourcePositionX: range ? Math.round(range.getBoundingClientRect().left) : null,
       color: colorCode,
       note: ''
     };
+    if (postUrl) clipData.pageUrl = postUrl;
 
     const savedClip = await ReMarkStorage.addClip(clipData);
     await ReMarkStorage.pushUndo({ type: 'restore_clip', id: savedClip.id });
@@ -786,6 +818,7 @@
   const COPIED_BTN_ICON = '<svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M438.6 105.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0l-96-96c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0L224 274.7l169.4-169.3c12.5-12.5 32.8-12.5 45.3 0z"/></svg>';
   const DELETE_BTN_ICON = '<svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M135.2 17.7L128 32H32C14.3 32 0 46.3 0 64S14.3 96 32 96H416c17.7 0 32-14.3 32-32s-14.3-32-32-32H320l-7.2-14.3C307.4 6.8 296.3 0 284.2 0H163.8c-12.1 0-23.2 6.8-28.6 17.7zM416 128H32L53.2 467c1.6 25.3 22.6 45 47.9 45H346.9c25.3 0 46.3-19.7 47.9-45L416 128z"/></svg>';
   function textMarkShortcutHint() {
+    if (!cachedQuickHighlightModifier) return t('mark_action');
     const platform = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent || '';
     return t(/mac|iphone|ipad|ipod/i.test(platform) ? 'text_mark_shortcut_mac' : 'text_mark_shortcut_ctrl');
   }
@@ -956,6 +989,7 @@
   }
   // Reappear while the pointer is over the selected range.
   document.addEventListener('mousemove', (event) => {
+    if (!cachedShowMarkPill) return;
     const ctx = markPillContext;
     if (!ctx) return;
     let inside = false;
@@ -1222,7 +1256,8 @@
     const clips = await ReMarkStorage.getClips();
     const currentUrl = window.location.href;
     for (const clip of clips) {
-      if (!(clip.pageUrl || clip.url) || !samePageUrl(clip.pageUrl || clip.url, currentUrl)) continue;
+      const isMatch = (clip.postUrl && (samePageUrl(clip.postUrl, currentUrl) || sameGenericPostUrl(clip.postUrl, currentUrl))) || (clip.feedUrl && samePageUrl(clip.feedUrl, currentUrl)) || ((clip.pageUrl || clip.url) && samePageUrl(clip.pageUrl || clip.url, currentUrl));
+      if (!isMatch) continue;
       if (!force && Number.isFinite(Number(clip.sourcePosition)) && Number.isFinite(Number(clip.sourcePositionX))) continue;
       const mark = [...document.querySelectorAll(`mark[data-clip-id="${clip.id}"]`)].at(-1);
       if (!mark) continue;
@@ -1253,13 +1288,35 @@
     };
     return norm(a) === norm(b);
   }
+  function sameGenericPostUrl(a, b) {
+    if (!a || !b) return false;
+    try {
+      const urlA = new URL(a);
+      const urlB = new URL(b);
+      if (urlA.hostname.replace(/^www\./, '') !== urlB.hostname.replace(/^www\./, '')) return false;
+      const xMatchA = urlA.pathname.match(/^(\/[a-zA-Z0-9_]+\/status\/\d+)/);
+      const xMatchB = urlB.pathname.match(/^(\/[a-zA-Z0-9_]+\/status\/\d+)/);
+      if (xMatchA && xMatchB) return xMatchA[1] === xMatchB[1];
+      const rMatchA = urlA.pathname.match(/^(\/r\/[^\/]+\/comments\/[a-zA-Z0-9]+)/);
+      const rMatchB = urlB.pathname.match(/^(\/r\/[^\/]+\/comments\/[a-zA-Z0-9]+)/);
+      if (rMatchA && rMatchB) return rMatchA[1] === rMatchB[1];
+      const qMatchA = urlA.pathname.match(/^(\/[^/]+\/answer\/[^/?#]+)/);
+      const qMatchB = urlB.pathname.match(/^(\/[^/]+\/answer\/[^/?#]+)/);
+      if (qMatchA && qMatchB) return qMatchA[1] === qMatchB[1];
+    } catch (_) {}
+    return false;
+  }
   // Restore page highlights from storage. Returns true when every clip for
   // this page is restored (or nothing is pending), which lets the caller
   // stop watching the DOM.
   async function restorePageHighlights() {
     const clips = await ReMarkStorage.getClips();
     const currentUrl = window.location.href;
-    loadedClipsForPage = clips.filter((clip) => (clip.pageUrl || clip.url) && samePageUrl(clip.pageUrl || clip.url, currentUrl));
+    loadedClipsForPage = clips.filter((clip) => {
+      if (clip.postUrl && (samePageUrl(clip.postUrl, currentUrl) || sameGenericPostUrl(clip.postUrl, currentUrl))) return true;
+      if (clip.feedUrl && samePageUrl(clip.feedUrl, currentUrl)) return true;
+      return (clip.pageUrl || clip.url) && samePageUrl(clip.pageUrl || clip.url, currentUrl);
+    });
     let allDone = true;
     for (const clip of loadedClipsForPage) {
       if (clip.text && !highlightTextInBody(clip)) allDone = false;
@@ -1341,7 +1398,390 @@
     if (host === 'music.youtube.com') return null;
     if (/(^|\.)bilibili\.com$/.test(host)) return 'bilibili';
     if (/(^|\.)youtube\.com$/.test(host) || /(^|\.)youtu\.be$/.test(host)) return 'youtube';
+    if (window.location.protocol === 'http:' || window.location.protocol === 'https:') return 'generic';
     return null;
+  }
+
+  function collectAllVideos(root = document, depth = 0) {
+    if (!root || depth > 5) return [];
+    const videos = [];
+    try {
+      videos.push(...root.querySelectorAll('video'));
+    } catch (_) {}
+    try {
+      const hosts = root.querySelectorAll('shreddit-player, shreddit-async-loader, [data-testid*="player"], [class*="player"]');
+      for (const host of hosts) {
+        if (host.shadowRoot) {
+          videos.push(...collectAllVideos(host.shadowRoot, depth + 1));
+        }
+      }
+      if (videos.length === 0) {
+        const all = root.querySelectorAll('*');
+        for (const el of all) {
+          if (el.shadowRoot) {
+            videos.push(...collectAllVideos(el.shadowRoot, depth + 1));
+          }
+        }
+      }
+    } catch (_) {}
+    return [...new Set(videos)];
+  }
+
+  function findClosestContainer(node, selector) {
+    let curr = node;
+    while (curr) {
+      if (curr.closest) {
+        const found = curr.closest(selector);
+        if (found) return found;
+      }
+      const root = curr.getRootNode ? curr.getRootNode() : null;
+      if (root && root.host) {
+        curr = root.host;
+      } else {
+        break;
+      }
+    }
+    return null;
+  }
+
+  function extractNodePostUrl(node) {
+    return extractVideoPostUrl(node);
+  }
+
+  function extractNodePostTitle(node) {
+    return extractVideoPostTitle(node);
+  }
+
+  function extractVideoPostUrl(node) {
+    if (!node) return window.location.href.split('#')[0];
+    const targetNode = node?.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3) ? node.parentElement : node;
+    const host = window.location.hostname.replace(/^www\./, '');
+
+    // X.com / Twitter: extract tweet permalink
+    if (host === 'x.com' || host === 'twitter.com') {
+      try {
+        const article = findClosestContainer(targetNode, 'article, [data-testid="tweet"]');
+        if (article) {
+          const timeLink = article.querySelector('time')?.closest('a[href*="/status/"]') || article.querySelector('time')?.parentElement?.closest('a[href*="/status/"]');
+          const href = timeLink?.getAttribute('href');
+          if (href) {
+            const m = href.match(/^(\/[a-zA-Z0-9_]+\/status\/\d+)/);
+            if (m) return new URL(m[1], window.location.origin).href;
+          }
+          const links = article.querySelectorAll('a[href*="/status/"]');
+          for (const a of links) {
+            const aHref = a.getAttribute('href') || '';
+            const m = aHref.match(/^(\/[a-zA-Z0-9_]+\/status\/\d+)/);
+            if (m) return new URL(m[1], window.location.origin).href;
+          }
+        }
+        const pathMatch = window.location.pathname.match(/^(\/[a-zA-Z0-9_]+\/status\/\d+)/);
+        if (pathMatch) {
+          return new URL(pathMatch[1], window.location.origin).href;
+        }
+      } catch (_) {}
+    }
+
+    // Reddit: extract post permalink
+    if (host.endsWith('reddit.com')) {
+      try {
+        const post = findClosestContainer(targetNode, 'shreddit-post, [data-permalink], [data-testid="post-container"]');
+        const permalink = post?.getAttribute('permalink') || post?.getAttribute('data-permalink');
+        if (permalink) {
+          const m = permalink.match(/^(\/r\/[^\/]+\/comments\/[a-zA-Z0-9]+)/);
+          if (m) return new URL(m[1], 'https://www.reddit.com').href;
+          return new URL(permalink, 'https://www.reddit.com').href.split('?')[0].split('#')[0];
+        }
+        if (post) {
+          const commentLink = post.querySelector('a[href*="/comments/"]');
+          const href = commentLink?.getAttribute('href');
+          if (href) {
+            const m = href.match(/^(\/r\/[^\/]+\/comments\/[a-zA-Z0-9]+)/);
+            if (m) return new URL(m[1], 'https://www.reddit.com').href;
+          }
+        }
+        const pathComments = window.location.pathname.match(/^(\/r\/[^\/]+\/comments\/[a-zA-Z0-9]+)/);
+        if (pathComments) {
+          return new URL(pathComments[1], 'https://www.reddit.com').href;
+        }
+      } catch (_) {}
+    }
+
+    // Quora: extract answer permalink or question link
+    if (host === 'quora.com' || host.endsWith('.quora.com')) {
+      try {
+        const docBody = typeof document !== 'undefined' ? document.body : null;
+        const docEl = typeof document !== 'undefined' ? document.documentElement : null;
+        let curr = targetNode;
+        let depth = 0;
+        while (curr && curr !== docBody && curr !== docEl && depth < 15) {
+          const answerLink = curr.querySelector?.('a[href*="/answer/"]');
+          if (answerLink) {
+            const href = answerLink.getAttribute('href');
+            if (href) {
+              let path = href;
+              try { path = new URL(href, window.location.origin).pathname; } catch (_) {}
+              const m = path.match(/^(\/[^/]+\/answer\/[^/?#]+)/);
+              if (m) return new URL(m[1], window.location.origin).href;
+              try { return new URL(href, window.location.origin).href.split('?')[0].split('#')[0]; } catch (_) {}
+            }
+          }
+          curr = curr.parentElement;
+          depth++;
+        }
+
+        // If no /answer/ link in card, check for post or question link
+        curr = targetNode;
+        depth = 0;
+        while (curr && curr !== docBody && curr !== docEl && depth < 15) {
+          const links = curr.querySelectorAll?.('a[href]');
+          if (links) {
+            for (const a of links) {
+              const href = a.getAttribute('href') || '';
+              if (href.startsWith('/') && !href.startsWith('/profile/') && !href.startsWith('/topic/') && !href.startsWith('/q/') && !href.startsWith('/messages') && !href.startsWith('/notifications') && href.length > 2) {
+                try { return new URL(href, window.location.origin).href.split('?')[0].split('#')[0]; } catch (_) {}
+              }
+            }
+          }
+          curr = curr.parentElement;
+          depth++;
+        }
+
+        const qMatch = window.location.pathname.match(/^(\/[^/]+\/answer\/[^/?#]+)/);
+        if (qMatch) return new URL(qMatch[1], window.location.origin).href;
+        if (window.location.pathname.length > 1 && !['/', '/home', '/following', '/notifications'].includes(window.location.pathname)) {
+          return new URL(window.location.pathname, window.location.origin).href.split('?')[0].split('#')[0];
+        }
+      } catch (_) {}
+    }
+
+    // Universal blog/article or semantic feed container
+    try {
+      const container = findClosestContainer(targetNode, 'article, [role="article"], [data-permalink], [itemtype*="Post" i], [itemtype*="Article" i]');
+      if (container) {
+        const pLink = container.querySelector?.('a[rel~="bookmark"], a[href*="/status/"], a[href*="/comments/"], a[href*="/answer/"], a[href*="/p/"], a[href*="/post/"], a[href*="/posts/"], a[href*="/item?id="]');
+        if (pLink) {
+          const href = pLink.getAttribute('href');
+          if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+            try {
+              const u = new URL(href, window.location.origin);
+              if (u.origin === window.location.origin && u.pathname !== window.location.pathname && u.pathname.length > 1) {
+                return u.href.split('?')[0].split('#')[0];
+              }
+            } catch (_) {}
+          }
+        }
+        const time = container.querySelector?.('time');
+        const timeLink = time?.closest?.('a[href]') || time?.parentElement?.closest?.('a[href]');
+        const timeHref = timeLink?.getAttribute('href');
+        if (timeHref && !timeHref.startsWith('#') && !timeHref.startsWith('javascript:')) {
+          try {
+            const u = new URL(timeHref, window.location.origin);
+            if (u.origin === window.location.origin && u.pathname !== window.location.pathname && u.pathname.length > 1) {
+              return u.href.split('?')[0].split('#')[0];
+            }
+          } catch (_) {}
+        }
+        const dlink = container.getAttribute?.('data-permalink') || container.getAttribute?.('data-url') || container.getAttribute?.('data-entry-url');
+        if (dlink) {
+          try {
+            const u = new URL(dlink, window.location.origin);
+            if (u.pathname !== window.location.pathname) return u.href.split('?')[0].split('#')[0];
+          } catch (_) {}
+        }
+        const propUrl = container.querySelector?.('[itemprop="url"]')?.getAttribute('href');
+        if (propUrl) {
+          try {
+            const u = new URL(propUrl, window.location.origin);
+            if (u.origin === window.location.origin && u.pathname !== window.location.pathname) return u.href.split('#')[0];
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+
+    // Universal upward card-boundary traversal for div-based feeds without semantic tags
+    try {
+      const docBody = typeof document !== 'undefined' ? document.body : null;
+      const docEl = typeof document !== 'undefined' ? document.documentElement : null;
+      let curr = targetNode;
+      let depth = 0;
+      while (curr && curr !== docBody && curr !== docEl && depth < 15) {
+        // Direct permalink anchor patterns
+        const pLink = curr.querySelector?.('a[href*="/status/"], a[href*="/comments/"], a[href*="/answer/"], a[href*="/p/"], a[href*="/post/"], a[href*="/posts/"], a[href*="/item?id="], a[rel~="bookmark"]');
+        if (pLink) {
+          const href = pLink.getAttribute('href');
+          if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+            try {
+              const u = new URL(href, window.location.origin);
+              if (u.origin === window.location.origin && u.pathname !== window.location.pathname && u.pathname.length > 1) {
+                return u.href.split('?')[0].split('#')[0];
+              }
+            } catch (_) {}
+          }
+        }
+
+        // Time element with anchor link
+        const time = curr.querySelector?.('time');
+        const timeLink = time?.closest?.('a[href]') || time?.parentElement?.closest?.('a[href]');
+        const timeHref = timeLink?.getAttribute('href');
+        if (timeHref && !timeHref.startsWith('#') && !timeHref.startsWith('javascript:')) {
+          try {
+            const u = new URL(timeHref, window.location.origin);
+            if (u.origin === window.location.origin && u.pathname !== window.location.pathname && u.pathname.length > 1) {
+              return u.href.split('?')[0].split('#')[0];
+            }
+          } catch (_) {}
+        }
+
+        // Direct permalink attributes
+        const dlink = curr.getAttribute?.('data-permalink') || curr.getAttribute?.('data-url') || curr.getAttribute?.('data-entry-url');
+        if (dlink) {
+          try {
+            const u = new URL(dlink, window.location.origin);
+            if (u.pathname !== window.location.pathname) return u.href.split('?')[0].split('#')[0];
+          } catch (_) {}
+        }
+
+        // Schema.org itemprop="url"
+        const propUrl = curr.querySelector?.('[itemprop="url"]')?.getAttribute('href');
+        if (propUrl) {
+          try {
+            const u = new URL(propUrl, window.location.origin);
+            if (u.origin === window.location.origin && u.pathname !== window.location.pathname) return u.href.split('#')[0];
+          } catch (_) {}
+        }
+
+        curr = curr.parentElement;
+        depth++;
+      }
+    } catch (_) {}
+
+    return window.location.href.split('#')[0];
+  }
+
+  function extractVideoPostTitle(node) {
+    const targetNode = node?.nodeType === (typeof Node !== 'undefined' ? Node.TEXT_NODE : 3) ? node.parentElement : node;
+    const host = window.location.hostname.replace(/^www\./, '');
+
+    if (host === 'x.com' || host === 'twitter.com') {
+      try {
+        const article = findClosestContainer(targetNode, 'article, [data-testid="tweet"]');
+        if (article) {
+          const tweetText = article.querySelector('[data-testid="tweetText"]')?.textContent?.trim();
+          const userName = article.querySelector('[data-testid="User-Name"]')?.textContent?.replace(/\s+/g, ' ')?.trim();
+          if (tweetText && userName) return `${userName}: ${tweetText}`;
+          if (tweetText) return tweetText;
+        }
+      } catch (_) {}
+    }
+
+    if (host.endsWith('reddit.com')) {
+      try {
+        const post = findClosestContainer(targetNode, 'shreddit-post, [data-testid="post-container"]');
+        const title = post?.getAttribute('post-title') || post?.querySelector('h1, [slot="title"]')?.textContent?.trim();
+        if (title) return title.trim();
+      } catch (_) {}
+    }
+
+    if (host === 'quora.com' || host.endsWith('.quora.com')) {
+      try {
+        const docBody = typeof document !== 'undefined' ? document.body : null;
+        const docEl = typeof document !== 'undefined' ? document.documentElement : null;
+        let curr = targetNode;
+        let depth = 0;
+        while (curr && curr !== docBody && curr !== docEl && depth < 15) {
+          const qLink = curr.querySelector?.('a[href*="/answer/"]');
+          if (qLink) {
+            const href = qLink.getAttribute('href') || '';
+            let path = href;
+            try { path = new URL(href, window.location.origin).pathname; } catch (_) {}
+            const m = path.match(/^\/([^/]+)\/answer\/([^/?#]+)/);
+            if (m) {
+              const qText = decodeURIComponent(m[1]).replace(/-/g, ' ');
+              const author = decodeURIComponent(m[2]).replace(/-/g, ' ');
+              const heading = curr.querySelector?.('h2, h3, [class*="question" i]')?.textContent?.trim();
+              if (heading) return `${author}: ${heading}`;
+              return `${author}'s answer to "${qText}"`;
+            }
+          }
+          const questionText = curr.querySelector?.('h2, h3')?.textContent?.trim();
+          if (questionText) return questionText;
+          curr = curr.parentElement;
+          depth++;
+        }
+      } catch (_) {}
+    }
+
+    // Generic article / container headline
+    try {
+      const container = findClosestContainer(targetNode, 'article, [role="article"], [itemtype*="Post" i], [itemtype*="Article" i]');
+      if (container) {
+        const headline = container.querySelector?.('h1, h2, h3, [itemprop="headline"]')?.textContent?.trim();
+        if (headline) return headline;
+      }
+    } catch (_) {}
+
+    // Upward traversal fallback for headlines
+    try {
+      const docBody = typeof document !== 'undefined' ? document.body : null;
+      let curr = targetNode;
+      let depth = 0;
+      while (curr && curr !== docBody && depth < 10) {
+        const headline = curr.querySelector?.('h1, h2, h3, [itemprop="headline"]')?.textContent?.trim();
+        if (headline && headline.length > 3) return headline;
+        curr = curr.parentElement;
+        depth++;
+      }
+    } catch (_) {}
+
+    const fromMeta = (sel) => {
+      if (typeof document === 'undefined') return '';
+      const m = document.querySelector(sel);
+      return m && m.content && m.content.trim() ? m.content.trim() : '';
+    };
+    const meta = fromMeta('meta[property="og:title"]') || fromMeta('meta[name="twitter:title"]') || fromMeta('meta[name="title"]');
+    if (meta) return meta;
+    const pageTitle = (typeof document !== 'undefined' ? (document.title || '') : '').trim();
+    return pageTitle || 'Post';
+  }
+
+  function findGenericVideoElement() {
+    const allVideos = collectAllVideos(document);
+    const videos = allVideos.filter((v) => {
+      try {
+        const rect = v.getBoundingClientRect();
+        if (rect.width < 40 || rect.height < 40) return false;
+        const style = window.getComputedStyle(v);
+        if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) < 0.05) return false;
+        return true;
+      } catch (_) {
+        return false;
+      }
+    });
+    if (!videos.length) return null;
+
+    const viewHeight = window.innerHeight || document.documentElement.clientHeight;
+    const viewWidth = window.innerWidth || document.documentElement.clientWidth;
+
+    const scoreVideo = (v) => {
+      const rect = v.getBoundingClientRect();
+      let score = 0;
+      if (!v.paused && !v.ended && v.currentTime > 0) score += 10000;
+      const inView = rect.bottom > 0 && rect.top < viewHeight && rect.right > 0 && rect.left < viewWidth;
+      if (inView) {
+        score += 5000;
+        const centerDist = Math.abs((rect.top + rect.height / 2) - (viewHeight / 2));
+        score += Math.max(0, 1000 - centerDist);
+      }
+      if (isFinite(v.duration) && v.duration > 0) score += 500;
+      if (v.currentTime > 0) score += 200;
+      const area = Math.min(rect.width * rect.height, 2000000);
+      score += area / 1000;
+      return score;
+    };
+
+    videos.sort((a, b) => scoreVideo(b) - scoreVideo(a));
+    return videos[0] || null;
   }
 
   const VIDEO_PLATFORMS = {
@@ -1456,12 +1896,36 @@
         const wrap = bar.closest('.ytp-progress-bar-container, .ytp-progress-container');
         return wrap || bar;
       }
+    },
+    generic: {
+      isVideoPage() {
+        return Boolean(findGenericVideoElement());
+      },
+      getVideoKey(video) {
+        return extractVideoPostUrl(video || findGenericVideoElement());
+      },
+      getVideoUrl(video) {
+        return extractVideoPostUrl(video || findGenericVideoElement());
+      },
+      getVideoTitle(video) {
+        return extractVideoPostTitle(video || findGenericVideoElement());
+      },
+      findVideoElement() {
+        return findGenericVideoElement();
+      },
+      findProgressBar() {
+        return null;
+      },
+      findMarkerHost(bar) {
+        return bar;
+      }
     }
   };
 
   function isVideoPage() { const p = detectVideoPlatform(); return !!p && VIDEO_PLATFORMS[p].isVideoPage(); }
-  function getVideoKey() { const p = detectVideoPlatform(); return p ? VIDEO_PLATFORMS[p].getVideoKey() : null; }
-  function getVideoTitle() { const p = detectVideoPlatform(); return p ? VIDEO_PLATFORMS[p].getVideoTitle() : document.title; }
+  function getVideoKey(video = findVideoElement()) { const p = detectVideoPlatform(); return p ? VIDEO_PLATFORMS[p].getVideoKey(video) : null; }
+  function getVideoUrl(video = findVideoElement()) { const p = detectVideoPlatform(); return p && typeof VIDEO_PLATFORMS[p].getVideoUrl === 'function' ? VIDEO_PLATFORMS[p].getVideoUrl(video) : window.location.href.split('#')[0]; }
+  function getVideoTitle(video = findVideoElement()) { const p = detectVideoPlatform(); return p ? VIDEO_PLATFORMS[p].getVideoTitle(video) : document.title; }
   function isUsableVideoTitle(title) { return Boolean(title && !/^(youtube|bilibili|哔哩哔哩|youtube 视频)$/i.test(title)); }
   async function refreshVideoMarkTitle(markId, videoKey, initialTitle) {
     for (const delay of [180, 700, 1500]) {
@@ -1959,8 +2423,9 @@
     }
     if (withNote) video.pause();
     const currentTitle = getVideoTitle();
+    const markUrl = getVideoUrl(video);
     const savedMark = await ReMarkStorage.addVideoMark({
-      url: window.location.href.split('#')[0], videoKey: vkey, time: Math.round(t * 10) / 10,
+      url: markUrl, videoKey: vkey, time: Math.round(t * 10) / 10,
       duration: isFinite(video.duration) ? Math.floor(video.duration) : 0, title: currentTitle
     });
     notifyStorageUpdated();
@@ -1977,7 +2442,7 @@
   async function attachVideoMarkCaption(mark, video, time) {
     try {
       const platform = detectVideoPlatform();
-      if (!platform) return;
+      if (!platform || platform === 'generic') return;
       const settings = await ReMarkStorage.getSettings();
       const payload = {
         platform,
@@ -2212,6 +2677,19 @@
     // little earlier so returning to a Mark restores the spoken context.
     video.currentTime = Math.max(0, Number(time) - VIDEO_MARK_REPLAY_PREROLL_SECONDS);
     if (video.paused) video.play().catch(() => {});
+  }
+
+  async function locateAndSeekVideoMark(markId, attempt = 0) {
+    const marks = await ReMarkStorage.getVideoMarks();
+    const mark = marks.find((m) => m.id === markId);
+    if (!mark) return;
+    const video = findVideoElement();
+    if (!video) {
+      if (attempt < 6) setTimeout(() => locateAndSeekVideoMark(markId, attempt + 1), 300);
+      return;
+    }
+    seekVideoToMark(mark.time);
+    try { chrome.runtime?.sendMessage({ action: 'SOURCE_CLIP_LOCATED', clipId: markId }); } catch (_) {}
   }
 
 })();

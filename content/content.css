@@ -14,6 +14,42 @@
   --remark-brand-soft: color-mix(in srgb, var(--remark-brand) 18%, transparent);
 }
 
+/* ---------- CSS Custom Highlight API (AI Editors / CodeMirror / ProseMirror) ---------- */
+/* Visual identity strictly unified with mark.remark-highlight-mark */
+::highlight(remark-ai-highlight),
+::highlight(remark-ai-trail-orange),
+::highlight(remark-ai-blazing-amber),
+::highlight(remark-ai-signal-coral),
+::highlight(remark-ai-atlas-blue),
+::highlight(remark-ai-beacon-yellow),
+::highlight(remark-ai-harbor-mist) {
+  background-color: var(--remark-brand, #FF5500);
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(68, 20, 0, .34);
+}
+::highlight(remark-ai-fresh) {
+  background-color: #FFE600;
+  color: #111111;
+  text-shadow: none;
+}
+
+.remark-ai-anchor-mark {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: auto;
+  z-index: 2147483640;
+}
+.remark-ai-anchor-mark .remark-mark-actions-anchor {
+  position: absolute;
+  bottom: 6px;
+  right: 0;
+}
+.remark-ai-highlight-hover,
+.remark-ai-highlight-hover * {
+  cursor: pointer !important;
+}
+
 mark.remark-highlight-mark {
   --remark-highlight-bg: var(--remark-brand);
   position: relative;
@@ -206,13 +242,42 @@ mark.remark-highlight-mark {
 mark.remark-highlight-mark.remark-selected { outline: none; }
 /* Locate pulse when jumping to a mark from the panel. */
 mark.remark-highlight-mark.remark-locate-pulse {
-  animation: remark-gentle-focus 1.15s ease-in-out;
+  animation: remark-locate-spotlight 2.2s cubic-bezier(0.25, 1, 0.5, 1);
+  position: relative;
+  z-index: 10;
 }
 
-@keyframes remark-gentle-focus {
-  0% { background: var(--remark-brand); box-shadow: none; }
-  18%, 62% { background: rgb(255, 138, 82); box-shadow: none; }
-  100% { background: var(--remark-brand); box-shadow: none; }
+@keyframes remark-locate-spotlight {
+  0% {
+    background: #FFE600 !important;
+    color: #111111 !important;
+    box-shadow: 0 0 0 6px rgba(255, 230, 0, 0.9), 0 4px 20px rgba(255, 170, 0, 0.7);
+    transform: scale(1.06);
+  }
+  20% {
+    background: #FFC400 !important;
+    color: #111111 !important;
+    box-shadow: 0 0 0 8px rgba(255, 196, 0, 0.95), 0 6px 24px rgba(255, 140, 0, 0.8);
+    transform: scale(1.08);
+  }
+  45% {
+    background: #FFE600 !important;
+    color: #111111 !important;
+    box-shadow: 0 0 0 5px rgba(255, 230, 0, 0.8), 0 4px 16px rgba(255, 170, 0, 0.6);
+    transform: scale(1.04);
+  }
+  75% {
+    background: var(--remark-brand);
+    color: #ffffff;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--remark-brand) 60%, transparent);
+    transform: scale(1.01);
+  }
+  100% {
+    background: var(--remark-brand);
+    color: #ffffff;
+    box-shadow: none;
+    transform: scale(1);
+  }
 }
 
 /* A just-saved highlight lands with a soft ink sweep. */
@@ -599,14 +664,18 @@ html.remark-page-light mark.remark-highlight-mark {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 14px;
-  border-radius: 999px;
+  padding: 10px 16px;
+  border-radius: 12px;
   background: rgba(26, 29, 34, .94);
   color: #fff;
-  font-size: 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
   font-weight: 500;
   box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
   pointer-events: auto;
+  white-space: pre-line;
+  text-align: left;
+  max-width: 420px;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI",
     Roboto, sans-serif;
   animation: remark-toast-in .2s ease;

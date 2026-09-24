@@ -27,14 +27,21 @@ assert.match(editableBlock, /parent\.closest\('input, textarea'\)/);
 assert.match(editableBlock, /parent\.closest\('\[contenteditable\]'\)/);
 assert.match(editableBlock, /!editable\.closest\(AI_GENERATED_BLOCK_SELECTOR\)/);
 
-// AI editors (ProseMirror / CodeMirror) own their content DOM, so no page
-// highlight is painted there — the clip is recorded and restored as a record
-// only. highlightDOMRange must skip those ranges entirely.
+// AI editors (ProseMirror / CodeMirror) own their content DOM, so no DOM-mutating
+// <mark> tags are inserted. Instead, safe non-mutating CSS Custom Highlights
+// are applied via highlightAiEditorRange so the page highlights visibly without breaking the editor.
 assert.match(source, /function isAiEditorRange\(/);
 assert.match(source, /el\.closest\('\[contenteditable\], \.cm-editor, \.cm-content, \.ProseMirror'\)/);
-assert.match(source, /function highlightDOMRange\(range, clip, fresh = false\) \{[\s\S]*if \(isAiEditorRange\(range\)\) return;/);
-assert.doesNotMatch(source, /remark-overlay-mark/);
-assert.doesNotMatch(css, /remark-overlay-mark/);
-assert.doesNotMatch(css, /remark-overlay-seg/);
+assert.match(source, /function highlightDOMRange\(range, clip, fresh = false\) \{[\s\S]*if \(isAiEditorRange\(range\)\) \{[\s\S]*highlightAiEditorRange\(range, clip, fresh\);[\s\S]*return;/);
+assert.match(source, /function highlightAiEditorRange\(/);
+assert.match(source, /function syncAiHighlightsToCSS\(/);
+// AI sentinel anchor system ensures actions and note indicators are unified
+// with normal text marks without injecting elements inside CodeMirror text nodes.
+assert.match(source, /function ensureAiAnchorMark\(/);
+assert.match(source, /function getAiHighlightName\(/);
+assert.match(source, /function getAiHostContainer\(/);
+assert.match(source, /window\.addEventListener\('scroll', syncAllAiAnchors, \{ capture: true/);
+assert.match(source, /quickHighlightSelection\(activeMarkColor,/);
+assert.match(css, /\.remark-ai-anchor-mark/);
 
 console.log('ai-block-highlight.test.js: all assertions passed');

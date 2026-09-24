@@ -1192,6 +1192,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     toastTimer = setTimeout(() => { root.textContent = ''; }, options.duration ?? 4200);
   }
 
+  function hideToast() {
+    clearTimeout(toastTimer);
+    const root = document.getElementById('remark-toast-root');
+    if (root) root.textContent = '';
+  }
+
   function safeSendMessage(tabId, message) {
     const tabs = globalThis.chrome?.tabs;
     if (!tabs?.sendMessage || !Number.isInteger(tabId)) return Promise.resolve();
@@ -1222,12 +1228,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // source page is open in a tab, ask its content script to backfill it so
   // the collection can be ordered top-to-bottom / left-to-right.
   function syncSourcePositions(url) {
-    const rows = all().filter((item) => item.type === 'highlight' && sameUrl(item.url, url));
+    const rows = all().filter((item) => item.type === 'highlight' && sameSource(item, url));
     if (!rows.length) return;
     globalThis.chrome?.tabs?.query({}).then((tabs) => {
       const pageUrls = [...new Set(rows.map((item) => item.pageUrl || item.url).filter(Boolean))];
       pageUrls.forEach((pageUrl) => {
-        const tab = tabs.find((row) => sameUrl(row.url, pageUrl));
+        const tab = tabs.find((row) => sameUrl(row.url, pageUrl) || sameGenericPostUrl(pageUrl, row.url));
         if (tab?.id) safeSendMessage(tab.id, { action: 'COMPUTE_CLIP_POSITIONS', url: pageUrl, forcePositions: true });
       });
     }).catch(() => {});
@@ -1357,15 +1363,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         return;
       }
-      const target = tabs.find((tab) => item.type === 'video' ? (sameVideoTab(item, tab.url) || sameUrl(tab.url, item.url) || sameGenericPostUrl(item.url, tab.url)) : (sameUrl(tab.url, targetUrl) || sameGenericPostUrl(targetUrl, tab.url)));
+      const target = tabs.find((tab) => sameSource(item, tab.url) || sameUrl(tab.url, targetUrl) || sameGenericPostUrl(targetUrl, tab.url));
       if (target?.id) {
         await chrome.tabs.update(target.id, { active: true });
         if (target.windowId) await chrome.windows.update(target.windowId, { focused: true });
         if (item.type === 'video') safeSendMessage(target.id, { action: 'SEEK_VIDEO_MARK', time: item.time });
-        else { safeSendMessage(target.id, { action: 'RESTORE_HIGHLIGHTS' }); setTimeout(() => safeSendMessage(target.id, { action: 'LOCATE_CLIP', clipId: item.id }), 90); }
+        else {
+          showToast(t('locating_mark'));
+          safeSendMessage(target.id, { action: 'RESTORE_HIGHLIGHTS' });
+          setTimeout(() => safeSendMessage(target.id, { action: 'LOCATE_CLIP', clipId: item.id }), 90);
+        }
         return;
       }
       if (item.type === 'highlight') {
+        showToast(t('locating_mark'));
         const result = await chrome.runtime.sendMessage({
           action: 'OPEN_MARK_NAVIGATION',
           url: targetUrl,
@@ -1433,7 +1444,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     menu.hidden = !menu.hidden;
   }
   function closeMarkMenus() { document.querySelectorAll('.mark-menu:not([hidden])').forEach((node) => { node.hidden = true; }); }
-  list.addEventListener('keydown', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) { const key = input.dataset.key; if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void saveNote(key, input.value); } if (event.key === 'Escape') { event.preventDefault(); void saveNote(key, input.value); } } });
+  list.addEventListener('keydown', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) { const key = input.dataset.key; if ((event.key === 'Enter' && !event.shiftKey) || (event.key === 'Enter' && (event.metaKey || event.ctrlKey))) { event.preventDefault(); void saveNote(key, input.value); } if (event.key === 'Escape') { event.preventDefault(); void saveNote(key, input.value); } } });
   list.addEventListener('input', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) resizeNoteInput(input); });
   list.addEventListener('focusout', (event) => { const input = event.target.closest('.mark-note-textarea'); if (input) setTimeout(() => { if (!input.closest('.mark-note-area')?.contains(document.activeElement)) void saveNote(input.dataset.key, input.value); }, 0); });
   list.addEventListener('focusin', (event) => { const card = event.target.closest('.mark-card'); if (keyboardFocus && card) { setSelection([card.dataset.key], card.dataset.key); setActive(card.dataset.key); } });
@@ -1455,7 +1466,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   search.addEventListener('input', () => { query = search.value; searchClear.hidden = !query; render(); });
   search.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.stopPropagation(); clearSearch(); } });
   searchClear.addEventListener('click', () => { clearSearch(); search.focus(); });
-  document.addEventListener('keydown', async (event) => { if (event.key === 'Tab' || event.key.startsWith('Arrow')) keyboardFocus = true; if (event.key === 'Escape' && !feedbackModal.hidden) { event.preventDefault(); closeFeedback(); return; } const editing = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable; if (!editing && event.key === 'ArrowDown') { event.preventDefault(); moveActive(1); return; } if (!editing && event.key === 'ArrowUp') { event.preventDefault(); moveActive(-1); return; } if (!editing && event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); void jump(itemFor(selected)); return; } if (!editing && event.key === 'Enter' && event.shiftKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); openNote(selected); return; } if (!editing && (event.metaKey || event.ctrlKey) && event.key === 'Enter' && selected) { event.preventDefault(); openNote(selected); } else if (!editing && !event.isComposing && ['Delete','Backspace'].includes(event.key) && selectedKeys.size) { event.preventDefault(); await deleteMarks(); } else if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (await ReMarkStorage.undoLast()) await load(); } else if (!editing && event.key === 'Escape' && selectedKeys.size) { clearSelection(); } else if (!editing && event.key === '/') { event.preventDefault(); if (sourceUrl === null) { search.focus(); search.select(); } } else if (!editing && event.key === 'Escape' && showingSettings) { showTimeline(); } else if (!editing && event.key === 'Escape' && sourceUrl !== null) { leaveSourceCollection(); } });
+  document.addEventListener('keydown', async (event) => { if (event.key === 'Tab' || event.key.startsWith('Arrow')) keyboardFocus = true; if (event.key === 'Escape' && !feedbackModal.hidden) { event.preventDefault(); closeFeedback(); return; } const editing = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable; if (!editing && event.key === 'ArrowDown') { event.preventDefault(); moveActive(1); return; } if (!editing && event.key === 'ArrowUp') { event.preventDefault(); moveActive(-1); return; } if (!editing && event.key === 'Enter' && !event.shiftKey && !event.metaKey && !event.ctrlKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); void jump(itemFor(selected)); return; } if (!editing && event.key === 'Enter' && event.shiftKey && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); openNote(selected); return; } if (!editing && (event.key.toLowerCase() === 'n' || ((event.metaKey || event.ctrlKey) && event.key === 'Enter')) && selected && !event.target.closest('.mark-menu, .mark-actions')) { event.preventDefault(); openNote(selected); return; } if (!editing && !event.isComposing && ['Delete','Backspace'].includes(event.key) && selectedKeys.size) { event.preventDefault(); await deleteMarks(); } else if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); if (await ReMarkStorage.undoLast()) await load(); } else if (!editing && event.key === 'Escape' && selectedKeys.size) { clearSelection(); } else if (!editing && event.key === '/') { event.preventDefault(); if (sourceUrl === null) { search.focus(); search.select(); } } else if (!editing && event.key === 'Escape' && showingSettings) { showTimeline(); } else if (!editing && event.key === 'Escape' && sourceUrl !== null) { leaveSourceCollection(); } });
   async function followActivePageCollection(url, windowId) {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -1487,7 +1498,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (message?.action === 'REMARK_STORAGE_UPDATED') void load();
     if (message?.action === 'ACTIVE_PAGE_COLLECTION_CHANGED') void followActivePageCollection(message.url, message.windowId);
     if (message?.action === 'FOCUS_CLIP') focusFromSource(message.clipId || message.markId);
-    if (message?.action === 'SOURCE_MARK_UNAVAILABLE' || message?.action === 'SOURCE_UNAVAILABLE') showToast(t('source_unavailable'));
+    if (message?.action === 'SOURCE_CLIP_LOCATED') hideToast();
+    if (message?.action === 'SOURCE_MARK_UNAVAILABLE' || message?.action === 'SOURCE_UNAVAILABLE') showToast(t(message?.reason || 'source_unavailable'));
   });
   async function consumePendingFocus() { try { const session = globalThis.chrome?.storage?.local; if (!session) return; const data = await session.get('remark_pending_focus'); const id = data?.remark_pending_focus?.clipId || data?.remark_pending_focus?.markId; if (id) { await session.remove('remark_pending_focus'); focusFromSource(id); } } catch (_) {} }
   globalThis.chrome?.storage?.onChanged?.addListener((changes) => {

@@ -21,6 +21,7 @@
   function applyGlobalMarkColor(color) {
     activeMarkColor = normalizeMarkColor(color);
     document.documentElement.style.setProperty('--remark-brand', activeMarkColor);
+    syncAiHighlightsToCSS();
   }
   function applyMarkContrastTheme() {
     const readColor = (value) => { const match = String(value || '').match(/rgba?\(([^)]+)\)/); if (!match) return null; const parts = match[1].split(',').map((part) => Number.parseFloat(part)); if (parts.length < 3 || (parts.length > 3 && parts[3] === 0)) return null; return parts; };
@@ -508,8 +509,10 @@
     const item = (await ReMarkStorage.getClips()).find((clip) => clip.id === clipId);
     if (!item) return;
     const mark = anchor || getHighlightActionAnchor(clipId);
+    const aiEntry = typeof aiHighlightMap !== 'undefined' ? aiHighlightMap.get(clipId) : null;
+    const rect = mark?.getBoundingClientRect() || aiEntry?.range?.getBoundingClientRect();
     openQuickNoteInput({
-      rect: mark?.getBoundingClientRect(),
+      rect,
       initialValue: item.note || '',
       onSave: async (note) => {
         if (!note) return;
@@ -557,15 +560,55 @@
     window.addEventListener('remark:urlchange', () => restorePageHighlights());
   }
 
-  const LOCATE_CLIP_RETRY_DELAYS = [250, 500, 900, 1500, 2400, 3600, 5000, 6500];
+  const LOCATE_CLIP_RETRY_DELAYS = [250, 500, 900, 1500, 2400, 3600, 5000, 6500, 8000, 10000];
   const pendingClipLocations = new Set();
+  const pendingClipStartTimes = new Map();
+  let locatingObserver = null;
+
+  function ensureLocatingObserver() {
+    if (locatingObserver) return;
+    locatingObserver = new MutationObserver(() => {
+      if (pendingClipLocations.size === 0) {
+        stopLocatingObserver();
+        return;
+      }
+      void restorePageHighlights().then(() => {
+        for (const clipId of Array.from(pendingClipLocations)) {
+          const mark = document.querySelector(`mark[data-clip-id="${clipId}"]`);
+          if (mark) {
+            resolvePendingClipLocation(clipId);
+            continue;
+          }
+          const aiEntry = typeof aiHighlightMap !== 'undefined' ? aiHighlightMap.get(clipId) : null;
+          if (aiEntry && aiEntry.range) {
+            resolvePendingClipLocation(clipId);
+          }
+        }
+      });
+    });
+    locatingObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
+  }
+
+  function stopLocatingObserver() {
+    if (locatingObserver) {
+      locatingObserver.disconnect();
+      locatingObserver = null;
+    }
+  }
 
   function resolvePendingClipLocation(clipId) {
-    if (!pendingClipLocations.delete(clipId)) return;
+    if (!pendingClipLocations.has(clipId)) return;
+    pendingClipLocations.delete(clipId);
+    pendingClipStartTimes.delete(clipId);
+    if (pendingClipLocations.size === 0) stopLocatingObserver();
     window.requestAnimationFrame(() => {
       const mark = document.querySelector(`mark[data-clip-id="${clipId}"]`);
-      if (mark) performLocateAnimation(mark);
-      else locateAndAnimateClip(clipId, 1);
+      if (mark) {
+        performLocateAnimation(mark);
+      } else {
+        const aiEntry = typeof aiHighlightMap !== 'undefined' ? aiHighlightMap.get(clipId) : null;
+        if (aiEntry && aiEntry.range) performLocateAnimationForRange(aiEntry.range, clipId);
+      }
     });
   }
 
@@ -573,19 +616,74 @@
   function locateAndAnimateClip(clipId, attempt = 0) {
     const mark = document.querySelector(`mark[data-clip-id="${clipId}"]`);
     if (mark) {
-      if (pendingClipLocations.has(clipId)) resolvePendingClipLocation(clipId);
-      else performLocateAnimation(mark);
+      pendingClipLocations.add(clipId);
+      resolvePendingClipLocation(clipId);
       return;
     }
-    if (attempt === 0) pendingClipLocations.add(clipId);
-    if (attempt >= LOCATE_CLIP_RETRY_DELAYS.length) { pendingClipLocations.delete(clipId); reportSourceUnavailable(clipId); return; }
+    const aiEntry = typeof aiHighlightMap !== 'undefined' ? aiHighlightMap.get(clipId) : null;
+    if (aiEntry && aiEntry.range) {
+      pendingClipLocations.add(clipId);
+      resolvePendingClipLocation(clipId);
+      return;
+    }
+
+    if (!pendingClipStartTimes.has(clipId)) {
+      pendingClipStartTimes.set(clipId, Date.now());
+    }
+    pendingClipLocations.add(clipId);
+    showPageToast(t('locating_mark'), { duration: 30000 });
+    ensureLocatingObserver();
+
+    const startTime = pendingClipStartTimes.get(clipId) || Date.now();
+    const elapsed = Date.now() - startTime;
+    const isPageLoaded = document.readyState === 'complete';
+    const maxWaitTime = 8000;
+
+    if (elapsed >= maxWaitTime) {
+      if (!isPageLoaded) {
+        window.addEventListener('load', () => locateAndAnimateClip(clipId, attempt), { once: true });
+        return;
+      }
+      Promise.resolve(restorePageHighlights()).then(() => {
+        const finalMark = document.querySelector(`mark[data-clip-id="${clipId}"]`);
+        const finalAi = typeof aiHighlightMap !== 'undefined' ? aiHighlightMap.get(clipId) : null;
+        if (finalMark || (finalAi && finalAi.range)) {
+          pendingClipLocations.add(clipId);
+          resolvePendingClipLocation(clipId);
+        } else {
+          pendingClipLocations.delete(clipId);
+          pendingClipStartTimes.delete(clipId);
+          if (pendingClipLocations.size === 0) stopLocatingObserver();
+          reportSourceUnavailable(clipId, { isLoadedPage: true });
+        }
+      });
+      return;
+    }
+
     Promise.resolve(restorePageHighlights()).finally(() => {
-      setTimeout(() => locateAndAnimateClip(clipId, attempt + 1), LOCATE_CLIP_RETRY_DELAYS[attempt]);
+      const delayIndex = Math.min(attempt, LOCATE_CLIP_RETRY_DELAYS.length - 1);
+      setTimeout(() => {
+        if (pendingClipLocations.has(clipId)) {
+          locateAndAnimateClip(clipId, attempt + 1);
+        }
+      }, LOCATE_CLIP_RETRY_DELAYS[delayIndex]);
     });
   }
-  function reportSourceUnavailable(clipId) {
-    showPageToast(t('source_unavailable'));
-    try { chrome.runtime?.sendMessage({ action: 'SOURCE_MARK_UNAVAILABLE', clipId, url: window.location.href }); } catch (_) {}
+  function reportSourceUnavailable(clipId, options = {}) {
+    if (document.readyState !== 'complete') {
+      window.addEventListener('load', () => locateAndAnimateClip(clipId, 0), { once: true });
+      return;
+    }
+    const key = options.isLoadedPage ? 'source_unavailable_loaded_page' : 'source_unavailable';
+    showPageToast(t(key), { duration: 8000 });
+    try {
+      chrome.runtime?.sendMessage({
+        action: 'SOURCE_MARK_UNAVAILABLE',
+        clipId,
+        url: window.location.href,
+        reason: key
+      });
+    } catch (_) {}
   }
   function acknowledgeSourceClipLocation(mark, attempt = 0) {
     const clipId = mark?.getAttribute('data-clip-id');
@@ -600,22 +698,25 @@
   }
 
   function performLocateAnimation(mark) {
+    hidePageToast();
+    const clipId = mark.getAttribute('data-clip-id');
+    if (clipId) {
+      try { chrome.runtime?.sendMessage({ action: 'SOURCE_CLIP_LOCATED', clipId }); } catch (_) {}
+    }
     const focus = () => {
       mark.classList.remove('remark-locate-pulse');
       void mark.offsetWidth;
       mark.classList.add('remark-locate-pulse');
-      setTimeout(() => mark.classList.remove('remark-locate-pulse'), 1300);
+      setTimeout(() => mark.classList.remove('remark-locate-pulse'), 2200);
       acknowledgeSourceClipLocation(mark);
     };
-    const rect = mark.getBoundingClientRect();
-    const visible = rect.top >= 0 && rect.bottom <= window.innerHeight;
-    if (visible) { focus(); return; }
     try {
       mark.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
     } catch (_) {
+      const rect = mark.getBoundingClientRect();
       window.scrollTo({ top: Math.max(0, window.scrollY + rect.top - window.innerHeight * 0.4), behavior: 'smooth' });
     }
-    setTimeout(focus, 520);
+    focus();
   }
 
   function cancelClipHighlightRemoval(clipId) {
@@ -625,6 +726,7 @@
     });
   }
   function removeClipHighlightFromDOM(clipId, options = {}) {
+    if (typeof removeAiHighlight !== 'undefined') removeAiHighlight(clipId);
     const marks = [...document.querySelectorAll(`mark[data-clip-id="${clipId}"]`)];
     if (!marks.length) return;
     const remove = () => {
@@ -648,6 +750,7 @@
     setTimeout(remove, 280);
   }
   function removeAllPageHighlightsFromDOM() {
+    if (typeof clearAllAiHighlights !== 'undefined') clearAllAiHighlights();
     const marks = document.querySelectorAll('mark.remark-highlight-mark');
     marks.forEach((mark, i) => {
       setTimeout(() => {
@@ -773,6 +876,12 @@
       root.id = 'remark-page-toast-root';
       root.className = 'remark-toast-root';
       document.body.appendChild(root);
+    }
+    const existingText = root.querySelector('.remark-toast span')?.textContent;
+    if (existingText === message && !options.label) {
+      clearTimeout(showPageToast.timer);
+      showPageToast.timer = window.setTimeout(hidePageToast, options.duration ?? 4200);
+      return;
     }
     root.textContent = '';
     const toast = document.createElement('div');
@@ -971,7 +1080,7 @@
     markPillContext = null;
     try {
       currentSelection = { text: ctx.text, range: ctx.range.cloneRange(), sourceUrl: ctx.sourceUrl };
-      const saved = await quickHighlightSelection(DEFAULT_HIGHLIGHT_COLOR, {
+      const saved = await quickHighlightSelection(activeMarkColor, {
         anchorRect: ctx.range.getBoundingClientRect(),
         withNote: Boolean(options.withNote),
         suppressActions: true
@@ -1012,12 +1121,281 @@
     hideMarkPill();
   }, true);
 
-  // DOM Highlighting Engine
-  // fresh = true when the mark was just created by the user; it then lands
-  // with a short ink sweep so the capture moment feels immediate.
-  // ChatGPT writing/code blocks are editors (ProseMirror / CodeMirror) that
-  // own and re-render their content DOM, so no durable page highlight can be
-  // painted there. The clip is still saved — the sidebar record is the mark.
+  // DOM Highlighting Engine for AI Editors (ChatGPT / CodeMirror / ProseMirror)
+  const aiHighlightMap = new Map(); // clipId -> { range, color, clip }
+  const aiFreshRanges = new Set();  // Set<Range> for fresh flash
+
+  function getAiHighlightName(color) {
+    const norm = ReMarkStorage.normalizeMarkColor(color || activeMarkColor);
+    for (const [key, val] of Object.entries(ReMarkStorage.MARK_COLOR_PRESETS)) {
+      if (val.toUpperCase() === norm) {
+        return `remark-ai-${key.replace(/_/g, '-')}`;
+      }
+    }
+    return 'remark-ai-trail-orange';
+  }
+
+  function syncAiHighlightsToCSS() {
+    if (typeof CSS === 'undefined' || !CSS.highlights || typeof Highlight === 'undefined') return;
+    try {
+      const groups = new Map();
+      aiHighlightMap.forEach(({ range, color }) => {
+        if (!range || !range.startContainer || !range.startContainer.isConnected) return;
+        const name = getAiHighlightName(color);
+        if (!groups.has(name)) groups.set(name, []);
+        groups.get(name).push(range);
+      });
+
+      const allNames = [
+        'remark-ai-highlight',
+        'remark-ai-trail-orange',
+        'remark-ai-blazing-amber',
+        'remark-ai-signal-coral',
+        'remark-ai-atlas-blue',
+        'remark-ai-beacon-yellow',
+        'remark-ai-harbor-mist'
+      ];
+
+      allNames.forEach((name) => {
+        const ranges = groups.get(name);
+        if (ranges && ranges.length > 0) {
+          CSS.highlights.set(name, new Highlight(...ranges));
+        } else {
+          CSS.highlights.delete(name);
+        }
+      });
+
+      const validFresh = Array.from(aiFreshRanges).filter((r) => r.startContainer && r.startContainer.isConnected);
+      if (validFresh.length > 0) {
+        CSS.highlights.set('remark-ai-fresh', new Highlight(...validFresh));
+      } else {
+        CSS.highlights.delete('remark-ai-fresh');
+      }
+    } catch (err) {
+      console.warn('[ReMark] CSS.highlights sync warning:', err);
+    }
+  }
+
+  function highlightAiEditorRange(range, clip, fresh = false) {
+    if (!range || !clip) return;
+    const cloned = range.cloneRange();
+    aiHighlightMap.set(clip.id, {
+      range: cloned,
+      color: clip.color || activeMarkColor,
+      clip
+    });
+
+    if (fresh) {
+      aiFreshRanges.add(cloned);
+      syncAiHighlightsToCSS();
+      setTimeout(() => {
+        aiFreshRanges.delete(cloned);
+        syncAiHighlightsToCSS();
+      }, 650);
+    } else {
+      syncAiHighlightsToCSS();
+    }
+    if (clip.note) setClipNoteIndicator(clip.id);
+    resolvePendingClipLocation(clip.id);
+  }
+
+  function hasAiHighlight(clipId) {
+    const entry = aiHighlightMap.get(clipId);
+    if (!entry || !entry.range) return false;
+    if (entry.range.startContainer && !entry.range.startContainer.isConnected) {
+      removeAiHighlight(clipId);
+      return false;
+    }
+    return true;
+  }
+
+  function removeAiHighlight(clipId) {
+    if (!aiHighlightMap.has(clipId)) return;
+    const entry = aiHighlightMap.get(clipId);
+    if (entry && entry.range) aiFreshRanges.delete(entry.range);
+    aiHighlightMap.delete(clipId);
+    document.querySelector(`.remark-ai-anchor-mark[data-clip-id="${clipId}"]`)?.remove();
+    syncAiHighlightsToCSS();
+  }
+
+  function clearAllAiHighlights() {
+    aiHighlightMap.clear();
+    aiFreshRanges.clear();
+    document.querySelectorAll('.remark-ai-anchor-mark').forEach((el) => el.remove());
+    syncAiHighlightsToCSS();
+  }
+
+  function getAiHostContainer(range) {
+    if (!range || !range.startContainer) return document.body;
+    const node = range.startContainer;
+    const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    const container = el?.closest?.('.cm-editor, [data-writing-block], pre, .ProseMirror');
+    return container || el?.parentElement || document.body;
+  }
+
+  function ensureAiAnchorMark(clipId) {
+    let el = document.querySelector(`.remark-ai-anchor-mark[data-clip-id="${clipId}"]`);
+    const entry = aiHighlightMap.get(clipId);
+    if (!entry || !entry.range) return el;
+    const host = getAiHostContainer(entry.range);
+    if (!host) return el;
+
+    if (!el || el.parentElement !== host) {
+      el?.remove();
+      el = document.createElement('span');
+      el.className = 'remark-ai-anchor-mark';
+      el.setAttribute('data-clip-id', clipId);
+      if (getComputedStyle(host).position === 'static') {
+        host.style.position = 'relative';
+      }
+      host.appendChild(el);
+    }
+    syncAiAnchorPosition(clipId, el, entry.range);
+    return el;
+  }
+
+  function syncAiAnchorPosition(clipId, el, range) {
+    if (!el || !range || !range.startContainer || !range.startContainer.isConnected) return;
+    const host = el.parentElement;
+    if (!host) return;
+    try {
+      const rects = range.getClientRects();
+      const firstRect = rects[0] || range.getBoundingClientRect();
+      const lastRect = rects[rects.length - 1] || firstRect;
+      const hostRect = host.getBoundingClientRect();
+
+      if (lastRect && lastRect.width > 0 && hostRect.width > 0) {
+        // If the highlighted text is scrolled out of the container bounds, hide the anchor
+        const isScrolledOut = (
+          lastRect.bottom < hostRect.top - 8 ||
+          lastRect.top > hostRect.bottom + 8 ||
+          lastRect.right < hostRect.left - 8 ||
+          lastRect.left > hostRect.right + 8
+        );
+        if (isScrolledOut) {
+          el.style.display = 'none';
+          return;
+        }
+        el.style.display = 'block';
+
+        // Host-relative coordinates: naturally moves with the code block container during scroll!
+        const left = Math.round(lastRect.right - hostRect.left);
+        const top = Math.round(lastRect.bottom - hostRect.top);
+        el.style.left = `${left}px`;
+        el.style.top = `${top}px`;
+
+        const noteControl = el.querySelector('.remark-note-control');
+        if (noteControl && firstRect) {
+          const dx = Math.round(firstRect.left - lastRect.right) - 6;
+          const dy = Math.round(firstRect.top - lastRect.bottom) - 14;
+          noteControl.style.transform = `translate(${dx}px, ${dy}px)`;
+          const noteHint = el.querySelector('.remark-note-hint');
+          if (noteHint) {
+            noteHint.style.transform = `translate(${dx}px, ${dy - 28}px)`;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  function syncAllAiAnchors() {
+    aiHighlightMap.forEach((entry, clipId) => {
+      const el = document.querySelector(`.remark-ai-anchor-mark[data-clip-id="${clipId}"]`);
+      if (el) syncAiAnchorPosition(clipId, el, entry.range);
+    });
+  }
+
+  // Use capture phase so scroll events on internal scrollbars (like CodeMirror .cm-scroller) trigger repositioning
+  window.addEventListener('scroll', syncAllAiAnchors, { capture: true, passive: true });
+  window.addEventListener('resize', syncAllAiAnchors, { passive: true });
+
+  function findAiHighlightAtPoint(clientX, clientY) {
+    if (aiHighlightMap.size === 0) return null;
+    for (const [clipId, entry] of aiHighlightMap.entries()) {
+      if (!entry.range || !entry.range.startContainer.isConnected) continue;
+      const rects = entry.range.getClientRects();
+      for (let i = 0; i < rects.length; i++) {
+        const r = rects[i];
+        if (
+          clientX >= r.left - 2 &&
+          clientX <= r.right + 2 &&
+          clientY >= r.top - 2 &&
+          clientY <= r.bottom + 2
+        ) {
+          return { clipId, entry };
+        }
+      }
+    }
+    return null;
+  }
+
+  let activeAiHoverClipId = null;
+  let aiHoverHideTimer = null;
+
+  document.addEventListener('mousemove', (event) => {
+    if (aiHighlightMap.size === 0) return;
+    if (event.target.closest?.('.remark-mark-actions, .remark-mark-actions-anchor, .remark-note-control, .remark-quick-note, .remark-ai-anchor-mark')) return;
+    const hit = findAiHighlightAtPoint(event.clientX, event.clientY);
+    if (hit) {
+      clearTimeout(aiHoverHideTimer);
+      if (activeAiHoverClipId !== hit.clipId) {
+        if (activeAiHoverClipId) scheduleHighlightActionHide(activeAiHoverClipId, 0);
+        activeAiHoverClipId = hit.clipId;
+        scheduleHighlightActionShow(hit.clipId);
+      }
+    } else if (activeAiHoverClipId) {
+      clearTimeout(aiHoverHideTimer);
+      aiHoverHideTimer = setTimeout(() => {
+        if (activeAiHoverClipId) {
+          scheduleHighlightActionHide(activeAiHoverClipId);
+          activeAiHoverClipId = null;
+        }
+      }, 350);
+    }
+  }, { passive: true });
+
+  document.addEventListener('click', (event) => {
+    if (aiHighlightMap.size === 0) return;
+    if (event.target.closest?.('.remark-mark-actions, .remark-mark-actions-anchor, .remark-note-control, .remark-quick-note, .remark-ai-anchor-mark')) return;
+    const hit = findAiHighlightAtPoint(event.clientX, event.clientY);
+    if (hit) {
+      event.preventDefault();
+      event.stopPropagation();
+      showHighlightActions(hit.clipId, 4000);
+    }
+  }, true);
+
+  function performLocateAnimationForRange(range, clipId) {
+    hidePageToast();
+    if (clipId) {
+      try { chrome.runtime?.sendMessage({ action: 'SOURCE_CLIP_LOCATED', clipId }); } catch (_) {}
+    }
+    const anchor = ensureAiAnchorMark(clipId);
+    const focus = () => {
+      aiFreshRanges.add(range);
+      if (anchor) {
+        anchor.classList.remove('remark-locate-pulse');
+        void anchor.offsetWidth;
+        anchor.classList.add('remark-locate-pulse');
+        setTimeout(() => anchor.classList.remove('remark-locate-pulse'), 2200);
+      }
+      syncAiHighlightsToCSS();
+      setTimeout(() => {
+        aiFreshRanges.delete(range);
+        syncAiHighlightsToCSS();
+      }, 2200);
+    };
+    try {
+      const host = getAiHostContainer(range);
+      const container = (host && host !== document.body) ? host : (range.startContainer.parentElement || range.startContainer);
+      container?.scrollIntoView?.({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    } catch (_) {
+      const rect = range.getBoundingClientRect();
+      window.scrollTo({ top: Math.max(0, window.scrollY + rect.top - window.innerHeight * 0.4), behavior: 'smooth' });
+    }
+    focus();
+  }
+
   function isAiEditorRange(range) {
     const node = range?.commonAncestorContainer;
     const el = node && node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
@@ -1028,7 +1406,10 @@
     );
   }
   function highlightDOMRange(range, clip, fresh = false) {
-    if (isAiEditorRange(range)) return;
+    if (isAiEditorRange(range)) {
+      highlightAiEditorRange(range, clip, fresh);
+      return;
+    }
     const markWithFresh = (mark) => {
       if (fresh) {
         mark.classList.add('remark-fresh');
@@ -1100,18 +1481,51 @@
       }
     }
   }
-  async function setClipNoteIndicator(clipId) {
-    const marks = [...document.querySelectorAll(`mark[data-clip-id="${clipId}"]`)];
-    marks.forEach((mark) => {
-      mark.classList.remove('has-note');
-      mark.querySelectorAll('.remark-note-control, .remark-note-hint, .remark-mark-actions, .remark-mark-actions-anchor').forEach((node) => node.remove());
-    });
-    const clip = (await ReMarkStorage.getClips()).find((item) => item.id === clipId);
-    if (!clip?.note?.trim()) return;
-    const target = marks.at(0);
-    if (!target) return;
-    target.classList.add('has-note');
-    attachNoteControl(target, clip);
+  async function setClipNoteIndicator(clipId, clipObject = null) {
+    const applyIndicator = (clip) => {
+      const noteText = String(clip?.note || '').trim();
+      const marks = [...document.querySelectorAll(`mark[data-clip-id="${clipId}"]`)];
+      const aiAnchor = document.querySelector(`.remark-ai-anchor-mark[data-clip-id="${clipId}"]`);
+      const target = marks.at(0) || (aiHighlightMap.has(clipId) ? ensureAiAnchorMark(clipId) : null);
+
+      if (!target || !noteText) {
+        marks.forEach((mark) => {
+          mark.classList.remove('has-note');
+          mark.querySelectorAll('.remark-note-control, .remark-note-hint').forEach((node) => node.remove());
+        });
+        if (aiAnchor) {
+          aiAnchor.classList.remove('has-note');
+          aiAnchor.querySelectorAll('.remark-note-control, .remark-note-hint').forEach((node) => node.remove());
+        }
+        return;
+      }
+
+      target.classList.add('has-note');
+      const existingControl = target.querySelector('.remark-note-control');
+      const existingHint = target.querySelector('.remark-note-hint');
+      if (existingControl && existingHint && existingHint.textContent === noteText) {
+        if (aiAnchor && aiHighlightMap.has(clipId)) {
+          syncAiAnchorPosition(clipId, aiAnchor, aiHighlightMap.get(clipId).range);
+        }
+        return;
+      }
+
+      if (existingControl) existingControl.remove();
+      if (existingHint) existingHint.remove();
+      attachNoteControl(target, clip);
+      if (aiAnchor && aiHighlightMap.has(clipId)) {
+        syncAiAnchorPosition(clipId, aiAnchor, aiHighlightMap.get(clipId).range);
+      }
+    };
+
+    if (clipObject) {
+      applyIndicator(clipObject);
+      return;
+    }
+
+    const clips = await ReMarkStorage.getClips();
+    const clip = clips.find((item) => item.id === clipId);
+    applyIndicator(clip);
   }
   function attachNoteControl(mark, clip) {
     const note = String(clip?.note || '').trim();
@@ -1156,7 +1570,12 @@
     highlightActionShowTimers.set(clipId, window.setTimeout(() => showHighlightActions(clipId), HIGHLIGHT_ACTION_SHOW_DELAY));
   }
   function getHighlightActionAnchor(clipId) {
-    return [...document.querySelectorAll(`mark[data-clip-id="${clipId}"]`)].at(-1) || null;
+    const domMark = [...document.querySelectorAll(`mark[data-clip-id="${clipId}"]`)].at(-1);
+    if (domMark) return domMark;
+    if (typeof aiHighlightMap !== 'undefined' && aiHighlightMap.has(clipId)) {
+      return ensureAiAnchorMark(clipId);
+    }
+    return null;
   }
   function cancelHighlightActionHide(clipId) {
     const timer = highlightActionTimers.get(clipId);
@@ -1255,23 +1674,27 @@
     const force = Boolean(options.force);
     const clips = await ReMarkStorage.getClips();
     const currentUrl = window.location.href;
+    let modified = false;
     for (const clip of clips) {
-      const isMatch = (clip.postUrl && (samePageUrl(clip.postUrl, currentUrl) || sameGenericPostUrl(clip.postUrl, currentUrl))) || (clip.feedUrl && samePageUrl(clip.feedUrl, currentUrl)) || ((clip.pageUrl || clip.url) && samePageUrl(clip.pageUrl || clip.url, currentUrl));
+      const clipTargetUrl = clip.postUrl || clip.pageUrl || clip.url;
+      const isMatch = (clipTargetUrl && (samePageUrl(clipTargetUrl, currentUrl) || sameGenericPostUrl(clipTargetUrl, currentUrl))) || (clip.feedUrl && samePageUrl(clip.feedUrl, currentUrl));
       if (!isMatch) continue;
       if (!force && Number.isFinite(Number(clip.sourcePosition)) && Number.isFinite(Number(clip.sourcePositionX))) continue;
       const mark = [...document.querySelectorAll(`mark[data-clip-id="${clip.id}"]`)].at(-1);
-      if (!mark) continue;
-      const rect = mark.getBoundingClientRect();
+      const aiEntry = typeof aiHighlightMap !== 'undefined' ? aiHighlightMap.get(clip.id) : null;
+      const rect = mark ? mark.getBoundingClientRect() : (aiEntry && aiEntry.range ? aiEntry.range.getBoundingClientRect() : null);
+      if (!rect) continue;
       const nextPosition = Math.round(rect.top + window.scrollY);
       const nextPositionX = Math.round(rect.left);
       const unchanged = Number.isFinite(Number(clip.sourcePosition)) && Number.isFinite(Number(clip.sourcePositionX)) && Number(clip.sourcePosition) === nextPosition && Number(clip.sourcePositionX) === nextPositionX;
       if (unchanged) continue;
-      await ReMarkStorage.updateClip(clip.id, {
-        sourcePosition: nextPosition,
-        sourcePositionX: nextPositionX
-      });
+      clip.sourcePosition = nextPosition;
+      clip.sourcePositionX = nextPositionX;
+      modified = true;
     }
-    notifyStorageUpdated();
+    if (modified) {
+      await ReMarkStorage.set(ReMarkStorage.KEYS.CLIPS, clips);
+    }
   }
   // Two URLs belong to the same page when their host (sans www) and path
   // match; hash, query strings and trailing slashes are ignored. If the
@@ -1293,7 +1716,13 @@
     try {
       const urlA = new URL(a);
       const urlB = new URL(b);
-      if (urlA.hostname.replace(/^www\./, '') !== urlB.hostname.replace(/^www\./, '')) return false;
+      const hostA = urlA.hostname.replace(/^www\./, '');
+      const hostB = urlB.hostname.replace(/^www\./, '');
+      const isChatGPTDomain = (h) => h.endsWith('chatgpt.com') || h.endsWith('openai.com');
+      if (hostA !== hostB && !(isChatGPTDomain(hostA) && isChatGPTDomain(hostB))) return false;
+      const cMatchA = urlA.pathname.match(/^(\/(?:g\/[^/]+\/)?c\/[a-f0-9-]+)/i);
+      const cMatchB = urlB.pathname.match(/^(\/(?:g\/[^/]+\/)?c\/[a-f0-9-]+)/i);
+      if (cMatchA && cMatchB) return cMatchA[1].toLowerCase() === cMatchB[1].toLowerCase();
       const xMatchA = urlA.pathname.match(/^(\/[a-zA-Z0-9_]+\/status\/\d+)/);
       const xMatchB = urlB.pathname.match(/^(\/[a-zA-Z0-9_]+\/status\/\d+)/);
       if (xMatchA && xMatchB) return xMatchA[1] === xMatchB[1];
@@ -1312,19 +1741,36 @@
   async function restorePageHighlights() {
     const clips = await ReMarkStorage.getClips();
     const currentUrl = window.location.href;
+    const isChatGPT = /(^|\.)(chatgpt\.com|openai\.com)$/i.test(window.location.hostname);
     loadedClipsForPage = clips.filter((clip) => {
-      if (clip.postUrl && (samePageUrl(clip.postUrl, currentUrl) || sameGenericPostUrl(clip.postUrl, currentUrl))) return true;
+      const clipTargetUrl = clip.postUrl || clip.pageUrl || clip.url;
+      if (clipTargetUrl && (samePageUrl(clipTargetUrl, currentUrl) || sameGenericPostUrl(clipTargetUrl, currentUrl))) return true;
       if (clip.feedUrl && samePageUrl(clip.feedUrl, currentUrl)) return true;
-      return (clip.pageUrl || clip.url) && samePageUrl(clip.pageUrl || clip.url, currentUrl);
+      return false;
     });
+    if (isChatGPT && loadedClipsForPage.length > 0) {
+      console.log('[ReMark ChatGPT Diagnostic]', {
+        stage: 'SOURCE_URL_MATCHED',
+        url: currentUrl,
+        matchedClipsCount: loadedClipsForPage.length,
+        clipIds: loadedClipsForPage.map((c) => c.id)
+      });
+    }
     let allDone = true;
     for (const clip of loadedClipsForPage) {
+      const aiEntry = typeof aiHighlightMap !== 'undefined' ? aiHighlightMap.get(clip.id) : null;
+      if (aiEntry) {
+        aiEntry.clip = clip;
+      }
       if (clip.text && !highlightTextInBody(clip)) allDone = false;
+      void setClipNoteIndicator(clip.id, clip);
     }
     return allDone;
   }
   function highlightTextInBody(clip) {
+    const isChatGPT = /(^|\.)(chatgpt\.com|openai\.com)$/i.test(window.location.hostname);
     if (document.querySelector(`mark[data-clip-id="${clip.id}"]`)) return true;
+    if (typeof hasAiHighlight !== 'undefined' && hasAiHighlight(clip.id)) return true;
     const textSegments = [];
     let text = '';
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
@@ -1339,36 +1785,124 @@
       text += node.nodeValue;
       textSegments.push({ node, start, end: text.length });
     }
-    let startIndex = text.indexOf(clip.text);
-    let endIndex = startIndex + clip.text.length;
-    if (startIndex < 0) {
-      const normalizedClipText = String(clip.text).replace(/\s+/g, '');
-      const originalIndexes = [];
-      let normalizedPageText = '';
-      for (let index = 0; index < text.length; index += 1) {
-        if (/\s/.test(text[index])) continue;
-        originalIndexes.push(index);
-        normalizedPageText += text[index];
+
+    const clipText = String(clip.text || '').replace(/\r\n/g, '\n');
+    if (!clipText) return false;
+    const candidates = [];
+    let passUsed = null;
+
+    const buildRange = (sIdx, eIdx) => {
+      const start = textSegments.find((segment) => sIdx >= segment.start && sIdx < segment.end);
+      const end = textSegments.find((segment) => eIdx > segment.start && eIdx <= segment.end);
+      if (!start || !end) return null;
+      try {
+        const range = document.createRange();
+        range.setStart(start.node, sIdx - start.start);
+        range.setEnd(end.node, eIdx - end.start);
+        return range;
+      } catch (_) {
+        return null;
       }
-      const normalizedStart = normalizedClipText ? normalizedPageText.indexOf(normalizedClipText) : -1;
-      if (normalizedStart < 0) return false;
-      startIndex = originalIndexes[normalizedStart];
-      endIndex = originalIndexes[normalizedStart + normalizedClipText.length - 1] + 1;
+    };
+
+    // 1. Direct text matches
+    let pos = 0;
+    while ((pos = text.indexOf(clipText, pos)) !== -1) {
+      const r = buildRange(pos, pos + clipText.length);
+      if (r) candidates.push(r);
+      pos += 1;
     }
-    const start = textSegments.find((segment) => startIndex >= segment.start && startIndex < segment.end);
-    const end = textSegments.find((segment) => endIndex > segment.start && endIndex <= segment.end);
-    if (!start || !end) return false;
-    const range = document.createRange();
-    range.setStart(start.node, startIndex - start.start);
-    range.setEnd(end.node, endIndex - end.start);
+    if (candidates.length > 0) passUsed = 'Pass 1 (Direct)';
+
+    // 2. Flexible whitespace regex matches (e.g. newlines / spaces across Markdown nodes)
+    if (candidates.length === 0 && /\s/.test(clipText)) {
+      try {
+        const pattern = clipText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+        const rx = new RegExp(pattern, 'g');
+        let match;
+        while ((match = rx.exec(text)) !== null) {
+          const r = buildRange(match.index, match.index + match[0].length);
+          if (r) candidates.push(r);
+          if (rx.lastIndex === match.index) rx.lastIndex++;
+        }
+      } catch (_) {}
+      if (candidates.length > 0) passUsed = 'Pass 2 (Flexible Regex)';
+    }
+
+    // 3. Normalized whitespace matches if direct and regex matches failed
+    if (candidates.length === 0) {
+      const normalizedClipText = clipText.replace(/\s+/g, '');
+      if (normalizedClipText) {
+        const originalIndexes = [];
+        let normalizedPageText = '';
+        for (let index = 0; index < text.length; index += 1) {
+          if (/\s/.test(text[index])) continue;
+          originalIndexes.push(index);
+          normalizedPageText += text[index];
+        }
+        let normPos = 0;
+        while ((normPos = normalizedPageText.indexOf(normalizedClipText, normPos)) !== -1) {
+          const normStart = normPos;
+          const normEnd = normPos + normalizedClipText.length - 1;
+          normPos += 1;
+          const sIdx = originalIndexes[normStart];
+          const eIdx = originalIndexes[normEnd] + 1;
+          const r = buildRange(sIdx, eIdx);
+          if (r) candidates.push(r);
+        }
+      }
+      if (candidates.length > 0) passUsed = 'Pass 3 (Normalized Whitespace)';
+    }
+
+    if (candidates.length === 0) {
+      if (isChatGPT) {
+        console.warn('[ReMark ChatGPT Diagnostic]', {
+          stage: 'TEXT_MATCH_FAILED',
+          clipId: clip.id,
+          searchedText: clipText.slice(0, 60),
+          reason: 'TEXT_NOT_FOUND_IN_WALKER_NODES'
+        });
+      }
+      return false;
+    }
+
+    if (isChatGPT) {
+      console.log('[ReMark ChatGPT Diagnostic]', {
+        stage: 'TEXT_MATCHED',
+        clipId: clip.id,
+        passUsed,
+        matchedText: clipText.slice(0, 60),
+        candidatesCount: candidates.length
+      });
+    }
+
+    if (candidates.length === 0) return false;
+
+    // Pick candidate closest to clip.sourcePosition (scroll Y offset)
+    let bestRange = candidates[0];
+    const targetY = Number.isFinite(Number(clip.sourcePosition)) ? Number(clip.sourcePosition) : null;
+    if (targetY !== null && candidates.length > 1) {
+      let minDistance = Infinity;
+      for (const cand of candidates) {
+        const rect = cand.getBoundingClientRect();
+        const candY = Math.round(rect.top + window.scrollY);
+        const dist = Math.abs(candY - targetY);
+        if (dist < minDistance) {
+          minDistance = dist;
+          bestRange = cand;
+        }
+      }
+    }
+
     if (!Number.isFinite(Number(clip.sourcePosition)) || !Number.isFinite(Number(clip.sourcePositionX))) {
-      const rect = range.getBoundingClientRect();
+      const rect = bestRange.getBoundingClientRect();
       void ReMarkStorage.updateClip(clip.id, {
         sourcePosition: Math.round(rect.top + window.scrollY),
         sourcePositionX: Math.round(rect.left)
       });
     }
-    highlightDOMRange(range, clip);
+
+    highlightDOMRange(bestRange, clip);
     return true;
   }
   // ========= Video Timestamp Marks (YouTube & Bilibili) =========

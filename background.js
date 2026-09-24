@@ -526,13 +526,6 @@ function installBiliSubtitleCaptureInMainWorld() {
   } catch (_) {}
 }
 
-chrome.webNavigation.onErrorOccurred.addListener((details) => {
-  if (details.frameId !== 0) return;
-  const pending = pendingSourceNavigations.get(details.tabId);
-  if (!pending) return;
-  pendingSourceNavigations.delete(details.tabId);
-  chrome.runtime.sendMessage({ action: 'SOURCE_UNAVAILABLE', clipId: pending.clipId, url: pending.url }).catch(() => {});
-});
 chrome.tabs.onRemoved.addListener((tabId) => pendingSourceNavigations.delete(tabId));
 // Handle messages from content script or sidepanel
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

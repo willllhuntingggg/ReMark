@@ -1,5 +1,5 @@
 {
-  "extension_name": { "message": "ReMark — Mark it now. Find it later." },
-  "extension_description": { "message": "Save web highlights, notes, and video timestamps locally." },
+  "extension_name": { "message": "ReMark - Web Highlighter: Highlight Text & Mark Video" },
+  "extension_description": { "message": "Highlight web text and mark video timestamps easily. Clean side panel manager with instant Markdown export. Private & local-first." },
   "open_sidepanel": { "message": "Open ReMark side panel" }
 }

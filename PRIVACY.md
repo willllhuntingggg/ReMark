@@ -64,4 +64,4 @@ If ReMark's data practices change materially, this policy will be updated before
 
 ## Contact
 
-For privacy questions about ReMark, contact: **xuzijian2222@gmail.com**.
+For privacy questions or feedback about ReMark, contact: **xuzijian2222@gmail.com** or connect on X: [**@d_jay_walker**](https://x.com/d_jay_walker).

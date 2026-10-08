@@ -55,7 +55,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const feedbackFallback = $('#feedback-fallback');
   const feedbackFallbackBody = $('#feedback-fallback-body');
   const feedbackCopyEmailButton = $('#feedback-copy-email');
+  const contactXLink = $('#contact-x-open');
+  const feedbackXLink = $('#feedback-x-link');
   const FEEDBACK_RECIPIENT = 'xuzijian2222@gmail.com';
+  const X_PROFILE_URL = 'https://x.com/d_jay_walker';
   const GMAIL_COMPOSE_URL = 'https://mail.google.com/mail/u/0/';
   const REPLAY_CONTENT_SCRIPT_FILES = ['lib/i18n.js', 'lib/storage.js', 'content/content.js'];
   const CONTENT_STYLE_FILE = 'content/content.css';
@@ -515,6 +518,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  const openXProfile = (event) => {
+    if (event) event.preventDefault();
+    void chrome.tabs.create({ url: X_PROFILE_URL, active: true });
+  };
+  contactXLink?.addEventListener('click', openXProfile);
+  feedbackXLink?.addEventListener('click', openXProfile);
+
   $('#replay-tutorial').addEventListener('click', () => { void replayTutorial(); });
   feedbackOpenButton.addEventListener('click', openFeedback);
   feedbackCloseButton.addEventListener('click', () => closeFeedback());
@@ -675,7 +685,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const urlA = new URL(a);
       const urlB = new URL(b);
-      if (urlA.hostname.replace(/^www\./, '') !== urlB.hostname.replace(/^www\./, '')) return false;
+      const hostA = urlA.hostname.replace(/^www\./, '').toLowerCase();
+      const hostB = urlB.hostname.replace(/^www\./, '').toLowerCase();
+      // ChatGPT has used both chat.openai.com and chatgpt.com. Treat the two
+      // hosts as one app when the conversation pathname is the same.
+      const isChatGPTHost = (host) => host === 'chatgpt.com' || host.endsWith('.chatgpt.com') || host === 'openai.com' || host.endsWith('.openai.com');
+      if (hostA !== hostB && !(isChatGPTHost(hostA) && isChatGPTHost(hostB))) return false;
+      const cMatchA = urlA.pathname.match(/^(\/(?:g\/[^/]+\/)?c\/[a-f0-9-]+)/i);
+      const cMatchB = urlB.pathname.match(/^(\/(?:g\/[^/]+\/)?c\/[a-f0-9-]+)/i);
+      if (cMatchA && cMatchB) return cMatchA[1].toLowerCase() === cMatchB[1].toLowerCase();
       const xMatchA = urlA.pathname.match(/^(\/[a-zA-Z0-9_]+\/status\/\d+)/);
       const xMatchB = urlB.pathname.match(/^(\/[a-zA-Z0-9_]+\/status\/\d+)/);
       if (xMatchA && xMatchB) return xMatchA[1] === xMatchB[1];

@@ -45,4 +45,19 @@ assert.match(css, /\.feedback-actions\[hidden\] \{[\s\S]*display: none/);
 assert.match(css, /\.feedback-modal \{[\s\S]*overflow-y: auto/);
 assert.match(css, /\.feedback-dialog \{[\s\S]*max-height: calc\(100dvh - 28px\)[\s\S]*overflow-y: auto/);
 
+assert.match(html, /id="contact-x-open"[\s\S]*href="https:\/\/x\.com\/d_jay_walker"/);
+assert.match(html, /id="feedback-x-link"[\s\S]*href="https:\/\/x\.com\/d_jay_walker"/);
+
+assert.match(sidepanel, /const X_PROFILE_URL = 'https:\/\/x\.com\/d_jay_walker'/);
+assert.match(sidepanel, /contactXLink\?\.addEventListener\('click', openXProfile\)/);
+assert.match(sidepanel, /feedbackXLink\?\.addEventListener\('click', openXProfile\)/);
+
+assert.match(i18n, /contact_x: '联系 X\.com'/);
+assert.match(i18n, /contact_x: 'Contact on X\.com'/);
+assert.match(i18n, /feedback_x_link: '在 X\.com \(@d_jay_walker\) 上联系作者'/);
+
+assert.match(css, /\.contact-x-action \{/);
+assert.match(css, /\.feedback-x-prompt \{/);
+assert.match(css, /\.feedback-x-link \{/);
+
 console.log('feedback-mvp.test.js: all assertions passed');

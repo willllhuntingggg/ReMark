@@ -650,6 +650,14 @@
         if (finalMark || (finalAi && finalAi.range)) {
           pendingClipLocations.add(clipId);
           resolvePendingClipLocation(clipId);
+        } else if (isChatGPTHost()) {
+          Promise.resolve(startChatGptVirtualizedScrollHunt(clipId)).then((found) => {
+            if (found || !pendingClipLocations.has(clipId)) return;
+            pendingClipLocations.delete(clipId);
+            pendingClipStartTimes.delete(clipId);
+            if (pendingClipLocations.size === 0) stopLocatingObserver();
+            reportSourceUnavailable(clipId, { isLoadedPage: true });
+          });
         } else {
           pendingClipLocations.delete(clipId);
           pendingClipStartTimes.delete(clipId);
@@ -668,6 +676,37 @@
         }
       }, LOCATE_CLIP_RETRY_DELAYS[delayIndex]);
     });
+  }
+  // ChatGPT virtualizes long conversations: only a window of messages near the
+  // current scroll position is mounted. A Mark saved in an off-screen reply is
+  // therefore absent from the DOM on reload, so the text walker cannot find it.
+  // Walk the real scroll container top-to-bottom to force each message to mount,
+  // re-running restoration after every step until the clip is found.
+  async function startChatGptVirtualizedScrollHunt(clipId) {
+    const scrollRoot = getPageScrollRoot();
+    if (!scrollRoot || typeof scrollRoot.scrollHeight !== 'number' || typeof scrollRoot.clientHeight !== 'number') return false;
+    const maxScroll = Math.max(0, scrollRoot.scrollHeight - scrollRoot.clientHeight);
+    if (maxScroll <= 0) return false;
+    const step = Math.max(360, Math.floor((window.innerHeight || 800) * 0.9));
+    const originalTop = scrollRoot.scrollTop || 0;
+    const stops = [];
+    for (let y = 0; y < maxScroll; y += step) stops.push(Math.min(y, maxScroll));
+    stops.push(maxScroll);
+    const maxSteps = 40;
+    for (let i = 0; i < stops.length && i < maxSteps; i += 1) {
+      if (!pendingClipLocations.has(clipId)) return true;
+      scrollRoot.scrollTop = stops[i];
+      await new Promise((resolve) => setTimeout(resolve, 280));
+      await restorePageHighlights();
+      const mark = document.querySelector(`mark[data-clip-id="${clipId}"]`);
+      const aiEntry = typeof aiHighlightMap !== 'undefined' ? aiHighlightMap.get(clipId) : null;
+      if (mark || (aiEntry && aiEntry.range)) {
+        resolvePendingClipLocation(clipId);
+        return true;
+      }
+    }
+    if (typeof scrollRoot.scrollTop === 'number') scrollRoot.scrollTop = originalTop;
+    return false;
   }
   function reportSourceUnavailable(clipId, options = {}) {
     if (document.readyState !== 'complete') {
@@ -714,7 +753,13 @@
       mark.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
     } catch (_) {
       const rect = mark.getBoundingClientRect();
-      window.scrollTo({ top: Math.max(0, window.scrollY + rect.top - window.innerHeight * 0.4), behavior: 'smooth' });
+      const scrollRoot = getPageScrollRoot();
+      const isDocumentScroll = !scrollRoot || scrollRoot === document.scrollingElement || scrollRoot === document.documentElement || scrollRoot === document.body;
+      if (isDocumentScroll) {
+        window.scrollTo({ top: Math.max(0, (window.scrollY || 0) + rect.top - window.innerHeight * 0.4), behavior: 'smooth' });
+      } else {
+        scrollRoot.scrollTop = Math.max(0, (scrollRoot.scrollTop || 0) + rect.top - scrollRoot.clientHeight * 0.4);
+      }
     }
     focus();
   }
@@ -794,7 +839,7 @@
       feedUrl: postUrl ? window.location.href : null,
       pageTitle: resolvedTitle,
       text,
-      sourcePosition: range ? Math.round(range.getBoundingClientRect().top + window.scrollY) : null,
+      sourcePosition: range ? absoluteYInScrollRoot(getPageScrollRoot(), range.getBoundingClientRect()) : null,
       sourcePositionX: range ? Math.round(range.getBoundingClientRect().left) : null,
       color: colorCode,
       note: ''
@@ -1684,7 +1729,7 @@
       const aiEntry = typeof aiHighlightMap !== 'undefined' ? aiHighlightMap.get(clip.id) : null;
       const rect = mark ? mark.getBoundingClientRect() : (aiEntry && aiEntry.range ? aiEntry.range.getBoundingClientRect() : null);
       if (!rect) continue;
-      const nextPosition = Math.round(rect.top + window.scrollY);
+      const nextPosition = absoluteYInScrollRoot(getPageScrollRoot(), rect);
       const nextPositionX = Math.round(rect.left);
       const unchanged = Number.isFinite(Number(clip.sourcePosition)) && Number.isFinite(Number(clip.sourcePositionX)) && Number(clip.sourcePosition) === nextPosition && Number(clip.sourcePositionX) === nextPositionX;
       if (unchanged) continue;
@@ -1735,13 +1780,50 @@
     } catch (_) {}
     return false;
   }
+  function isChatGPTHost() {
+    return /(^|\.)(chatgpt\.com|openai\.com)$/i.test(window.location.hostname);
+  }
+
+  // ChatGPT scrolls inside an overflow container while <html>/<body> stay fixed,
+  // so window.scrollY is always 0 and window.scrollTo is a no-op. Resolve the
+  // element that actually scrolls so position math and fallback scrolling work.
+  function getPageScrollRoot() {
+    const doc = document.scrollingElement || document.documentElement;
+    if (!isChatGPTHost()) return doc || document.body;
+    let best = null;
+    let bestDelta = 0;
+    try {
+      const all = document.querySelectorAll('div, main, section, article');
+      for (const el of all) {
+        let overflowY = '';
+        try { overflowY = getComputedStyle(el).overflowY; } catch (_) {}
+        if (!['auto', 'scroll', 'overlay'].includes(overflowY)) continue;
+        const delta = el.scrollHeight - el.clientHeight;
+        if (delta > bestDelta) { bestDelta = delta; best = el; }
+      }
+    } catch (_) {}
+    if (best && bestDelta > 40) return best;
+    if (doc && (doc.scrollHeight - doc.clientHeight) > 0) return doc;
+    return doc || document.body;
+  }
+
+  // Position within the scrollable content (document/container space), as
+  // opposed to the viewport-relative value getBoundingClientRect().top gives.
+  function absoluteYInScrollRoot(scrollRoot, rect) {
+    if (!rect) return null;
+    if (!scrollRoot || scrollRoot === document.scrollingElement || scrollRoot === document.documentElement || scrollRoot === document.body) {
+      return Math.round(rect.top + (window.scrollY || 0));
+    }
+    const rootRect = scrollRoot.getBoundingClientRect();
+    return Math.round(rect.top - rootRect.top + (scrollRoot.scrollTop || 0));
+  }
   // Restore page highlights from storage. Returns true when every clip for
   // this page is restored (or nothing is pending), which lets the caller
   // stop watching the DOM.
   async function restorePageHighlights() {
     const clips = await ReMarkStorage.getClips();
     const currentUrl = window.location.href;
-    const isChatGPT = /(^|\.)(chatgpt\.com|openai\.com)$/i.test(window.location.hostname);
+    const isChatGPT = isChatGPTHost();
     loadedClipsForPage = clips.filter((clip) => {
       const clipTargetUrl = clip.postUrl || clip.pageUrl || clip.url;
       if (clipTargetUrl && (samePageUrl(clipTargetUrl, currentUrl) || sameGenericPostUrl(clipTargetUrl, currentUrl))) return true;
@@ -1856,7 +1938,7 @@
 
     if (candidates.length === 0) {
       if (isChatGPT) {
-        console.warn('[ReMark ChatGPT Diagnostic]', {
+        console.log('[ReMark ChatGPT Diagnostic]', {
           stage: 'TEXT_MATCH_FAILED',
           clipId: clip.id,
           searchedText: clipText.slice(0, 60),
@@ -1885,7 +1967,7 @@
       let minDistance = Infinity;
       for (const cand of candidates) {
         const rect = cand.getBoundingClientRect();
-        const candY = Math.round(rect.top + window.scrollY);
+        const candY = absoluteYInScrollRoot(getPageScrollRoot(), rect);
         const dist = Math.abs(candY - targetY);
         if (dist < minDistance) {
           minDistance = dist;
@@ -1897,7 +1979,7 @@
     if (!Number.isFinite(Number(clip.sourcePosition)) || !Number.isFinite(Number(clip.sourcePositionX))) {
       const rect = bestRange.getBoundingClientRect();
       void ReMarkStorage.updateClip(clip.id, {
-        sourcePosition: Math.round(rect.top + window.scrollY),
+        sourcePosition: absoluteYInScrollRoot(getPageScrollRoot(), rect),
         sourcePositionX: Math.round(rect.left)
       });
     }

@@ -1,5 +1,5 @@
 {
-  "extension_name": { "message": "ReMark — 即刻标记，随时回顾" },
-  "extension_description": { "message": "在本地保存网页划线、笔记与视频时间点。" },
-  "open_sidepanel": { "message": "打开 ReMark 侧边栏" }
+  "extension_name": { "message": "ReMark - 網頁劃線高亮 & Markdown 標記剪藏" },
+  "extension_description": { "message": "輕鬆劃線高亮網頁文本、記錄影片時間點，在原生側邊欄中快速搜尋定位並導出 Markdown。純本地儲存，安全無打擾。" },
+  "open_sidepanel": { "message": "打開 ReMark 側邊欄" }
 }

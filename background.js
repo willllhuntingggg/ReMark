@@ -277,6 +277,11 @@ chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
   if (details.frameId !== 0) return;
   void syncActionIconForPage(details.tabId, details.url);
   void syncActivePagePanel(details.tabId, details.url);
+  // ChatGPT navigates with pushState/replaceState after the document has
+  // completed. Deliver pending Mark navigation on the final conversation URL
+  // as well as on the initial document completion event.
+  const pending = pendingSourceNavigations.get(details.tabId);
+  if (pending) deliverPendingSourceLocate(details.tabId, pending);
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
